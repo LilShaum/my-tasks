@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>My Tasks</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500&display=swap" rel="stylesheet"/>
+
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"/>
+
+  <!-- Your styles -->
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<canvas id="confetti"></canvas>
+
+<div class="wrap" id="wrap">
+
+  <!-- ── Main view ── -->
+  <div class="view" id="main-view">
+    <div class="top-meta">
+      <span class="date-lbl" id="date-lbl"></span>
+      <span class="pct-lbl" id="pct-lbl">0%</span>
+    </div>
+    <div class="prog-track"><div class="prog-fill" id="prog-fill" style="width:0"></div></div>
+
+    <div class="page-hdr">
+      <h1 class="page-title">My <em>tasks</em></h1>
+      <div class="hdr-right">
+        <span class="active-cnt" id="active-cnt">0 left</span>
+        <select class="sort-sel" onchange="setSortBy(this.value)" aria-label="Sort tasks">
+          <option value="added">Date added</option>
+          <option value="priority">Priority</option>
+          <option value="due">Due date</option>
+          <option value="alpha">A → Z</option>
+          <option value="status">Status</option>
+        </select>
+        <button class="hdr-btn" id="dark-btn" onclick="toggleDark()" title="Toggle dark mode" aria-label="Toggle dark mode">
+          <i class="ti ti-moon"></i>
+        </button>
+        <button class="hdr-btn" onclick="showView('stats')" title="Statistics" aria-label="Statistics">
+          <i class="ti ti-chart-bar"></i>
+        </button>
+        <button class="hdr-btn" onclick="showView('calendar')" title="Calendar" aria-label="Calendar">
+          <i class="ti ti-calendar-month"></i>
+        </button>
+        <button class="hdr-btn" onclick="showView('help')" title="Help" aria-label="Help">
+          <i class="ti ti-help"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="search-wrap">
+      <i class="ti ti-search si-icon"></i>
+      <input class="search-inp" id="search-inp" placeholder="Search tasks…" oninput="onSearch(this.value)" aria-label="Search"/>
+      <button class="si-clear" id="si-clear" onclick="clearSearch()" aria-label="Clear search">
+        <i class="ti ti-x"></i>
+      </button>
+    </div>
+
+    <div class="add-card">
+      <div class="add-top">
+        <input class="add-inp" id="new-inp" placeholder="What needs doing?" maxlength="200"/>
+        <button class="add-go" onclick="addTodo()" aria-label="Add task">
+          <i class="ti ti-arrow-up"></i>
+        </button>
+      </div>
+      <div class="add-div"></div>
+      <div class="add-opts" id="add-opts"></div>
+    </div>
+
+    <div class="backup-bar" id="backup-bar">
+      <i class="ti ti-device-floppy"></i>
+      <span id="backup-lbl">Auto-backup: off</span>
+      <button id="backup-link-btn"    class="backup-btn" onclick="linkBackupFile()">Link file</button>
+      <button id="backup-unlink-btn"  class="backup-btn" onclick="unlinkBackupFile()" style="display:none">Unlink</button>
+      <button id="backup-restore-btn" class="backup-btn" onclick="restoreFromFile()">Restore</button>
+    </div>
+
+    <div class="toolbar">
+      <div class="tabs">
+        <button class="tab act" onclick="setFilter('all',this)">All</button>
+        <button class="tab" onclick="setFilter('active',this)">Active</button>
+        <button class="tab" onclick="setFilter('done',this)">Done</button>
+      </div>
+      <button class="sel-btn" id="sel-btn" onclick="toggleSelectMode()">Select</button>
+    </div>
+
+    <div class="tag-strip" id="tag-strip"></div>
+
+    <div id="bulk-bar" style="display:none" class="bulk-bar">
+      <span id="bulk-lbl">0 selected</span>
+      <div class="bulk-acts">
+        <button class="bulk-btn b-comp" onclick="bulkComplete()">
+          <i class="ti ti-check"></i> Complete
+        </button>
+        <button class="bulk-btn b-del" onclick="bulkDelete()">
+          <i class="ti ti-trash"></i> Delete
+        </button>
+      </div>
+    </div>
+
+    <div class="todo-list" id="todo-list"></div>
+
+    <div class="ftr" id="ftr" style="display:none">
+      <span class="ftr-note" id="ftr-note"></span>
+      <button class="clr-btn" onclick="clearDone()">Clear completed</button>
+    </div>
+
+    <div class="toast-wrap" id="toast-wrap" style="display:none">
+      <div class="toast">
+        <span>Task deleted</span>
+        <button class="undo-btn" onclick="undoDelete()">Undo</button>
+      </div>
+    </div>
+
+    <div class="kb-bar">
+      <span class="kb-item"><span class="kbd">N</span> new task</span>
+      <span class="kb-item"><span class="kbd">/</span> search</span>
+      <span class="kb-item"><span class="kbd">S</span> stats</span>
+      <span class="kb-item"><span class="kbd">D</span> dark mode</span>
+      <span class="kb-item"><span class="kbd">?</span> help</span>
+      <span class="kb-item"><span class="kbd">Esc</span> back</span>
+    </div>
+  </div>
+
+  <!-- ── Stats view ── -->
+  <div class="view" id="stats-view" style="display:none">
+    <div class="help-hdr">
+      <h2 class="help-title">Statistics</h2>
+      <button class="help-back" onclick="showView('main')">
+        <i class="ti ti-arrow-left"></i> Back
+      </button>
+    </div>
+    <div id="stats-content"></div>
+  </div>
+
+  <!-- ── Calendar view ── -->
+  <div class="view" id="cal-view" style="display:none">
+    <div class="help-hdr">
+      <h2 class="help-title">Calendar</h2>
+      <div class="cal-nav">
+        <button class="cal-nav-btn" onclick="calPrev()" title="Previous month" aria-label="Previous month">
+          <i class="ti ti-chevron-left"></i>
+        </button>
+        <span class="cal-month-lbl" id="cal-month-lbl"></span>
+        <button class="cal-nav-btn" onclick="calNext()" title="Next month" aria-label="Next month">
+          <i class="ti ti-chevron-right"></i>
+        </button>
+      </div>
+      <button class="help-back" onclick="showView('main')">
+        <i class="ti ti-arrow-left"></i> Back
+      </button>
+    </div>
+    <div id="cal-content"></div>
+  </div>
+
+  <!-- ── Help view ── -->
+  <div class="view" id="help-view" style="display:none">
+    <div class="help-hdr">
+      <h2 class="help-title">How it works</h2>
+      <button class="help-back" onclick="showView('main')">
+        <i class="ti ti-arrow-left"></i> Back
+      </button>
+    </div>
+
+    <div class="help-sec">
+      <div class="h-sec-lbl">Adding tasks</div>
+      <div class="h-item">
+        <div class="h-ic"><i class="ti ti-plus"></i></div>
+        <div>
+          <div class="h-t">Add a task</div>
+          <div class="h-d">Type in the "What needs doing?" box and press <span class="kbd">Enter</span> or the ↑ button. Set priority, date, repeat, and tags in the options row before adding.</div>
+        </div>
+      </div>
+      <div class="h-item">
+        <div class="h-ic"><i class="ti ti-flag-3"></i></div>
+        <div>
+          <div class="h-t">Priority</div>
+          <div class="h-d">Click the Priority pill to cycle None → Low → Medium → High. The coloured stripe on the left of each task shows its priority. Change it anytime from the detail panel.</div>
+        </div>
+      </div>
+      <div class="h-item">
+        <div class="h-ic"><i class="ti ti-calendar"></i></div>
+        <div>
+          <div class="h-t">Due dates</div>
+          <div class="h-d">Pick a date when adding, or edit it in the detail panel. Overdue tasks show red, today shows amber.</div>
+        </div>
+      </div>
+      <div class="h-item">
+        <div class="h-ic"><i class="ti ti-repeat"></i></div>
+        <div>
+          <div class="h-t">Recurring tasks</div>
+          <div class="h-d">Click Repeat to cycle Daily, Weekdays, Weekly, or Monthly. Completing a recurring task auto-reschedules it to the next occurrence.</div>
+        </div>
+      </div>
+      <div class="h-item">
+        <div class="h-ic"><i class="ti ti-hash"></i></div>
+        <div>
+          <div class="h-t">Tags</div>
+          <div class="h-d">Click a tag pill to attach it. Click "+ tag" to create a new one. Filter by clicking a tag chip below the filter tabs. Hover a chip to rename or delete it.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="help-sec">
+      <div class="h-sec-lbl">Managing tasks</div>
+      <div class="h-item">
+        <div class="h-ic"><i class="ti ti-circle-check"></i></div>
+        <div>
+          <div class="h-t">Complete a task</div>
+          <div class="h-d">Click the circle to mark done. Click again to unmark. Recurring tasks reschedule automatically.</div>
+        </div>
+      </div>
+      <div class="h-item">
+        <div class="h-ic"><i class="ti ti-pin"></i></div>
+        <div>
+          <div class="h-t">Pin tasks</div>
+          <div class="h-d">Hover a task and click the pin icon to pin it. Pinned tasks always appear at the top of the list.</div>
+        </div>
+      </div>
+      <div class="h-item">
+        <div class="h-ic"><i class="ti ti-pencil"></i></div>
+        <div>
+          <div class="h-t">Edit task text</div>
+          <div class="h-d">Hover a task and click the pencil icon. Press <span class="kbd">Enter</span> to save or <span class="kbd">Esc</span> to cancel.</div>
+        </div>
+      </div>
+      <div class="h-item">
+        <div class="h-ic"><i class="ti ti-chevron-down"></i></div>
+        <div>
+          <div class="h-t">Task details</div>
+          <div class="h-d">Click the ↓ chevron to expand a task. Inside: priority, due date, recurrence, time estimate, notes, and subtasks.</div>
+        </div>
+      </div>
+      <div class="h-item">
+        <div class="h-ic"><i class="ti ti-grip-vertical"></i></div>
+        <div>
+          <div class="h-t">Drag to reorder</div>
+          <div class="h-d">Hover to reveal the grip handle on the left, then drag up or down.</div>
+        </div>
+      </div>
+      <div class="h-item">
+        <div class="h-ic"><i class="ti ti-trash"></i></div>
+        <div>
+          <div class="h-t">Delete &amp; undo</div>
+          <div class="h-d">Hover and click the trash icon. An Undo toast appears for 5 seconds at the bottom.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="help-sec">
+      <div class="h-sec-lbl">Organising</div>
+      <div class="h-item">
+        <div class="h-ic"><i class="ti ti-search"></i></div>
+        <div>
+          <div class="h-t">Search</div>
+          <div class="h-d">Filters tasks in real time by name, note, or tag. Press <span class="kbd">/</span> to jump to it, <span class="kbd">Esc</span> to clear.</div>
+        </div>
+      </div>
+      <div class="h-item">
+        <div class="h-ic"><i class="ti ti-checks"></i></div>
+        <div>
+          <div class="h-t">Bulk actions</div>
+          <div class="h-d">Click "Select" to enter selection mode, tick tasks, then Complete or Delete all at once.</div>
+        </div>
+      </div>
+      <div class="h-item">
+        <div class="h-ic"><i class="ti ti-device-floppy"></i></div>
+        <div>
+          <div class="h-t">Auto-backup</div>
+          <div class="h-d">Click "Link file" in the backup bar to pick a local JSON file. Every change is saved to it automatically. Click "Restore" to load tasks from a backup file.</div>
+        </div>
+      </div>
+      <div class="h-item">
+        <div class="h-ic"><i class="ti ti-chart-bar"></i></div>
+        <div>
+          <div class="h-t">Statistics</div>
+          <div class="h-d">Click the chart icon (or press <span class="kbd">S</span>) to see your completion stats, streaks, and task breakdowns.</div>
+        </div>
+      </div>
+      <div class="h-item">
+        <div class="h-ic"><i class="ti ti-confetti"></i></div>
+        <div>
+          <div class="h-t">Confetti</div>
+          <div class="h-d">Complete every task on your list and watch what happens 🎉</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="help-sec">
+      <div class="h-sec-lbl">Keyboard shortcuts</div>
+      <div class="h-item">
+        <div class="h-ic"><i class="ti ti-keyboard"></i></div>
+        <div>
+          <div class="h-t">Shortcuts</div>
+          <div class="h-d" style="display:flex;flex-direction:column;gap:5px">
+            <span><span class="kbd">N</span> — focus the new task input</span>
+            <span><span class="kbd">/</span> — focus search</span>
+            <span><span class="kbd">S</span> — open statistics</span>
+            <span><span class="kbd">D</span> — toggle dark mode</span>
+            <span><span class="kbd">?</span> — open this help page</span>
+            <span><span class="kbd">Enter</span> — add task / save edit</span>
+            <span><span class="kbd">Esc</span> — go back / cancel / clear search</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Your scripts -->
+<script src="script.js"></script>
+</body>
+</html>
