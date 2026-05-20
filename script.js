@@ -1,4 +1,4 @@
-// ─── State ───────────────────────────────────────────────────────────────────
+// âââ State âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 let todos        = [];
 let nextId       = 1;
 let filter       = 'all';
@@ -25,9 +25,12 @@ let renamingTag  = null;
 let fileHandle   = null;
 let backupSaved  = false;
 let stats        = { completedTotal: 0, streak: 0, lastCompletedDate: null };
+let newDays        = [];       // selected day-of-week indices (0=Sun … 6=Sat)
+let newWeeklyRepeat = false;   // weekly-repeat toggle for DOW pill selection
+let calConfirm     = null;     // { id, dateStr, isRecurring } — pending calendar delete
 
 const REC     = ['none', 'daily', 'weekdays', 'weekly', 'monthly'];
-const REC_LBL = { none: 'Repeat', daily: 'Daily ·', weekdays: 'Weekdays ·', weekly: 'Weekly ·', monthly: 'Monthly ·' };
+const REC_LBL = { none: 'Repeat', daily: 'Daily Â·', weekdays: 'Weekdays Â·', weekly: 'Weekly Â·', monthly: 'Monthly Â·' };
 
 const TC = [
   { bg: '#EDE9FE', t: '#3C3489', b: '#7F77DD' },
@@ -49,7 +52,7 @@ const TC_DARK = [
   { bg: '#072018', t: '#4DC9A0', b: '#1D9E75' },
 ];
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// âââ Helpers âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function tc(tag) {
   let h = 0;
   for (let c of tag) h = (h * 31 + c.charCodeAt(0)) & 0xFFFF;
@@ -122,7 +125,7 @@ function fmtDate(ds) {
   return { lbl: `${mo[m - 1]} ${d}`, cls: 'd-n' };
 }
 
-// ─── Persistence ─────────────────────────────────────────────────────────────
+// âââ Persistence âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function save() {
   try {
     localStorage.setItem('todo_v1', JSON.stringify({ todos, nextId, allTags, stats }));
@@ -154,7 +157,7 @@ function load() {
   renderAll();
 }
 
-// ─── Dark mode ────────────────────────────────────────────────────────────────
+// âââ Dark mode ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function toggleDark() {
   darkMode = !darkMode;
   localStorage.setItem('dark_mode', darkMode);
@@ -173,7 +176,7 @@ function renderDarkBtn() {
   btn.title = darkMode ? 'Switch to light mode' : 'Switch to dark mode';
 }
 
-// ─── IndexedDB (file handle storage) ─────────────────────────────────────────
+// âââ IndexedDB (file handle storage) âââââââââââââââââââââââââââââââââââââââââ
 function openDB() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open('my-tasks-db', 1);
@@ -211,7 +214,7 @@ async function clearFileHandleFromDB() {
   } catch (e) {}
 }
 
-// ─── Auto-backup ──────────────────────────────────────────────────────────────
+// âââ Auto-backup ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 async function autoSaveToFile() {
   if (!fileHandle) return;
   try {
@@ -281,7 +284,7 @@ function renderBackupStatus() {
   if (!bar) return;
 
   if (fileHandle) {
-    lbl.textContent      = backupSaved ? 'Auto-backup: active' : 'Auto-backup: linking…';
+    lbl.textContent      = backupSaved ? 'Auto-backup: active' : 'Auto-backup: linkingâ¦';
     linkBtn.style.display = 'none';
     unlBtn.style.display  = 'inline-flex';
     resBtn.style.display  = 'none';
@@ -295,7 +298,7 @@ function renderBackupStatus() {
   }
 }
 
-// ─── Filtering / sorting ──────────────────────────────────────────────────────
+// âââ Filtering / sorting ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function getVis() {
   let list = [...todos];
   if (filter === 'active') list = list.filter(t => !t.done);
@@ -326,20 +329,37 @@ function getVis() {
   return list;
 }
 
-// ─── Actions ──────────────────────────────────────────────────────────────────
+// âââ Actions ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function addTodo() {
   const inp  = document.getElementById('new-inp');
   const text = inp.value.trim();
   if (!text) return;
-  todos.unshift({
-    id: nextId++, text, done: false,
-    priority: newPri, dueDate: newDate,
-    tags: [...newSelTags], note: '',
-    subtasks: [], expanded: false, recurring: newRec,
-    pinned: false, estimate: '',
-  });
+
+  if (newDays.length > 0) {
+    // Multi-day creation: one task per selected day-of-week
+    newDays.forEach(dow => {
+      todos.unshift({
+        id: nextId++, text, done: false,
+        priority: newPri, dueDate: nextDateForDow(dow),
+        tags: [...newSelTags], note: '',
+        subtasks: [], expanded: false,
+        recurring: newWeeklyRepeat ? 'weekly' : 'none',
+        pinned: false, estimate: '',
+      });
+    });
+  } else {
+    todos.unshift({
+      id: nextId++, text, done: false,
+      priority: newPri, dueDate: newDate,
+      tags: [...newSelTags], note: '',
+      subtasks: [], expanded: false, recurring: newRec,
+      pinned: false, estimate: '',
+    });
+  }
+
   inp.value = '';
   newPri = 'none'; newDate = ''; newSelTags = []; newRec = 'none';
+  newDays = []; newWeeklyRepeat = false;
   save(); renderAll();
 }
 
@@ -370,7 +390,7 @@ function toggleTodo(id) {
       t.resetAt     = nextOccurrenceMidnight(t.recurring);
     }
   } else if (t.recurring && t.recurring !== 'none') {
-    // Manually unchecked — clear the scheduled reset
+    // Manually unchecked â clear the scheduled reset
     t.completedAt = null;
     t.resetAt     = null;
   }
@@ -467,7 +487,7 @@ function setEstimate(id, v) {
   save();
 }
 
-// ─── Subtasks ─────────────────────────────────────────────────────────────────
+// âââ Subtasks âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function addSubtask(tid) {
   const inp  = document.getElementById('si-' + tid);
   if (!inp) return;
@@ -495,7 +515,7 @@ function deleteSub(tid, sid) {
   save(); renderAll();
 }
 
-// ─── Tag management ───────────────────────────────────────────────────────────
+// âââ Tag management âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function deleteTag(tag) {
   if (!confirm(`Delete the tag "${tag}"? It will be removed from all tasks.`)) return;
   allTags = allTags.filter(t => t !== tag);
@@ -530,7 +550,7 @@ function commitRenameTag() {
   renderAll();
 }
 
-// ─── Add-task options ─────────────────────────────────────────────────────────
+// âââ Add-task options âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function cycleNewPri() {
   const c = ['none', 'low', 'medium', 'high'];
   newPri  = c[(c.indexOf(newPri) + 1) % c.length];
@@ -552,6 +572,63 @@ function toggleNewTag(i) {
 
 function setNewDate(v) { newDate = v; }
 
+// Returns the YYYY-MM-DD string of the next (or current) occurrence of a given day-of-week
+function nextDateForDow(dow) {
+  const today = new Date();
+  const diff  = (dow - today.getDay() + 7) % 7;
+  const d     = new Date(today.getFullYear(), today.getMonth(), today.getDate() + diff);
+  return d.toISOString().split('T')[0];
+}
+
+function toggleNewDay(i) {
+  newDays = newDays.includes(i) ? newDays.filter(d => d !== i) : [...newDays, i];
+  if (newDays.length === 0) newWeeklyRepeat = false;
+  renderAddOpts();
+}
+
+function toggleWeeklyRepeat() {
+  newWeeklyRepeat = !newWeeklyRepeat;
+  renderAddOpts();
+}
+
+// Toggle a tag on an existing task (used from expanded panel)
+function toggleTaskTag(tid, tag) {
+  const t = todos.find(t => t.id === tid);
+  if (!t) return;
+  t.tags = t.tags || [];
+  t.tags = t.tags.includes(tag) ? t.tags.filter(g => g !== tag) : [...t.tags, tag];
+  save(); renderAll();
+}
+
+// ─── Calendar delete helpers ──────────────────────────────────────────────
+function calTaskClick(e, taskId, dateStr, isRecurring) {
+  e.stopPropagation();
+  calConfirm = { id: taskId, dateStr, isRecurring };
+  renderCalendar();
+}
+
+function calExecuteDelete(taskId, dateStr, isRecurring) {
+  if (isRecurring) {
+    const t = todos.find(t => t.id === taskId);
+    if (t) {
+      t.skippedDates = [...(t.skippedDates || []), dateStr];
+      save();
+    }
+    calConfirm = null;
+    renderCalendar();
+  } else {
+    calConfirm = null;
+    deleteTodo(taskId);   // calls save() + renderAll() internally
+    renderCalendar();
+  }
+}
+
+function calCancelConfirm(e) {
+  if (e) e.stopPropagation();
+  calConfirm = null;
+  renderCalendar();
+}
+
 function showNtagField() {
   showNtag = true; renderAddOpts();
   setTimeout(() => { const inp = document.getElementById('ntag-inp'); if (inp) { inp.style.display = 'inline-flex'; inp.focus(); } }, 0);
@@ -568,7 +645,7 @@ function addNewTag() {
   showNtag = false; save(); renderAddOpts(); renderTagStrip();
 }
 
-// ─── Search ───────────────────────────────────────────────────────────────────
+// âââ Search âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function onSearch(v) {
   searchQ = v;
   const clr = document.getElementById('si-clear');
@@ -581,13 +658,13 @@ function clearSearch() {
   onSearch('');
 }
 
-// ─── Tag filter ───────────────────────────────────────────────────────────────
+// âââ Tag filter âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function setTagFilter(tag) {
   tagFilter = tagFilter === tag ? null : tag;
   renderAll();
 }
 
-// ─── Select / bulk ────────────────────────────────────────────────────────────
+// âââ Select / bulk ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function toggleSelectMode() {
   selMode = !selMode;
   if (!selMode) selIds.clear();
@@ -622,7 +699,7 @@ function bulkDelete() {
   selIds.clear(); save(); renderAll();
 }
 
-// ─── Drag & drop ──────────────────────────────────────────────────────────────
+// âââ Drag & drop ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function onDragStart(e, id) {
   dragSrcId = id;
   e.dataTransfer.effectAllowed = 'move';
@@ -651,7 +728,7 @@ function onDrop(e, tid) {
   save(); renderAll();
 }
 
-// ─── Toast ────────────────────────────────────────────────────────────────────
+// âââ Toast ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function showToast() {
   document.getElementById('toast-wrap').style.display = 'block';
   clearTimeout(undoTimer);
@@ -664,8 +741,9 @@ function hideToast() {
   deletedTodo = null;
 }
 
-// ─── Views ────────────────────────────────────────────────────────────────────
+// âââ Views ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function showView(name) {
+  if (name !== 'calendar') calConfirm = null;
   document.getElementById('main-view').style.display  = name === 'main'     ? 'block' : 'none';
   document.getElementById('help-view').style.display  = name === 'help'     ? 'block' : 'none';
   document.getElementById('stats-view').style.display = name === 'stats'    ? 'block' : 'none';
@@ -677,7 +755,7 @@ function showView(name) {
 function showHelp() { showView('help'); }
 function hideHelp() { showView('main'); }
 
-// ─── Stats ────────────────────────────────────────────────────────────────────
+// âââ Stats ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function renderStats() {
   const total   = todos.length;
   const done    = todos.filter(t => t.done).length;
@@ -754,7 +832,7 @@ function renderStats() {
   document.getElementById('stats-content').innerHTML = html;
 }
 
-// ─── Confetti ─────────────────────────────────────────────────────────────────
+// âââ Confetti âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function fireConfetti() {
   const canvas = document.getElementById('confetti');
   canvas.style.display = 'block';
@@ -789,12 +867,14 @@ function fireConfetti() {
   draw();
 }
 
-// ─── Calendar ─────────────────────────────────────────────────────────────────
+// âââ Calendar âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function calPrev() {
+  calConfirm = null;
   if (calMonth === 0) { calMonth = 11; calYear--; } else calMonth--;
   renderCalendar();
 }
 function calNext() {
+  calConfirm = null;
   if (calMonth === 11) { calMonth = 0; calYear++; } else calMonth++;
   renderCalendar();
 }
@@ -814,16 +894,16 @@ function renderCalendar() {
   document.getElementById('cal-month-lbl').textContent =
     `${MONTH_NAMES[calMonth]} ${calYear}`;
 
-  // ── Day-of-week header row ──
-  let html = '<div class="cal-grid">';
+  // ââ Day-of-week header row ââ
+  let html = '<div class="cal-grid" onclick="calCancelConfirm(event)">';
   DOW_LABELS.forEach(d => { html += `<div class="cal-dow">${d}</div>`; });
 
-  // ── Leading blank cells ──
+  // ââ Leading blank cells ââ
   for (let i = 0; i < startDow; i++) {
     html += '<div class="cal-day cal-day-empty"></div>';
   }
 
-  // ── One cell per day ──
+  // ââ One cell per day ââ
   for (let day = 1; day <= daysInMo; day++) {
     const dateObj = new Date(calYear, calMonth, day);
     const dow     = dateObj.getDay();
@@ -832,6 +912,8 @@ function renderCalendar() {
 
     // Tasks that appear on this day
     const dayTasks = todos.filter(t => {
+      // Skip this occurrence if the user deleted it from the calendar
+      if (t.skippedDates && t.skippedDates.includes(dateStr)) return false;
       if (!t.recurring || t.recurring === 'none') return t.dueDate === dateStr;
       switch (t.recurring) {
         case 'daily':    return true;
@@ -854,15 +936,28 @@ function renderCalendar() {
     html += `<div class="cal-day-num">${day}</div>`;
 
     const maxShow = 3;
-    dayTasks.slice(0, maxShow).forEach(t => {
+        dayTasks.slice(0, maxShow).forEach(t => {
       // Non-recurring: use the task's own done state.
       // Recurring: only show as done on today's cell (the task only has one live done state).
-      const isDone = t.done && (!t.recurring || t.recurring === 'none' || isToday);
-      const col    = PRI_COLOR[t.priority] || PRI_COLOR.none;
-      html += `<div class="cal-task${isDone ? ' cal-task-done' : ''}" `
-            + `style="border-left-color:${col}" title="${esc(t.text)}">`
-            + (isDone ? '<i class="ti ti-check"></i>' : '')
-            + `<span>${esc(t.text)}</span></div>`;
+      const isDone       = t.done && (!t.recurring || t.recurring === 'none' || isToday);
+      const col          = PRI_COLOR[t.priority] || PRI_COLOR.none;
+      const isRecurring  = !!(t.recurring && t.recurring !== 'none');
+      const isConfirming = calConfirm && calConfirm.id === t.id && calConfirm.dateStr === dateStr;
+
+      if (isConfirming) {
+        html += `<div class="cal-task cal-task-confirming" style="border-left-color:${col}">`
+              + `<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px">Del?</span>`
+              + `<button class="cal-conf-btn cal-conf-yes" onclick="calExecuteDelete(${t.id},'${dateStr}',${isRecurring})" title="Confirm delete">✓</button>`
+              + `<button class="cal-conf-btn cal-conf-no"  onclick="calCancelConfirm(event)" title="Cancel">✗</button>`
+              + `</div>`;
+      } else {
+        html += `<div class="cal-task${isDone ? ' cal-task-done' : ''}" ' + BT + '
+              + `style="border-left-color:${col}" ' + BT + '
+              + `onclick="calTaskClick(event,${t.id},'${dateStr}',${isRecurring})" ' + BT + '
+              + `title="Click to delete: ${esc(t.text)}">' + BT + '
+              + (isDone ? '<i class="ti ti-check"></i>' : '')
+              + `<span>${esc(t.text)}</span></div>`;
+      }
     });
 
     if (dayTasks.length > maxShow) {
@@ -872,7 +967,7 @@ function renderCalendar() {
     html += '</div>';
   }
 
-  // ── Trailing blank cells to complete the final row ──
+  // ââ Trailing blank cells to complete the final row ââ
   const total    = startDow + daysInMo;
   const trailing = (7 - (total % 7)) % 7;
   for (let i = 0; i < trailing; i++) {
@@ -883,7 +978,7 @@ function renderCalendar() {
   document.getElementById('cal-content').innerHTML = html;
 }
 
-// ─── Recurring reset ─────────────────────────────────────────────────────────
+// âââ Recurring reset âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // Checks all recurring tasks and resets any whose next-occurrence time has passed.
 function checkRecurringResets() {
   const now     = Date.now();
@@ -910,7 +1005,7 @@ function scheduleMidnightCheck() {
   }, msUntil);
 }
 
-// ─── Render ───────────────────────────────────────────────────────────────────
+// âââ Render âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function renderAll() {
   renderDarkBtn(); renderProg(); renderAddOpts(); renderTagStrip();
   renderList(); renderFtr(); renderBulkBar(); renderBackupStatus();
@@ -932,13 +1027,26 @@ function renderProg() {
 }
 
 function renderAddOpts() {
-  const pC  = { none: '', low: 'p-low', medium: 'p-med', high: 'p-high' };
-  const pL  = { none: 'Priority', low: 'Low ·', medium: 'Medium ·', high: 'High ·' };
-  const rOn = newRec !== 'none';
+  const pC      = { none: '', low: 'p-low', medium: 'p-med', high: 'p-high' };
+  const pL      = { none: 'Priority', low: 'Low ·', medium: 'Medium ·', high: 'High ·' };
+  const rOn     = newRec !== 'none';
+  const DOW_LBL = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
   let h = `<button class="pill ${pC[newPri] || ''}" onclick="cycleNewPri()" title="Set priority"><i class="ti ti-flag-3" style="font-size:10px"></i>${pL[newPri]}</button>`;
-  h += `<input type="date" class="date-pill" value="${newDate}" onchange="setNewDate(this.value)" title="Set due date"/>`;
-  h += `<button class="pill${rOn ? ' r-on' : ''}" onclick="cycleNewRec()" title="Set recurrence"><i class="ti ti-repeat" style="font-size:10px"></i>${REC_LBL[newRec]}</button>`;
+
+  // Day-of-week pill selectors
+  DOW_LBL.forEach((d, i) => {
+    const on = newDays.includes(i);
+    h += `<button class="pill dow-pill${on ? ' dow-on' : ''}" onclick="toggleNewDay(${i})" title="${d}">${d}</button>`;
+  });
+
+  // When day pills selected: show weekly-repeat toggle; otherwise show date + recurrence
+  if (newDays.length > 0) {
+    h += `<button class="pill${newWeeklyRepeat ? ' r-on' : ''}" onclick="toggleWeeklyRepeat()" title="Repeat weekly"><i class="ti ti-repeat" style="font-size:10px"></i>${newWeeklyRepeat ? 'Weekly ·' : 'Weekly?'}</button>`;
+  } else {
+    h += `<input type="date" class="date-pill" value="${newDate}" onchange="setNewDate(this.value)" title="Set due date"/>`;
+    h += `<button class="pill${rOn ? ' r-on' : ''}" onclick="cycleNewRec()" title="Set recurrence"><i class="ti ti-repeat" style="font-size:10px"></i>${REC_LBL[newRec]}</button>`;
+  }
 
   allTags.forEach((tag, i) => {
     const on = newSelTags.includes(tag);
@@ -956,7 +1064,6 @@ function renderAddOpts() {
 
   document.getElementById('add-opts').innerHTML = h;
 }
-
 let _usedTags = [];
 
 function renderTagStrip() {
@@ -992,7 +1099,7 @@ function renderList() {
 
   if (!vis.length) {
     const msgs = {
-      all:    'ti-clipboard|No tasks yet — add one above',
+      all:    'ti-clipboard|No tasks yet â add one above',
       active: 'ti-circle-check|All done! Great work.',
       done:   'ti-clock|No completed tasks yet.',
     };
@@ -1063,6 +1170,16 @@ function renderTask(t) {
     return `<button class="opt-p${sel ? ' s-r' : ''}" onclick="setRecurring(${t.id},'${r}')">${lbl}</button>`;
   }).join('');
 
+  const tagEditH = allTags.length
+    ? allTags.map(tag => {
+        const on = (t.tags || []).includes(tag);
+        const c  = tc(tag);
+        return `<button class="opt-p${on ? ' ep-tag-on' : ''}" ' +
+          `style="${on ? `background:${c.bg};color:${c.t};border-color:${c.b}` : ''}" ' +
+          `onclick="toggleTaskTag(${t.id},'${esc(tag)}')">#${esc(tag)}</button>`;
+      }).join('')
+    : `<span style="font-size:11px;color:var(--text3)">No tags yet — create one above</span>`;
+
   const expPanel = `
     <div class="exp-panel${t.expanded ? ' op' : ''}" id="exp-${t.id}">
       <div class="ep-lbl">Priority</div>
@@ -1072,15 +1189,17 @@ function renderTask(t) {
       ${t.dueDate ? `<button class="ep-clear-date" onclick="setDueDate(${t.id},'')">Clear date</button>` : ''}
       <div class="ep-lbl">Repeat</div>
       <div class="opt-row">${recOpts}</div>
+      <div class="ep-lbl">Tags</div>
+      <div class="opt-row">${tagEditH}</div>
       <div class="ep-lbl">Time estimate</div>
       <input type="text" class="est-inp" placeholder="e.g. 30m, 2h, 1 day" maxlength="20" value="${esc(t.estimate || '')}"
         oninput="setEstimate(${t.id},this.value)"/>
       <div class="ep-lbl">Note</div>
-      <textarea class="note-area" placeholder="Add a note…" oninput="saveNote(${t.id},this.value)">${esc(t.note || '')}</textarea>
+      <textarea class="note-area" placeholder="Add a noteâ¦" oninput="saveNote(${t.id},this.value)">${esc(t.note || '')}</textarea>
       <div class="ep-lbl">Steps</div>
       <div class="sub-list">${subH}</div>
       <div class="sub-add-row">
-        <input id="si-${t.id}" type="text" class="sub-add-inp" placeholder="Add a step…" maxlength="100"
+        <input id="si-${t.id}" type="text" class="sub-add-inp" placeholder="Add a stepâ¦" maxlength="100"
           onkeydown="if(event.key==='Enter')addSubtask(${t.id})"/>
         <button class="sub-add-btn" onclick="addSubtask(${t.id})">Add</button>
       </div>
@@ -1132,7 +1251,7 @@ function renderFtr() {
   }
 }
 
-// ─── Keyboard shortcuts ───────────────────────────────────────────────────────
+// âââ Keyboard shortcuts âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 document.addEventListener('keydown', e => {
   const el     = document.activeElement;
   const typing = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA');
@@ -1160,5 +1279,5 @@ document.getElementById('new-inp').addEventListener('keydown', e => {
   if (e.key === 'Enter') addTodo();
 });
 
-// ─── Init ─────────────────────────────────────────────────────────────────────
+// âââ Init âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 load();
