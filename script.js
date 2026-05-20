@@ -951,10 +951,10 @@ function renderCalendar() {
               + `<button class="cal-conf-btn cal-conf-no"  onclick="calCancelConfirm(event)" title="Cancel">✗</button>`
               + `</div>`;
       } else {
-        html += `<div class="cal-task${isDone ? ' cal-task-done' : ''}" ' + BT + '
-              + `style="border-left-color:${col}" ' + BT + '
-              + `onclick="calTaskClick(event,${t.id},'${dateStr}',${isRecurring})" ' + BT + '
-              + `title="Click to delete: ${esc(t.text)}">' + BT + '
+        html += `<div class="cal-task${isDone ? ' cal-task-done' : ''}" `
+              + `style="border-left-color:${col}" `
+              + `onclick="calTaskClick(event,${t.id},'${dateStr}',${isRecurring})" `
+              + `title="Click to delete: ${esc(t.text)}">`
               + (isDone ? '<i class="ti ti-check"></i>' : '')
               + `<span>${esc(t.text)}</span></div>`;
       }
@@ -1174,9 +1174,8 @@ function renderTask(t) {
     ? allTags.map(tag => {
         const on = (t.tags || []).includes(tag);
         const c  = tc(tag);
-        return `<button class="opt-p${on ? ' ep-tag-on' : ''}" ' +
-          `style="${on ? `background:${c.bg};color:${c.t};border-color:${c.b}` : ''}" ' +
-          `onclick="toggleTaskTag(${t.id},'${esc(tag)}')">#${esc(tag)}</button>`;
+        const styleVal = on ? 'background:' + c.bg + ';color:' + c.t + ';border-color:' + c.b : '';
+        return `<button class="opt-p${on ? ' ep-tag-on' : ''}" style="${styleVal}" onclick="toggleTaskTag(${t.id},'${esc(tag)}')">#${esc(tag)}</button>`;
       }).join('')
     : `<span style="font-size:11px;color:var(--text3)">No tags yet — create one above</span>`;
 
