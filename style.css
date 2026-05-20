@@ -1,4 +1,4 @@
-/* ─── Reset & Variables ─────────────────────────────────── */
+/* âââ Reset & Variables âââââââââââââââââââââââââââââââââââ */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -23,7 +23,7 @@
   --blue:      #378ADD;
 }
 
-/* ─── Dark mode ─────────────────────────────────────────── */
+/* âââ Dark mode âââââââââââââââââââââââââââââââââââââââââââ */
 body.dark {
   --bg:      #1C1C1A;
   --bg2:     #141412;
@@ -35,7 +35,7 @@ body.dark {
   --border2: #3E3E3A;
 }
 
-/* ─── Page ──────────────────────────────────────────────── */
+/* âââ Page ââââââââââââââââââââââââââââââââââââââââââââââââ */
 body {
   background: var(--bg2);
   min-height: 100vh;
@@ -56,7 +56,7 @@ body {
   padding: 1.5rem 0;
 }
 
-/* ─── Progress bar ──────────────────────────────────────── */
+/* âââ Progress bar ââââââââââââââââââââââââââââââââââââââââ */
 .top-meta {
   display: flex;
   justify-content: space-between;
@@ -91,7 +91,7 @@ body {
   transition: width .5s cubic-bezier(.4, 0, .2, 1);
 }
 
-/* ─── Header ────────────────────────────────────────────── */
+/* âââ Header ââââââââââââââââââââââââââââââââââââââââââââââ */
 .page-hdr {
   display: flex;
   align-items: flex-end;
@@ -160,7 +160,7 @@ body {
 
 .hdr-btn:hover { background: var(--bg3); }
 
-/* ─── Search ────────────────────────────────────────────── */
+/* âââ Search ââââââââââââââââââââââââââââââââââââââââââââââ */
 .search-wrap {
   position: relative;
   margin-bottom: .75rem;
@@ -215,7 +215,7 @@ body {
   padding: 0;
 }
 
-/* ─── Add card ──────────────────────────────────────────── */
+/* âââ Add card ââââââââââââââââââââââââââââââââââââââââââââ */
 .add-card {
   background: var(--bg);
   border: 0.5px solid var(--border);
@@ -280,7 +280,7 @@ body {
   align-items: center;
 }
 
-/* ─── Backup bar ─────────────────────────────────────────── */
+/* âââ Backup bar âââââââââââââââââââââââââââââââââââââââââââ */
 .backup-bar {
   display: flex;
   align-items: center;
@@ -316,7 +316,7 @@ body {
 
 .backup-btn:hover { background: var(--bg2); }
 
-/* ─── Pills ─────────────────────────────────────────────── */
+/* âââ Pills âââââââââââââââââââââââââââââââââââââââââââââââ */
 .pill {
   font-family: 'Geist', sans-serif;
   font-size: 11px;
@@ -377,7 +377,7 @@ body.dark .pill.r-on   { background: #0C1A2E; border-color: #378ADD; color: #6EB
   display: none;
 }
 
-/* ─── Toolbar / Tabs ─────────────────────────────────────── */
+/* âââ Toolbar / Tabs âââââââââââââââââââââââââââââââââââââââ */
 .toolbar {
   display: flex;
   align-items: center;
@@ -429,7 +429,7 @@ body.dark .pill.r-on   { background: #0C1A2E; border-color: #378ADD; color: #6EB
   color: var(--text);
 }
 
-/* ─── Tag strip ─────────────────────────────────────────── */
+/* âââ Tag strip âââââââââââââââââââââââââââââââââââââââââââ */
 .tag-strip {
   display: flex;
   gap: 4px;
@@ -473,7 +473,7 @@ body.dark .pill.r-on   { background: #0C1A2E; border-color: #378ADD; color: #6EB
 .tag-chip:hover .chip-del { display: flex; }
 .chip-edit:hover, .chip-del:hover { opacity: 1; background: rgba(0,0,0,.12); }
 
-/* ─── Bulk bar ──────────────────────────────────────────── */
+/* âââ Bulk bar ââââââââââââââââââââââââââââââââââââââââââââ */
 .bulk-bar {
   background: var(--text);
   border-radius: var(--radius-lg);
@@ -510,7 +510,7 @@ body.dark .pill.r-on   { background: #0C1A2E; border-color: #378ADD; color: #6EB
 .b-comp { background: #EAF3DE; color: #3B6D11; }
 .b-del  { background: #FCEBEB; color: #A32D2D; }
 
-/* ─── Task list ─────────────────────────────────────────── */
+/* âââ Task list âââââââââââââââââââââââââââââââââââââââââââ */
 .todo-list {
   display: flex;
   flex-direction: column;
@@ -537,7 +537,7 @@ body.dark .task-item.is-pinned {
   background: #1F1C0E;
 }
 
-/* ─── Task row ──────────────────────────────────────────── */
+/* âââ Task row ââââââââââââââââââââââââââââââââââââââââââââ */
 .task-row {
   display: flex;
   align-items: center;
@@ -742,7 +742,7 @@ body.dark .pin-badge { background: #2A1F06; color: #D4943E; }
 
 .pin-act-on i { color: #B45309 !important; }
 
-/* ─── Expanded detail panel ──────────────────────────────── */
+/* âââ Expanded detail panel ââââââââââââââââââââââââââââââââ */
 .exp-panel {
   display: none;
   padding: 0 0 14px 44px;
@@ -848,7 +848,7 @@ body.dark .opt-p.s-r { background: #0C1A2E; border-color: #378ADD; color: #6EB3F
 .note-area:focus { border-color: var(--border2); }
 .note-area::placeholder { color: var(--text3); }
 
-/* ─── Subtasks ───────────────────────────────────────────── */
+/* âââ Subtasks âââââââââââââââââââââââââââââââââââââââââââââ */
 .sub-list {
   display: flex;
   flex-direction: column;
@@ -939,7 +939,7 @@ body.dark .opt-p.s-r { background: #0C1A2E; border-color: #378ADD; color: #6EB3F
 
 .sub-add-btn:hover { background: var(--bg3); }
 
-/* ─── Empty state ────────────────────────────────────────── */
+/* âââ Empty state ââââââââââââââââââââââââââââââââââââââââââ */
 .empty {
   text-align: center;
   padding: 3rem 0;
@@ -954,7 +954,7 @@ body.dark .opt-p.s-r { background: #0C1A2E; border-color: #378ADD; color: #6EB3F
   opacity: .4;
 }
 
-/* ─── Footer ─────────────────────────────────────────────── */
+/* âââ Footer âââââââââââââââââââââââââââââââââââââââââââââââ */
 .ftr {
   display: flex;
   justify-content: space-between;
@@ -981,7 +981,7 @@ body.dark .opt-p.s-r { background: #0C1A2E; border-color: #378ADD; color: #6EB3F
 
 .clr-btn:hover { color: #A32D2D; }
 
-/* ─── Toast ──────────────────────────────────────────────── */
+/* âââ Toast ââââââââââââââââââââââââââââââââââââââââââââââââ */
 .toast-wrap { margin-top: .6rem; }
 
 .toast {
@@ -1013,7 +1013,7 @@ body.dark .opt-p.s-r { background: #0C1A2E; border-color: #378ADD; color: #6EB3F
   text-underline-offset: 2px;
 }
 
-/* ─── Keyboard shortcut bar ──────────────────────────────── */
+/* âââ Keyboard shortcut bar ââââââââââââââââââââââââââââââââ */
 .kb-bar {
   display: flex;
   gap: 10px;
@@ -1044,7 +1044,7 @@ body.dark .opt-p.s-r { background: #0C1A2E; border-color: #378ADD; color: #6EB3F
   font-family: monospace;
 }
 
-/* ─── Stats view ─────────────────────────────────────────── */
+/* âââ Stats view âââââââââââââââââââââââââââââââââââââââââââ */
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1123,7 +1123,7 @@ body.dark .opt-p.s-r { background: #0C1A2E; border-color: #378ADD; color: #6EB3F
   flex-shrink: 0;
 }
 
-/* ─── Help view ──────────────────────────────────────────── */
+/* âââ Help view ââââââââââââââââââââââââââââââââââââââââââââ */
 .help-hdr {
   display: flex;
   align-items: center;
@@ -1205,7 +1205,7 @@ body.dark .opt-p.s-r { background: #0C1A2E; border-color: #378ADD; color: #6EB3F
   line-height: 1.6;
 }
 
-/* ─── Calendar view ─────────────────────────────────────── */
+/* âââ Calendar view âââââââââââââââââââââââââââââââââââââââ */
 .cal-nav {
   display: flex;
   align-items: center;
@@ -1337,7 +1337,59 @@ body.dark .opt-p.s-r { background: #0C1A2E; border-color: #378ADD; color: #6EB3F
   flex-shrink: 0;
 }
 
-/* ─── Confetti canvas ────────────────────────────────────── */
+.dow-pill {
+  padding: 3px 7px;
+  min-width: 30px;
+  justify-content: center;
+  font-weight: 500;
+  letter-spacing: .01em;
+}
+
+.dow-on {
+  background: var(--text) !important;
+  color: var(--bg) !important;
+  border-color: var(--text) !important;
+}
+
+/* ─── Calendar task interaction ────────────────────────────────────── */
+.cal-task { cursor: pointer; }
+
+.cal-task:not(.cal-task-confirming):not(.cal-task-done):hover {
+  background: var(--bg3);
+}
+
+.cal-task-confirming {
+  background: #FCEBEB !important;
+  color: #A32D2D !important;
+  border-left-color: var(--red) !important;
+}
+
+body.dark .cal-task-confirming {
+  background: #2D0A0A !important;
+  color: #F08080 !important;
+}
+
+.cal-conf-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0 1px;
+  font-size: 9px;
+  line-height: 1;
+  flex-shrink: 0;
+  font-weight: 700;
+}
+
+.cal-conf-yes { color: #E24B4A; }
+.cal-conf-no  { color: var(--text3); }
+
+/* ─── Expanded panel tag selection ────────────────────────── */
+.opt-p.ep-tag-on {
+  outline: 1.5px solid currentColor;
+  outline-offset: -1px;
+}
+
+/* âââ Confetti canvas ââââââââââââââââââââââââââââââââââââââ */
 canvas#confetti {
   position: fixed;
   top: 0;
