@@ -59,6 +59,10 @@ function applyAttrs(node, attrs) {
 
     if (key === 'class' || key === 'className') {
       node.setAttribute('class', String(value));
+    } else if (key === 'value' && node instanceof HTMLTextAreaElement) {
+      // A textarea has no value *attribute* — its value is its text content,
+      // so setAttribute('value', …) silently does nothing.
+      node.value = String(value);
     } else if (key === 'text') {
       node.textContent = String(value);
     } else if (key === 'html') {

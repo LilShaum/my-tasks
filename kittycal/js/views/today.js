@@ -18,7 +18,9 @@
 
 import { el, replace, haptic } from '../utils/dom.js';
 import { todayKey, fmtDayMonth, fmtRelative, daysBetween } from '../utils/date.js';
-import { plural } from '../utils/fmt.js';
+import { plural, listJoin } from '../utils/fmt.js';
+import { labelFor } from '../data/taxonomy.js';
+import { openLogSheet } from './log.js';
 import { buildCycles } from '../domain/cycles.js';
 import { predict, conceptionChance } from '../domain/predict.js';
 import { phaseFor } from '../domain/phases.js';
@@ -321,15 +323,41 @@ function acogCards(cycles, today, prediction) {
  */
 function loggedTodayCard(log, particle) {
   const logged = log != null;
+  const today = todayKey();
+
   return el('div', { class: 'card log-nudge' }, [
     el('div', { class: 'decorative' }, [mascot(store.getState().settings.theme, { size: 52 })]),
     el('div', { style: { flex: '1' } }, [
       el('h3', { text: logged ? 'Logged for today' : 'Nothing logged today' }),
       el('p', { class: 'hint-sm', text: logged
-        ? 'You can add to it or change it any time.'
+        ? summariseLog(log)
         : 'Flow, symptoms, mood — whatever you feel like recording.' }),
     ]),
+    el('button', {
+      type: 'button',
+      class: 'btn',
+      style: { minHeight: '40px', padding: '0 var(--sp-4)', fontSize: 'var(--fs-sm)' },
+      text: logged ? 'Edit' : 'Log',
+      onclick: () => { haptic(); openLogSheet(today); },
+    }),
   ]);
+}
+
+/**
+ * A factual one-liner about what's recorded. Deliberately no praise and no
+ * commentary — the app doesn't have an opinion about her day.
+ * @param {import('../domain/model.js').DayLog} log
+ */
+function summariseLog(log) {
+  /** @type {string[]} */
+  const bits = [];
+  if (log.flow !== 'none') bits.push(labelFor('flow', log.flow).toLowerCase());
+  const chips = log.symptoms.length + log.moods.length + log.discharge.length
+    + log.activity.length + log.other.length + log.sex.length + log.custom.length;
+  if (chips) bits.push(`${chips} ${chips === 1 ? 'entry' : 'entries'}`);
+  if (log.bbt != null) bits.push('temperature');
+  if (log.notes.trim()) bits.push('a note');
+  return bits.length ? `${listJoin(bits)}.` : 'You can add to it any time.';
 }
 
 function disclaimerNote() {

@@ -31,6 +31,7 @@ import { buildCycles, isPeriodDay } from '../domain/cycles.js';
 import { predict, upcomingPeriods, upcomingFertile } from '../domain/predict.js';
 import { toastUndo } from '../ui/toast.js';
 import { spotArt } from '../ui/mascot.js';
+import { openLogSheet } from './log.js';
 import * as store from '../state/store.js';
 
 /** How many cycles ahead to draw. */
@@ -234,8 +235,7 @@ function grid({ year, month, today, firstDayOfWeek, periodDays, cycles, logs, ma
 
 /**
  * Tap behaviour. In edit mode a tap toggles a period day, with undo. Otherwise
- * it selects the day — the detail sheet that opens from here lands in the next
- * phase, so for now selection is announced and the day is highlighted.
+ * it opens that day's logging sheet.
  * @param {DateKey} key
  * @param {boolean} editMode
  */
@@ -252,7 +252,7 @@ function activate(key, editMode) {
   }
 
   store.setUi({ selectedDate: key });
-  announce(`Selected ${fmtLong(key)}`);
+  openLogSheet(key);
 }
 
 /**

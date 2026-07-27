@@ -1,0 +1,104 @@
+/* ── Logging sheet ────────────────────────────────────────────────────── */
+
+.log-section + .log-section {
+  border-top: 1px solid var(--line-soft);
+}
+
+/* The whole row is the toggle, so it gets a full touch target. */
+.log-section-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--tap);
+  padding: var(--sp-2) 0;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+/* Suppress the native disclosure triangle in both engines — we draw our own
+   chevron so it can sit on the right and animate. */
+.log-section-head::-webkit-details-marker { display: none; }
+.log-section-head::marker { content: ''; }
+
+.log-section-title {
+  flex: 1;
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-family: var(--font-body);
+}
+
+/* An open section's title darkens, so the expanded one is obvious at a glance. */
+.log-section[open] > .log-section-head .log-section-title { color: var(--ink); }
+
+.log-chevron {
+  font-size: 18px;
+  line-height: 1;
+  color: var(--ink-3);
+  transition: transform var(--dur-enter) var(--ease-soft);
+}
+
+.log-section[open] > .log-section-head .log-chevron { transform: rotate(180deg); }
+
+.log-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding-bottom: var(--sp-4);
+}
+
+.log-section[open] > .log-section-body {
+  animation: pop-in 240ms var(--ease-soft) both;
+}
+
+/* The add-your-own chip reads as an affordance, not a value. */
+.chip-add {
+  border-style: dashed;
+  color: var(--ink-2);
+  font-weight: 700;
+}
+
+.chip-add::after { content: none; }
+
+/* ── Water ────────────────────────────────────────────────────────────── */
+.water-glasses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+
+.water-glass {
+  width: 40px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--line-soft);
+  border-radius: var(--r-sm);
+  transition: transform var(--dur-tap) var(--ease-bounce),
+              color var(--dur-hover) var(--ease-soft);
+}
+
+.water-glass:active { transform: scale(0.85); }
+
+.water-glass.is-filled { color: var(--primary-line); }
+
+.water-readout {
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  font-weight: 600;
+}
+
+/* ── Day summary card, shown above the chips when a day already has data ─ */
+.log-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  padding: var(--sp-3);
+  background: var(--surface-2);
+  border-radius: var(--r-md);
+}
