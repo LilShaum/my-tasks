@@ -1,0 +1,164 @@
+/* ── Calendar ─────────────────────────────────────────────────────────── */
+
+.cal-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+
+.cal-month {
+  font-size: var(--fs-lg);
+  text-align: center;
+}
+
+.cal-head .btn-icon {
+  font-size: 24px;
+  border: var(--bw-data) solid var(--line-soft);
+  background: var(--card);
+}
+
+.cal-today-btn {
+  min-height: 36px;
+  padding: var(--sp-1) var(--sp-3);
+  font-size: var(--fs-sm);
+}
+
+.cal-editbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+}
+
+/* ── Grid ─────────────────────────────────────────────────────────────── */
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+  margin-bottom: var(--sp-4);
+  /* Stops a drag across cells from scrolling the page instead of marking. */
+  touch-action: none;
+}
+
+.cal-dow {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+  padding-bottom: var(--sp-2);
+}
+
+.cal-cell {
+  position: relative;
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  color: var(--ink);
+  font-weight: 600;
+  /* 44px targets in a 7-column phone grid isn't possible; 40 with 3px gaps is
+     the practical floor and keeps the whole month on one screen. */
+  min-height: 40px;
+  transition:
+    transform var(--dur-tap) var(--ease-bounce),
+    background var(--dur-hover) var(--ease-soft),
+    border-color var(--dur-hover) var(--ease-soft);
+}
+
+.cal-cell:active { transform: scale(0.88); }
+
+.cal-cell-empty { pointer-events: none; }
+
+.cal-num { font-size: var(--fs-sm); line-height: 1; }
+
+/* A logged day carries a dot for anything recorded beyond flow. */
+.cal-dot {
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--ink-3);
+  position: absolute;
+  bottom: 5px;
+}
+
+/* ── States. Each is a shape difference as well as a colour difference, so
+      the calendar is still readable without colour vision.            ── */
+
+.cal-cell.is-future { color: var(--ink-3); }
+
+.cal-cell.is-today {
+  border-color: var(--ink);
+  font-weight: 800;
+}
+
+.cal-cell.is-period {
+  background: var(--period);
+  color: var(--on-primary);
+  border-color: var(--period);
+}
+
+.cal-cell.is-period .cal-dot { background: var(--on-primary); }
+
+/* Predicted: outline only, dashed. Never filled — a forecast must not look
+   like a record. */
+.cal-cell.is-predicted {
+  border: 2px dashed var(--period-pred);
+  color: var(--period-pred);
+  background: none;
+}
+
+.cal-cell.is-fertile {
+  background: var(--fertile-soft);
+  color: var(--ink);
+}
+
+.cal-cell.is-ovulation {
+  border: 2px dotted var(--ovulation);
+  background: var(--fertile-soft);
+  font-weight: 800;
+}
+
+.cal-cell.is-luteal { background: var(--luteal-soft); }
+
+.cal-cell.is-selected {
+  outline: 2.5px solid var(--ink);
+  outline-offset: 1px;
+}
+
+/* Today wins the border when it coincides with another state. */
+.cal-cell.is-today.is-period,
+.cal-cell.is-today.is-fertile,
+.cal-cell.is-today.is-luteal {
+  box-shadow: 0 0 0 2px var(--ink);
+}
+
+/* ── Legend ───────────────────────────────────────────────────────────── */
+.cal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-4);
+  font-size: var(--fs-xs);
+  color: var(--ink-2);
+  font-weight: 600;
+  margin-bottom: var(--sp-4);
+}
+
+.cal-legend li { display: flex; align-items: center; gap: 6px; }
+
+.cal-legend-swatch {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  flex: none;
+  border: 2px solid transparent;
+}
+
+.cal-legend-swatch.is-period { background: var(--period); border-color: var(--period); }
+.cal-legend-swatch.is-predicted { border: 2px dashed var(--period-pred); }
+.cal-legend-swatch.is-fertile { background: var(--fertile-soft); border-color: var(--fertile-soft); }
+.cal-legend-swatch.is-ovulation { border: 2px dotted var(--ovulation); background: var(--fertile-soft); }

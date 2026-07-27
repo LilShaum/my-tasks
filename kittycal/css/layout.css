@@ -1,0 +1,296 @@
+/* ── layout.css — app shell, header, tab bar, view switching ──────────── */
+
+.shell {
+  width: 100%;
+  max-width: var(--shell-max);
+  margin: 0 auto;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Bottom padding clears the tab bar plus the iOS home indicator. */
+.view {
+  flex: 1;
+  padding: var(--sp-4) var(--sp-4)
+           calc(var(--sp-8) + 34px + env(safe-area-inset-bottom, 0px));
+}
+
+.view[hidden] { display: none; }
+
+/* ── App header ───────────────────────────────────────────────────────── */
+.app-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: calc(var(--sp-3) + env(safe-area-inset-top, 0px)) var(--sp-4) var(--sp-3);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: color-mix(in oklab, var(--surface) 88%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.app-head h1 {
+  font-size: var(--fs-lg);
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.app-head .mascot-mini { width: 30px; height: 30px; flex: none; }
+
+/* ── Tab bar ──────────────────────────────────────────────────────────── */
+.tabbar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(var(--sp-3) + env(safe-area-inset-bottom, 0px));
+  z-index: 60;
+  width: min(calc(100vw - var(--sp-6)), calc(var(--shell-max) - var(--sp-4)));
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  align-items: center;
+  padding: var(--sp-2);
+  background: var(--card);
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-pill);
+  box-shadow: var(--sh-lift);
+}
+
+.tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: var(--tap);
+  border-radius: var(--r-pill);
+  color: var(--ink-3);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  transition: transform var(--dur-tap) var(--ease-bounce),
+              color var(--dur-hover) var(--ease-soft),
+              background var(--dur-hover) var(--ease-soft);
+}
+
+.tab svg { width: 22px; height: 22px; }
+
+.tab:active { transform: scale(0.9); }
+
+.tab[aria-selected='true'] {
+  color: var(--ink);
+  background: var(--primary-soft);
+}
+
+/* ── Onboarding ───────────────────────────────────────────────────────── */
+.onb {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  max-width: var(--shell-max);
+  margin: 0 auto;
+  padding: calc(var(--sp-4) + env(safe-area-inset-top, 0px)) var(--sp-4)
+           calc(var(--sp-4) + env(safe-area-inset-bottom, 0px));
+}
+
+.onb-progress {
+  display: flex;
+  gap: var(--sp-1);
+  margin-bottom: var(--sp-5);
+  flex: none;
+}
+
+.onb-pip {
+  height: 5px;
+  flex: 1;
+  border-radius: var(--r-pill);
+  background: var(--surface-3);
+  transition: background var(--dur-enter) var(--ease-soft);
+}
+
+.onb-pip[data-done='true'] { background: var(--primary); }
+
+.onb-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4) 0;
+}
+
+.onb-step { display: flex; flex-direction: column; gap: var(--sp-4); }
+
+.onb-step h2 { font-size: var(--fs-xl); }
+
+/* Each step moves focus to its heading so a screen reader announces the new
+   question. The heading isn't interactive, so a visible ring on it would just
+   confuse sighted users — suppress it there and only there. */
+.onb-step h2:focus,
+.onb-step h2:focus-visible { outline: none; }
+
+.onb-art {
+  width: 128px;
+  margin: 0 auto var(--sp-2);
+  animation: float-y 4.5s var(--ease-soft) infinite;
+}
+
+.onb-foot {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding-top: var(--sp-4);
+}
+
+/* Big tappable answer rows for onboarding choices. */
+.choice {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  min-height: 58px;
+  padding: var(--sp-3) var(--sp-4);
+  text-align: left;
+  background: var(--card);
+  border: var(--bw) solid var(--line-soft);
+  border-radius: var(--r-lg);
+  font-weight: 600;
+  box-shadow: var(--sh-sticker);
+  transition: transform var(--dur-tap) var(--ease-bounce),
+              border-color var(--dur-hover) var(--ease-soft),
+              background var(--dur-hover) var(--ease-soft),
+              box-shadow var(--dur-tap) var(--ease-soft);
+}
+
+.choice:active {
+  transform: translate(2px, 3px) scale(0.98);
+  box-shadow: var(--sh-sticker-press);
+}
+
+.choice[aria-pressed='true'] {
+  background: var(--primary-soft);
+  border-color: var(--primary-line);
+}
+
+.choice-emoji { font-size: 22px; flex: none; line-height: 1; }
+
+.choice-text { flex: 1; }
+
+.choice-sub {
+  display: block;
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: var(--ink-2);
+  margin-top: 1px;
+}
+
+.choice-list { display: flex; flex-direction: column; gap: var(--sp-2); }
+
+/* ── Theme picker: the sticker book ───────────────────────────────────── */
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: var(--sp-3);
+}
+
+/* Each card previews itself: it sets its own hue, so the swatch is the
+   theme rather than a description of it. */
+.theme-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-3) var(--sp-2) var(--sp-2);
+  border-radius: var(--r-lg);
+  border: var(--bw) solid var(--line);
+  background: var(--surface-2);
+  box-shadow: var(--sh-sticker);
+  transition: transform var(--dur-tap) var(--ease-bounce),
+              box-shadow var(--dur-tap) var(--ease-soft);
+}
+
+.theme-card:active {
+  transform: translate(2px, 3px) scale(0.97);
+  box-shadow: var(--sh-sticker-press);
+}
+
+.theme-card[aria-pressed='true'] { border-width: 4px; }
+
+.theme-card svg, .theme-card img {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.theme-card-name {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.theme-card-dots { display: flex; gap: 3px; }
+
+.theme-card-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  border: 1px solid oklch(50% 0 0 / 0.18);
+}
+
+/* ── Settings rows ────────────────────────────────────────────────────── */
+.rows {
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: var(--bw-data) solid var(--line-soft);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  min-height: 54px;
+  padding: var(--sp-3) var(--sp-4);
+  text-align: left;
+  background: none;
+}
+
+.row + .row { border-top: 1px solid var(--line-soft); }
+
+.row-label { flex: 1; font-weight: 600; }
+
+.row-value { color: var(--ink-2); font-size: var(--fs-sm); }
+
+button.row { transition: background var(--dur-hover) var(--ease-soft); }
+button.row:active { background: var(--surface-2); }
+
+/* ── Loading / boot ───────────────────────────────────────────────────── */
+.boot {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  z-index: 200;
+  transition: opacity 260ms var(--ease-soft);
+}
+
+.boot[data-hide='true'] { opacity: 0; pointer-events: none; }
+
+.boot-art { width: 92px; animation: wobble 1.6s var(--ease-soft) infinite; }
+
+/* ── Wider screens: the phone column stays, but breathe a little ──────── */
+@media (min-width: 640px) {
+  :root { --shell-max: 520px; }
+  .view { padding-top: var(--sp-5); }
+}

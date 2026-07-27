@@ -1,0 +1,224 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   tokens.css — the whole design system.
+
+   Every theme sets exactly two knobs: --h (hue) and --c (chroma). Every
+   colour below is derived from them in OKLCH, where the L channel is
+   perceptually uniform. Because L is pinned per token, contrast ratios hold
+   identically across all themes — there's no per-theme accessibility audit.
+
+   Ink-on-surface lands ≈8:1. Line-on-surface lands ≈3.5:1. Both are verified
+   empirically by test/contrast.test.js.
+
+   ── Why the colour tokens are declared on `[data-theme]` and not `:root`
+
+   Custom-property substitution happens where a property is *declared*, not
+   where it's used. If `--primary: oklch(68% var(--c) var(--h))` were declared
+   only on :root, it would resolve against the root's hue and children would
+   inherit that already-computed colour — so setting --h on a nested element
+   would do nothing. Declaring the derived tokens on `[data-theme]` too means
+   any element carrying a theme attribute re-derives the whole palette from its
+   own hue. That's what lets the theme picker render each card in its own
+   colours.
+   ───────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ── Type ─────────────────────────────────────────────────────────── */
+  --font-display: 'Fredoka', 'M PLUS Rounded 1c', ui-rounded,
+                  'SF Pro Rounded', system-ui, sans-serif;
+  --font-body:    'Nunito', ui-rounded, 'SF Pro Rounded', system-ui, sans-serif;
+  --font-num:     'Nunito', ui-rounded, system-ui, sans-serif;
+
+  --fs-xs:   11px;
+  --fs-sm:   13px;
+  --fs-base: 15px;
+  --fs-md:   17px;
+  --fs-lg:   21px;
+  --fs-xl:   27px;
+  --fs-2xl:  34px;
+  --fs-3xl:  46px;
+
+  /* ── Space & shape ────────────────────────────────────────────────── */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 22px; --sp-6: 30px; --sp-7: 40px; --sp-8: 56px;
+
+  --r-sm:   10px;
+  --r-md:   14px;
+  --r-lg:   20px;
+  --r-xl:   26px;
+  --r-pill: 999px;
+
+  --bw:      2.5px;  /* chrome border: thick and friendly   */
+  --bw-data: 1.5px;  /* data zone border: quiet and precise */
+
+  /* ── Motion. Overshoot lives on transform only — never on opacity or
+        colour, where out-of-range beziers flash.                      ── */
+  --ease-soft:   cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-back:   cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --ease-spring: var(--ease-bounce);
+
+  --dur-tap:   120ms;
+  --dur-hover: 180ms;
+  --dur-enter: 300ms;
+  --dur-party: 550ms;
+
+  --pat-size: 16px;
+
+  --tap: 44px;          /* minimum touch target */
+  --shell-max: 460px;   /* phone-first column   */
+}
+
+/* True spring easing where supported — beats any cubic-bezier for weight. */
+@supports (animation-timing-function: linear(0, 1)) {
+  :root {
+    --ease-spring: linear(
+      0, 0.006, 0.086, 0.235, 0.44, 0.66, 0.85, 0.97,
+      1.03, 1.04, 1.02, 1.005, 0.998, 1
+    );
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Light palette. Declared on both :root and [data-theme] — see the note at
+   the top of this file for why the duplication is load-bearing.
+   ───────────────────────────────────────────────────────────────────────── */
+:root,
+[data-theme] {
+  /* Defaults; css/themes.css overrides these two per theme. */
+  --h: 350;
+  --c: 0.12;
+
+  /* ── Surfaces ─────────────────────────────────────────────────────── */
+  --surface:    oklch(97.5% calc(var(--c) * 0.18) var(--h));
+  --surface-2:  oklch(93.5% calc(var(--c) * 0.34) var(--h));
+  --surface-3:  oklch(89%   calc(var(--c) * 0.44) var(--h));
+  --card:       oklch(99.4% calc(var(--c) * 0.08) var(--h));
+
+  /* ── Ink ──────────────────────────────────────────────────────────── */
+  --ink:        oklch(32% calc(var(--c) * 0.55) var(--h));  /* body      */
+  --ink-2:      oklch(48% calc(var(--c) * 0.45) var(--h));  /* secondary */
+  --ink-3:      oklch(62% calc(var(--c) * 0.35) var(--h));  /* tertiary  */
+  /* Dark, not white. --primary sits at L68 so white-on-primary measures around
+     2.8:1 — and 1.8:1 on the yellow themes, which is illegible. A deep tinted
+     ink clears 5:1 on every theme, and dark-on-pastel is the more characteristic
+     look anyway. */
+  --on-primary: oklch(22% calc(var(--c) * 0.45) var(--h));
+
+  /* ── Brand ────────────────────────────────────────────────────────── */
+  --primary:      oklch(68% var(--c) var(--h));
+  --primary-soft: oklch(88% calc(var(--c) * 0.6) var(--h));
+  --primary-deep: oklch(52% calc(var(--c) * 0.95) var(--h));
+  /* --primary is a *fill*. At L68 it sits around 2.6:1 on the surface, which
+     is right for a bright brand colour but under the 3:1 WCAG 1.4.11 floor for
+     a component boundary. So anything that draws the edge of a control — a
+     toggle in its on state, a selected chip — uses this darker same-hue
+     sibling instead. Pastel fill, darker stroke. */
+  --primary-line: oklch(46% calc(var(--c) * 0.9) var(--h));
+  --accent:       oklch(74% calc(var(--c) * 0.85) calc(var(--h) + 150));
+  --accent-soft:  oklch(90% calc(var(--c) * 0.5)  calc(var(--h) + 150));
+
+  /* ── Lines: >=3:1 for borders, icons, chart marks (WCAG 1.4.11) ───── */
+  --line:      oklch(55% calc(var(--c) * 0.75) var(--h));
+  --line-soft: oklch(80% calc(var(--c) * 0.45) var(--h));
+
+  /* ── Cycle semantics. Held constant across themes so the calendar
+        always reads the same way, with only a light hue nudge.       ── */
+  --period:        oklch(58% 0.19 12);
+  --period-soft:   oklch(86% 0.09 12);
+  --period-pred:   oklch(68% 0.15 12);
+  --fertile:       oklch(72% 0.12 195);
+  --fertile-soft:  oklch(91% 0.06 195);
+  --ovulation:     oklch(58% 0.14 195);
+  --luteal:        oklch(78% 0.035 var(--h));
+  --luteal-soft:   oklch(90% 0.02 var(--h));
+  --delay:         oklch(65% 0.02 var(--h));
+
+  /* ── Alerts. Theme-immune by design: fixed L and C, so a warning is
+        never softened below threshold by a pastel theme.             ── */
+  --danger:      oklch(52% 0.20 25);
+  --danger-bg:   oklch(95% 0.05 25);
+  --warn:        oklch(52% 0.15 75);
+  --warn-bg:     oklch(95% 0.06 85);
+  --ok:          oklch(52% 0.14 150);
+  --ok-bg:       oklch(95% 0.05 150);
+  --info:        oklch(52% 0.13 250);
+  --info-bg:     oklch(95% 0.04 250);
+
+  /* ── Shadows. Hue-tinted — grey shadows on pastel look dirty. ─────── */
+  --sh-soft:
+    0 1px 2px  oklch(50% calc(var(--c) * 0.6) var(--h) / 0.09),
+    0 4px 10px oklch(50% calc(var(--c) * 0.6) var(--h) / 0.10),
+    0 12px 28px oklch(50% calc(var(--c) * 0.6) var(--h) / 0.07);
+  --sh-lift:
+    0 2px 4px  oklch(50% calc(var(--c) * 0.6) var(--h) / 0.10),
+    0 10px 22px oklch(50% calc(var(--c) * 0.6) var(--h) / 0.14),
+    0 24px 48px oklch(50% calc(var(--c) * 0.6) var(--h) / 0.10);
+  /* Hard offset — the "sticker" look. Collapsing this on :active is what
+     sells the press; scale alone reads flat. */
+  --sh-sticker:       3px 4px 0 var(--line);
+  --sh-sticker-press: 1px 1px 0 var(--line);
+
+  --pat-color: oklch(72% calc(var(--c) * 0.7) var(--h) / 0.16);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Dark palette. Lightness inverts; hue and chroma carry over so each theme
+   keeps its identity.
+
+   Two selectors for the same reason as above: the first themes the root, the
+   second re-derives the palette for any theme-scoped element inside it (the
+   picker cards), which would otherwise be re-lightened by the `[data-theme]`
+   rule and lose dark mode.
+   ───────────────────────────────────────────────────────────────────────── */
+:root[data-mode='dark'],
+[data-mode='dark'] [data-theme] {
+  --surface:    oklch(20%   calc(var(--c) * 0.20) var(--h));
+  --surface-2:  oklch(26%   calc(var(--c) * 0.28) var(--h));
+  --surface-3:  oklch(32%   calc(var(--c) * 0.34) var(--h));
+  --card:       oklch(24.5% calc(var(--c) * 0.24) var(--h));
+
+  --ink:        oklch(95% calc(var(--c) * 0.16) var(--h));
+  --ink-2:      oklch(79% calc(var(--c) * 0.20) var(--h));
+  --ink-3:      oklch(63% calc(var(--c) * 0.20) var(--h));
+  --on-primary: oklch(17% 0.02 var(--h));
+
+  --primary:      oklch(78% calc(var(--c) * 0.92) var(--h));
+  --primary-soft: oklch(38% calc(var(--c) * 0.55) var(--h));
+  --primary-deep: oklch(88% calc(var(--c) * 0.70) var(--h));
+  --primary-line: oklch(80% calc(var(--c) * 0.75) var(--h));
+  --accent:       oklch(80% calc(var(--c) * 0.80) calc(var(--h) + 150));
+  --accent-soft:  oklch(40% calc(var(--c) * 0.45) calc(var(--h) + 150));
+
+  --line:      oklch(70% calc(var(--c) * 0.55) var(--h));
+  --line-soft: oklch(40% calc(var(--c) * 0.40) var(--h));
+
+  --period:       oklch(70% 0.17 12);
+  --period-soft:  oklch(38% 0.10 12);
+  --period-pred:  oklch(62% 0.13 12);
+  --fertile:      oklch(78% 0.11 195);
+  /* Kept well clear of the dark surface — this doubles as the follicular arc
+     on the cycle ring, and at L36 it vanished against the background. */
+  --fertile-soft: oklch(52% 0.08 195);
+  --ovulation:    oklch(82% 0.13 195);
+  --luteal:       oklch(42% 0.03 var(--h));
+  --luteal-soft:  oklch(30% 0.02 var(--h));
+  --delay:        oklch(60% 0.02 var(--h));
+
+  --danger:    oklch(74% 0.17 25);
+  --danger-bg: oklch(30% 0.07 25);
+  --warn:      oklch(80% 0.14 85);
+  --warn-bg:   oklch(30% 0.06 85);
+  --ok:        oklch(76% 0.14 150);
+  --ok-bg:     oklch(28% 0.05 150);
+  --info:      oklch(76% 0.12 250);
+  --info-bg:   oklch(28% 0.05 250);
+
+  --pat-color: oklch(70% calc(var(--c) * 0.7) var(--h) / 0.13);
+
+  --sh-soft:
+    0 1px 2px  oklch(8% 0.02 var(--h) / 0.5),
+    0 4px 12px oklch(8% 0.02 var(--h) / 0.45);
+  --sh-lift:
+    0 2px 6px   oklch(8% 0.02 var(--h) / 0.55),
+    0 12px 30px oklch(8% 0.02 var(--h) / 0.5);
+}

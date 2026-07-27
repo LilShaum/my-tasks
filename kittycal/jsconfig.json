@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "checkJs": true,
+    "allowJs": true,
+    "noEmit": true,
+    "strict": true,
+    "noImplicitAny": false,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+  },
+  "//": "test/ is excluded: it imports node:test and node:assert, which would need @types/node, and adding a devDependency to a deliberately zero-dependency project isn't worth it. The tests verify themselves by running.",
+  "include": ["js/**/*.js", "sw.js"]
+}
