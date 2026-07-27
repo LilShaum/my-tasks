@@ -20,6 +20,11 @@
 
 * { margin: 0; padding: 0; }
 
+/* The `hidden` attribute is only `display: none` at user-agent specificity, so
+   any class setting `display: flex` silently defeats it. Since this app hides
+   things with the attribute in several places, make it win outright. */
+[hidden] { display: none !important; }
+
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;

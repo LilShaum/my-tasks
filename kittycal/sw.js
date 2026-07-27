@@ -49,6 +49,7 @@ const PRECACHE = [
   'js/views/log.js',
   'js/data/taxonomy.js',
   'js/ui/sheet.js',
+  'js/ui/image-picker.js',
   'js/ui/theme.js',
   'js/ui/theme-picker.js',
   'js/ui/mascot.js',

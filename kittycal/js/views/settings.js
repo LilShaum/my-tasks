@@ -13,7 +13,8 @@ import { themePicker, setPickerSelection } from '../ui/theme-picker.js';
 import { getTheme, THEMES } from '../data/themes.js';
 import { applyTheme } from '../ui/theme.js';
 import { toast } from '../ui/toast.js';
-import { releaseMascotUrls } from '../ui/mascot.js';
+import { releaseMascotUrls, mascot } from '../ui/mascot.js';
+import { openMascotPicker } from '../ui/image-picker.js';
 import * as store from '../state/store.js';
 import * as repo from '../storage/repo.js';
 import * as backup from '../storage/backup.js';
@@ -38,6 +39,7 @@ export function renderSettings(host) {
       el('div', { class: 'section-title' }, [el('h2', { text: 'Look' })]),
       picker,
       el('p', { class: 'hint-sm', text: getTheme(settings.theme).blurb }),
+      mascotRow(settings.theme),
       appearanceRows(settings),
     ]),
 
@@ -62,6 +64,43 @@ export function renderSettings(host) {
       aboutCard(),
     ]),
   ]);
+}
+
+/**
+ * Swap the active theme's mascot for one of her own pictures.
+ * @param {string} themeId
+ */
+function mascotRow(themeId) {
+  const theme = getTheme(themeId);
+
+  const row = el('button', {
+    type: 'button',
+    class: 'row',
+    style: { border: 'var(--bw-data) solid var(--line-soft)',
+             borderRadius: 'var(--r-lg)', background: 'var(--card)',
+             marginTop: 'var(--sp-3)' },
+    onclick: () => openMascotPicker(themeId, () => {
+      const host = document.getElementById('view-settings');
+      if (host) renderSettings(host);
+    }),
+  }, [
+    mascot(themeId, { size: 40 }),
+    el('span', { class: 'row-label' }, [
+      `${theme.name} picture`,
+      el('span', { class: 'choice-sub', text:
+        'Use one of your own images instead of the built-in art' }),
+    ]),
+    el('span', { class: 'row-value', 'aria-hidden': 'true', text: '›' }),
+  ]);
+
+  // Reflect whether a custom image is already in place, once we know.
+  repo.loadMascot(themeId).then((blob) => {
+    if (!blob) return;
+    const label = row.querySelector('.choice-sub');
+    if (label) label.textContent = 'Using your picture — tap to change or remove';
+  }).catch(() => { /* the default label is fine */ });
+
+  return row;
 }
 
 /* ── Appearance ─────────────────────────────────────────────────────────── */
