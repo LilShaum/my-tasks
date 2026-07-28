@@ -1,0 +1,26 @@
+/* ── Help sheet ───────────────────────────────────────────────────────── */
+
+.help-body {
+  gap: var(--sp-3);
+}
+
+.help-body .hint {
+  line-height: 1.55;
+}
+
+/* Explaining a colour by showing it beats describing it. */
+.help-legend {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+
+.help-legend .cal-legend-swatch {
+  margin-top: 2px;
+  flex: none;
+}
+
+.help-legend strong { color: var(--ink); }

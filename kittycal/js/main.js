@@ -17,8 +17,11 @@ import { renderCalendar } from './views/calendar.js';
 import { renderInsights } from './views/insights.js';
 import { renderSettings } from './views/settings.js';
 import { mountOnboarding } from './views/onboarding.js';
+import { openHelp } from './views/help.js';
+import { mascot } from './ui/mascot.js';
 import { loadLock, showLockScreen } from './ui/lock.js';
 import { checkReminders } from './ui/reminders.js';
+import { requestPersistence } from './storage/persist.js';
 import { buildCycles } from './domain/cycles.js';
 import { predict } from './domain/predict.js';
 
@@ -71,6 +74,11 @@ async function boot() {
   }
 
   hideBootScreen();
+
+  // Ask the browser not to evict her data. Done after boot rather than before,
+  // so it never delays first paint, and it's safe to call on every launch —
+  // it resolves immediately once granted.
+  void requestPersistence();
 }
 
 function startOnboarding() {
@@ -96,6 +104,8 @@ function startApp() {
   if (!started) {
     started = true;
     wireTabs();
+    const help = $('#help-btn');
+    if (help) help.addEventListener('click', () => openHelp());
     store.subscribe(render);
     watchDayRollover();
   }
@@ -122,6 +132,25 @@ function render() {
   syncTabs(ui.view);
   const title = $('#app-title-text');
   if (title) title.textContent = titleFor(ui.view);
+  renderHeaderMascot();
+}
+
+/**
+ * The theme's mascot in the header.
+ *
+ * It used to be a bow hardcoded into index.html, which meant every theme showed
+ * Hello Kitty's motif and an uploaded picture never appeared here at all. Only
+ * re-rendered when the theme actually changes — this runs on every render, and
+ * rebuilding it each time would restart the image load.
+ */
+let headerMascotTheme = '';
+function renderHeaderMascot() {
+  const host = $('#header-mascot');
+  if (!host) return;
+  const theme = store.getState().settings.theme;
+  if (theme === headerMascotTheme) return;
+  headerMascotTheme = theme;
+  host.replaceChildren(mascot(theme, { size: 30, className: '' }));
 }
 
 /** @param {string} view */
@@ -236,7 +265,14 @@ function registerServiceWorker() {
 
 // Make sure pending writes land if the app is backgrounded or closed. `pagehide`
 // is the reliable one on iOS; `beforeunload` never fires there.
+// Three signals, because no single one is reliable across platforms:
+// `visibilitychange` fires when the app is backgrounded (the common case on a
+// phone), `pagehide` when it's being unloaded — the only one iOS reliably
+// gives — and `freeze` when Chrome is about to discard the page entirely.
+// Writes are already flushed urgently at the point of the change, so these are
+// a backstop rather than the primary save.
 window.addEventListener('pagehide', () => { void store.flushNow(); });
+document.addEventListener('freeze', () => { void store.flushNow(); });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) void store.flushNow();
 });

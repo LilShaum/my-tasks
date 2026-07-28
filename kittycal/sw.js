@@ -28,6 +28,7 @@ const PRECACHE = [
   'css/views/insights.css',
   'css/print.css',
   'css/views/lock.css',
+  'css/views/help.css',
 
   'assets/fonts/nunito.woff2',
   'assets/fonts/fredoka.woff2',
@@ -38,6 +39,7 @@ const PRECACHE = [
   'js/storage/db.js',
   'js/storage/repo.js',
   'js/storage/backup.js',
+  'js/storage/persist.js',
   'js/domain/model.js',
   'js/domain/cycles.js',
   'js/domain/predict.js',
@@ -53,6 +55,7 @@ const PRECACHE = [
   'js/views/log.js',
   'js/views/insights.js',
   'js/views/report.js',
+  'js/views/help.js',
   'js/data/taxonomy.js',
   'js/data/tips.js',
   'js/ui/sheet.js',

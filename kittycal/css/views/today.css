@@ -203,3 +203,50 @@
   color: var(--ink-2);
   line-height: 1.5;
 }
+
+/* ── Phase caption under the ring ─────────────────────────────────────── */
+/* Not a card: it captions the ring above it. Bordering it made it compete
+   with the actual predictions below. */
+.phase-line {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  margin: calc(var(--sp-2) * -1) 0 var(--sp-4);
+  text-align: center;
+}
+
+.phase-line-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+}
+
+.phase-line-head h3 { font-size: var(--fs-lg); }
+
+.phase-line .hint { max-width: 34ch; margin: 0 auto; }
+
+/* ── Primary action ───────────────────────────────────────────────────── */
+.log-cta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-5);
+}
+
+.log-cta-summary { text-align: center; }
+
+/* ── Confidence, inline under a prediction ────────────────────────────── */
+.confidence {
+  font-size: var(--fs-xs);
+  line-height: 1.45;
+  margin-top: var(--sp-2);
+  padding-left: var(--sp-3);
+  border-left: 3px solid var(--line-soft);
+  color: var(--ink-2);
+}
+
+.confidence-high { border-left-color: var(--ok); }
+.confidence-medium { border-left-color: var(--info); }
+.confidence-low,
+.confidence-none { border-left-color: var(--warn); }

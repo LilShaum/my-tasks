@@ -107,7 +107,7 @@ for (const tab of ['calendar', 'insights', 'settings', 'today']) {
 }
 
 // Open the logging sheet, which is the most module-hungry path.
-await page.click('.log-nudge .btn');
+await page.click('.log-cta .btn');
 await page.waitForTimeout(600);
 await page.keyboard.press('Escape');
 await page.waitForTimeout(400);

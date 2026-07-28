@@ -23,14 +23,12 @@ import { labelFor } from '../data/taxonomy.js';
 import { pick } from '../data/tips.js';
 import { loggedIds } from '../domain/stats.js';
 import { openLogSheet } from './log.js';
-import { buildCycles } from '../domain/cycles.js';
+import { buildCycles, cycleLengths, periodLengths } from '../domain/cycles.js';
 import { predict, conceptionChance } from '../domain/predict.js';
 import { phaseFor } from '../domain/phases.js';
 import { evaluate } from '../domain/acog.js';
-import { cycleLengths, periodLengths, summarize } from '../domain/cycles.js';
-import { cycleRing, ringLegend } from '../ui/ring.js';
-import { mascot, spotArt } from '../ui/mascot.js';
-import { getTheme } from '../data/themes.js';
+import { cycleRing } from '../ui/ring.js';
+import { spotArt } from '../ui/mascot.js';
 import * as store from '../state/store.js';
 
 /**
@@ -44,7 +42,6 @@ export function renderToday(host) {
   const cycles = buildCycles(periodDays);
   const prediction = predict({ periodDays, settings, today });
   const phase = phaseFor({ date: today, cycles, prediction });
-  const theme = getTheme(settings.theme);
 
   if (!cycles.length) {
     replace(host, [emptyState(settings.name)]);
@@ -53,26 +50,87 @@ export function renderToday(host) {
 
   const headline = ringHeadline(prediction);
 
+  /*
+   * Today answers three questions, in this order: where am I, what is coming,
+   * and can I log now. Everything else earns its place or belongs on another
+   * screen.
+   *
+   * What used to be here and is not any more:
+   *   - a colour legend under the ring, plus a separate "Luteal phase" card.
+   *     Between them the phase was stated three times. It is now named once,
+   *     in text, directly under the ring — which also removes the ring's
+   *     reliance on colour alone.
+   *   - a cycle-length stats card, which was a duplicate of the first card on
+   *     Insights. Stats are not a "today" question.
+   *   - a standalone confidence banner. It is meta-information about one
+   *     prediction, so it now sits as a line inside that prediction.
+   *
+   * And the Log button has moved from the very bottom to directly under the
+   * ring: it is the most frequent action in the app and it was below the fold.
+   */
   replace(host, [
     greeting(settings.name, today),
+
     cycleRing({
       prediction,
       headline: headline.value,
       caption: headline.caption,
       eyebrow: prediction.cycleDay != null ? `Day ${prediction.cycleDay}` : undefined,
     }),
-    ringLegend(prediction),
-    tipsRow({ phase, prediction, log: logs[today], today }),
+
+    phaseLine(phase),
+    logButton(logs[today], today),
+
     el('div', { class: 'section stagger' }, [
-      phaseCard(phase, prediction),
       prediction.isLate ? lateCard(prediction) : nextPeriodCard(prediction),
       prediction.showFertility && prediction.ovulation ? fertileCard(prediction, today) : null,
-      confidenceCard(prediction),
-      regularityCard(prediction, cycles, today),
       ...acogCards(cycles, today, prediction),
-      loggedTodayCard(logs[today], theme.particle),
-      disclaimerNote(),
     ]),
+
+    tipsRow({ phase, prediction, log: logs[today], today }),
+    disclaimerNote(),
+  ]);
+}
+
+/**
+ * The phase, named in text under the ring.
+ *
+ * Not a card: it's a caption for the ring above it, and giving it a border
+ * made it compete with the actual content below.
+ * @param {import('../domain/phases.js').PhaseInfo} phase
+ */
+function phaseLine(phase) {
+  return el('div', { class: 'phase-line' }, [
+    el('div', { class: 'phase-line-head' }, [
+      el('span', {
+        class: 'phase-dot',
+        style: { background: `var(${phase.token})` },
+        'aria-hidden': 'true',
+      }),
+      el('h3', { text: `${phase.name} phase` }),
+    ]),
+    el('p', { class: 'hint', text: phase.summary }),
+  ]);
+}
+
+/**
+ * The primary action, directly under the ring rather than at the bottom of the
+ * screen. Shows what's already recorded so tapping it isn't a leap of faith.
+ * @param {import('../domain/model.js').DayLog|undefined} log
+ * @param {DateKey} today
+ */
+function logButton(log, today) {
+  const logged = log != null;
+
+  return el('div', { class: 'log-cta' }, [
+    el('button', {
+      type: 'button',
+      class: 'btn btn-block btn-lg',
+      onclick: () => { haptic(); openLogSheet(today); },
+    }, [
+      el('span', { text: logged ? 'Add to today’s log' : 'Log today' }),
+    ]),
+    logged && el('p', { class: 'hint-sm log-cta-summary', text: summariseLog(log) }),
   ]);
 }
 
@@ -184,23 +242,6 @@ function tipsRow({ phase, prediction, log, today }) {
   ]);
 }
 
-/**
- * @param {import('../domain/phases.js').PhaseInfo} phase
- * @param {import('../domain/predict.js').Prediction} prediction
- */
-function phaseCard(phase, prediction) {
-  return el('div', { class: 'card' }, [
-    el('div', { class: 'card-head' }, [
-      el('span', {
-        class: 'phase-dot',
-        style: { background: `var(${phase.token})` },
-        'aria-hidden': 'true',
-      }),
-      el('h3', { text: `${phase.name} phase` }),
-    ]),
-    el('p', { class: 'hint', text: phase.summary }),
-  ]);
-}
 
 /** @param {import('../domain/predict.js').Prediction} prediction */
 function nextPeriodCard(prediction) {
@@ -213,7 +254,36 @@ function nextPeriodCard(prediction) {
     el('p', { class: 'hint-sm', text:
       `Estimated ${prediction.avgPeriodLength}-day period, ` +
       `based on ${prediction.basis}.` }),
+    confidenceLine(prediction),
   ]);
+}
+
+/**
+ * How much to trust the prediction above, as a line rather than a banner.
+ *
+ * This used to be a full-width coloured alert of its own, which gave a footnote
+ * the same visual weight as the forecast it was describing. It still never
+ * hides — a prediction without its confidence is the dishonest version.
+ *
+ * @param {import('../domain/predict.js').Prediction} prediction
+ */
+function confidenceLine(prediction) {
+  /** @type {Record<string, string>} */
+  const copy = {
+    none: 'No cycles logged yet, so this is only your stated average.',
+    low: `Low confidence — based on ${plural(prediction.cyclesLogged, 'complete cycle')}. ` +
+      'This will tighten up over the next couple of months.',
+    medium: `Reasonable confidence — based on ${plural(prediction.cyclesLogged, 'complete cycle')}.`,
+    high: `Good confidence — based on ${plural(prediction.cyclesLogged, 'complete cycle')}` +
+      (prediction.recalibrated
+        ? ', recently re-anchored because your cycle length changed and stayed changed.'
+        : '.'),
+  };
+
+  return el('p', {
+    class: `confidence confidence-${prediction.confidence}`,
+    text: copy[prediction.confidence],
+  });
 }
 
 /**
@@ -230,6 +300,7 @@ function lateCard(prediction) {
       `Expected around ${prediction.nextStart ? fmtDayMonth(prediction.nextStart) : '—'}. ` +
       'Cycles shift for all sorts of ordinary reasons — stress, travel, illness, ' +
       'a change in sleep. Kittycal will update once you log your next period.' }),
+    confidenceLine(prediction),
   ]);
 }
 
@@ -257,87 +328,8 @@ function fertileCard(prediction, today) {
   ]);
 }
 
-/** @param {import('../domain/predict.js').Prediction} prediction */
-function confidenceCard(prediction) {
-  /** @type {Record<string, {label: string, text: string, tone: string}>} */
-  const copy = {
-    none: {
-      label: 'No prediction yet',
-      tone: 'alert-info',
-      text: 'Log a period and Kittycal can start forecasting.',
-    },
-    low: {
-      label: 'Low confidence',
-      tone: 'alert-warn',
-      text: `Working from ${plural(prediction.cyclesLogged, 'complete cycle')}. ` +
-        'Predictions will tighten up over the next couple of months.',
-    },
-    medium: {
-      label: 'Getting there',
-      tone: 'alert-info',
-      text: `Working from ${plural(prediction.cyclesLogged, 'complete cycle')}. ` +
-        'Another cycle or two and this gets noticeably sharper.',
-    },
-    high: {
-      label: 'Good confidence',
-      tone: 'alert-ok',
-      text: `Based on ${plural(prediction.cyclesLogged, 'complete cycle')}` +
-        (prediction.recalibrated
-          ? ', recently re-anchored because your cycle length changed and stayed changed.'
-          : '.'),
-    },
-  };
 
-  const info = copy[prediction.confidence];
-  return el('div', { class: `alert ${info.tone}` }, [
-    el('span', { class: 'alert-icon', text: 'i', 'aria-hidden': 'true' }),
-    el('div', {}, [el('strong', { text: `${info.label}. ` }), info.text]),
-  ]);
-}
 
-/**
- * @param {import('../domain/predict.js').Prediction} prediction
- * @param {import('../domain/cycles.js').Cycle[]} cycles
- * @param {DateKey} today
- */
-function regularityCard(prediction, cycles, today) {
-  const lengths = cycleLengths(cycles);
-  if (lengths.length < 2) return null;
-  const stats = summarize(lengths);
-  if (stats.min == null || stats.max == null) return null;
-
-  /** @type {Record<string, string>} */
-  const wording = {
-    regular: 'Your cycles are consistent.',
-    variable: 'Your cycles move around a little.',
-    irregular: 'Your cycles vary quite a lot.',
-  };
-
-  return el('div', { class: 'card data-zone' }, [
-    el('h3', { text: 'Cycle length' }),
-    el('div', { class: 'stat-row' }, [
-      stat('Average', `${prediction.avgCycleLength}`, 'days'),
-      stat('Shortest', `${stats.min}`, 'days'),
-      stat('Longest', `${stats.max}`, 'days'),
-    ]),
-    el('p', { class: 'hint-sm', text:
-      `${wording[prediction.regularity ?? 'regular']} ` +
-      `Measured across ${plural(lengths.length, 'cycle')}.` }),
-  ]);
-}
-
-/**
- * @param {string} label
- * @param {string} value
- * @param {string} unit
- */
-function stat(label, value, unit) {
-  return el('div', { class: 'stat' }, [
-    el('span', { class: 'stat-label', text: label }),
-    el('span', { class: 'stat-value num', text: value }),
-    el('span', { class: 'stat-unit', text: unit }),
-  ]);
-}
 
 /**
  * ACOG-based prompts. Framed as things worth raising with a doctor, never as
@@ -373,33 +365,6 @@ function acogCards(cycles, today, prediction) {
   ];
 }
 
-/**
- * The one place the mascot appears on this screen, and it responds only to
- * whether she logged — never to what she logged.
- * @param {import('../domain/model.js').DayLog|undefined} log
- * @param {string} particle
- */
-function loggedTodayCard(log, particle) {
-  const logged = log != null;
-  const today = todayKey();
-
-  return el('div', { class: 'card log-nudge' }, [
-    el('div', { class: 'decorative' }, [mascot(store.getState().settings.theme, { size: 52 })]),
-    el('div', { style: { flex: '1' } }, [
-      el('h3', { text: logged ? 'Logged for today' : 'Nothing logged today' }),
-      el('p', { class: 'hint-sm', text: logged
-        ? summariseLog(log)
-        : 'Flow, symptoms, mood — whatever you feel like recording.' }),
-    ]),
-    el('button', {
-      type: 'button',
-      class: 'btn',
-      style: { minHeight: '40px', padding: '0 var(--sp-4)', fontSize: 'var(--fs-sm)' },
-      text: logged ? 'Edit' : 'Log',
-      onclick: () => { haptic(); openLogSheet(today); },
-    }),
-  ]);
-}
 
 /**
  * A factual one-liner about what's recorded. Deliberately no praise and no
