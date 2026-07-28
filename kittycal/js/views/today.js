@@ -144,7 +144,18 @@ function ringHeadline(prediction) {
  * @param {DateKey} opts.today
  */
 function tipsRow({ phase, prediction, log, today }) {
-  const loggedToday = log ? loggedIds(log) : [];
+  // loggedIds only covers the chip categories. Tips can also key off the
+  // numeric trackers, so add a pseudo-id for each one that has a value —
+  // without this the temperature tip could never fire.
+  const loggedToday = log
+    ? [
+        ...loggedIds(log),
+        ...(log.bbt != null ? ['bbt'] : []),
+        ...(log.weight != null ? ['weight'] : []),
+        ...(log.sleep != null ? ['sleep'] : []),
+        ...(log.water ? ['water'] : []),
+      ]
+    : [];
 
   const tips = pick({
     phase: phase.id,
