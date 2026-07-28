@@ -6,8 +6,10 @@
   "type": "module",
   "scripts": {
     "test": "node --test \"test/*.test.js\"",
-    "typecheck": "npx -y typescript@5 --noEmit -p jsconfig.json",
-    "serve": "python3 -m http.server 8080"
+    "typecheck": "npx -y -p typescript@5 tsc --noEmit -p jsconfig.json",
+    "serve": "python3 -m http.server 8080",
+    "test:contrast": "node test/contrast.mjs http://127.0.0.1:8080",
+    "test:network": "node test/network.mjs http://127.0.0.1:8080"
   },
   "dependencies": {},
   "devDependencies": {}
