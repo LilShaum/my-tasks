@@ -1,0 +1,155 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   print.css — the doctor report.
+
+   When printing, the entire app is hidden and only #report-root is laid out.
+   The report deliberately does not look like Kittycal: no theme colour, no
+   pattern, no mascot, no pastels. A clinician gets black text on white paper
+   with plain tables, because that is what is useful to them.
+
+   Every modern platform's print dialogue offers "Save as PDF", so this
+   doubles as the PDF export without needing a PDF library.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Off-screen until openReport() unhides it, so it never affects app layout. */
+#report-root { display: none; }
+
+@media print {
+  @page {
+    size: A4;
+    margin: 18mm 16mm;
+  }
+
+  /* Hide the app entirely, including the fixed-position furniture that would
+     otherwise print on top of the report. */
+  #app-root,
+  #onboarding-root,
+  .app-bg,
+  .tabbar,
+  .toast-host,
+  .boot,
+  .sheet,
+  .sheet-backdrop,
+  #particle-canvas {
+    display: none !important;
+  }
+
+  html, body {
+    background: #fff !important;
+    color: #000 !important;
+    font-size: 10.5pt;
+  }
+
+  #report-root {
+    display: block !important;
+  }
+
+  .report {
+    /* Explicit black on white rather than tokens: the report must not inherit
+       a pastel theme, and a printer has no dark mode. */
+    color: #000;
+    background: #fff;
+    font-family: Georgia, 'Times New Roman', serif;
+    line-height: 1.45;
+    max-width: none;
+  }
+
+  .report-head {
+    border-bottom: 1.5pt solid #000;
+    padding-bottom: 6pt;
+    margin-bottom: 12pt;
+  }
+
+  .report-head h1 {
+    font-family: inherit;
+    font-size: 17pt;
+    font-weight: 700;
+    letter-spacing: 0;
+    margin-bottom: 3pt;
+  }
+
+  .report-head p {
+    font-size: 9.5pt;
+    color: #333;
+    margin: 1pt 0;
+  }
+
+  .report-section {
+    /* Never split a section across a page break if it can be helped. */
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 14pt;
+  }
+
+  .report-section h2 {
+    font-family: inherit;
+    font-size: 12pt;
+    font-weight: 700;
+    letter-spacing: 0;
+    border-bottom: 0.5pt solid #999;
+    padding-bottom: 2pt;
+    margin-bottom: 6pt;
+  }
+
+  .report-section p { margin-bottom: 5pt; }
+
+  .report-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 5pt 0 9pt;
+    font-size: 9.5pt;
+  }
+
+  .report-table th {
+    text-align: left;
+    font-weight: 700;
+    border-bottom: 1pt solid #000;
+    padding: 3pt 6pt 3pt 0;
+  }
+
+  .report-table td {
+    padding: 2.5pt 6pt 2.5pt 0;
+    border-bottom: 0.4pt solid #ccc;
+    vertical-align: top;
+  }
+
+  /* Repeat the header row when a long table spans pages. */
+  .report-table thead { display: table-header-group; }
+  .report-table tr { break-inside: avoid; page-break-inside: avoid; }
+
+  .report-list { margin: 4pt 0 8pt 14pt; }
+
+  .report-list li {
+    list-style: disc;
+    margin-bottom: 4pt;
+  }
+
+  .report-foot {
+    margin-top: 16pt;
+    padding-top: 6pt;
+    border-top: 0.5pt solid #999;
+    font-size: 8.5pt;
+    color: #333;
+    break-inside: avoid;
+  }
+}
+
+/* On screen — the report is only ever shown transiently before printing, but
+   if a browser renders it (or someone opens print preview) it should still be
+   legible rather than unstyled. */
+@media screen {
+  #report-root[hidden] { display: none !important; }
+
+  .report {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: var(--sp-5) var(--sp-4);
+    background: #fff;
+    color: #111;
+    font-family: Georgia, serif;
+  }
+
+  .report-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .report-table th { text-align: left; border-bottom: 2px solid #111; padding: 4px 8px 4px 0; }
+  .report-table td { padding: 3px 8px 3px 0; border-bottom: 1px solid #ddd; }
+  .report-list li { list-style: disc; margin-left: 18px; }
+}

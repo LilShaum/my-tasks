@@ -52,6 +52,8 @@
 <link rel="stylesheet" href="css/views/today.css"/>
 <link rel="stylesheet" href="css/views/calendar.css"/>
 <link rel="stylesheet" href="css/views/log.css"/>
+<link rel="stylesheet" href="css/views/insights.css"/>
+<link rel="stylesheet" href="css/print.css"/>
 
 <script>
 /*
@@ -131,6 +133,7 @@
     <main>
       <section class="view" id="view-today" aria-label="Today"></section>
       <section class="view" id="view-calendar" aria-label="Calendar" hidden></section>
+      <section class="view" id="view-insights" aria-label="Insights" hidden></section>
       <section class="view" id="view-settings" aria-label="Settings" hidden></section>
     </main>
   </div>
@@ -152,6 +155,13 @@
       </svg>
       <span>Calendar</span>
     </button>
+    <button class="tab" type="button" role="tab" data-tab="insights" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 20V10M10 20V5M16 20v-7M22 20H2"/>
+      </svg>
+      <span>Insights</span>
+    </button>
     <button class="tab" type="button" role="tab" data-tab="settings" aria-selected="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -162,6 +172,9 @@
     </button>
   </nav>
 </div>
+
+<!-- Built on demand by report.js, printed, then hidden again. -->
+<div id="report-root" hidden></div>
 
 <div class="toast-host" id="toast-host" aria-live="off"></div>
 

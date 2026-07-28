@@ -1,0 +1,82 @@
+/* ── Insights ─────────────────────────────────────────────────────────────
+   This whole view is a data zone: thinner borders, smaller radii, tabular
+   numerals, no decorative motion. Same palette as the rest of the app,
+   different density.                                                       */
+
+#view-insights .card { margin-bottom: var(--sp-4); }
+
+#view-insights .card h3 {
+  font-size: var(--fs-md);
+  margin-bottom: var(--sp-1);
+}
+
+/* ── Charts ───────────────────────────────────────────────────────────── */
+.chart {
+  display: block;
+  width: 100%;
+  margin: var(--sp-3) 0 var(--sp-2);
+  overflow: visible;
+}
+
+.chart-label {
+  font-family: var(--font-num);
+  font-size: 9px;
+  font-weight: 700;
+  fill: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Cycle-day heatmap ────────────────────────────────────────────────── */
+.heatmap-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: var(--sp-2) 0;
+}
+
+.heatmap {
+  display: grid;
+  grid-template-columns: repeat(var(--heat-cols), 1fr);
+  gap: 1.5px;
+  height: 26px;
+}
+
+.heat-cell {
+  border-radius: 2px;
+  background: var(--surface-3);
+  min-width: 0;
+}
+
+.heat-cell.has-value { background: var(--primary-line); }
+
+.heatmap-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Pattern list ─────────────────────────────────────────────────────── */
+.pattern-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  margin-top: var(--sp-3);
+}
+
+.pattern {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pattern-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.pattern-head strong { font-size: var(--fs-sm); }

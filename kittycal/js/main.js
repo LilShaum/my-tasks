@@ -14,6 +14,7 @@ import * as store from './state/store.js';
 import { applyTheme, readStoredTheme, watchSystemMode } from './ui/theme.js';
 import { renderToday } from './views/today.js';
 import { renderCalendar } from './views/calendar.js';
+import { renderInsights } from './views/insights.js';
 import { renderSettings } from './views/settings.js';
 import { mountOnboarding } from './views/onboarding.js';
 
@@ -21,6 +22,7 @@ import { mountOnboarding } from './views/onboarding.js';
 const VIEWS = {
   today: renderToday,
   calendar: renderCalendar,
+  insights: renderInsights,
   settings: renderSettings,
 };
 
@@ -113,6 +115,7 @@ function render() {
 /** @param {string} view */
 function titleFor(view) {
   if (view === 'calendar') return 'Calendar';
+  if (view === 'insights') return 'Insights';
   if (view === 'settings') return 'Settings';
   return 'Kittycal';
 }
