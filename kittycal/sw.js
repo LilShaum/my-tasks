@@ -27,6 +27,7 @@ const PRECACHE = [
   'css/views/log.css',
   'css/views/insights.css',
   'css/print.css',
+  'css/views/lock.css',
 
   'assets/fonts/nunito.woff2',
   'assets/fonts/fredoka.woff2',
@@ -56,6 +57,8 @@ const PRECACHE = [
   'js/ui/sheet.js',
   'js/ui/image-picker.js',
   'js/ui/chart.js',
+  'js/ui/lock.js',
+  'js/ui/reminders.js',
   'js/ui/theme.js',
   'js/ui/theme-picker.js',
   'js/ui/mascot.js',

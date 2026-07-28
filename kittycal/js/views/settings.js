@@ -8,6 +8,10 @@
  */
 
 import { el, replace, haptic, announce } from '../utils/dom.js';
+import { loadLock, disableLock, promptForNewPin } from '../ui/lock.js';
+import {
+  loadReminders, saveReminders, permissionState, requestPermission,
+} from '../ui/reminders.js';
 import { BIRTH_CONTROL, HORMONAL_BIRTH_CONTROL } from '../domain/model.js';
 import { themePicker, setPickerSelection } from '../ui/theme-picker.js';
 import { getTheme, THEMES } from '../data/themes.js';
@@ -51,6 +55,16 @@ export function renderSettings(host) {
     el('div', { class: 'section' }, [
       el('div', { class: 'section-title' }, [el('h2', { text: 'Units' })]),
       unitRows(settings),
+    ]),
+
+    el('div', { class: 'section' }, [
+      el('div', { class: 'section-title' }, [el('h2', { text: 'Reminders' })]),
+      reminderRows(),
+    ]),
+
+    el('div', { class: 'section' }, [
+      el('div', { class: 'section-title' }, [el('h2', { text: 'Privacy' })]),
+      lockRows(),
     ]),
 
     el('div', { class: 'section' }, [
@@ -230,6 +244,151 @@ function unitRows(settings) {
       'Changing a unit only changes how values are displayed. Nothing you have ' +
       'already logged is converted or rounded.' }),
   ]);
+}
+
+/* ── Reminders ──────────────────────────────────────────────────────────── */
+
+/**
+ * The copy here is deliberately blunt about the limitation. Flo's reminders
+ * arrive because Flo runs a server that pushes to your phone; Kittycal has no
+ * server, so it can only fire a reminder while the app is being used. Saying
+ * so is better than a notification that silently never comes.
+ */
+function reminderRows() {
+  const host = el('div', {});
+
+  const repaint = () => {
+    const state = permissionState();
+
+    /** @param {keyof import('../ui/reminders.js').ReminderSettings} key */
+    const row = (key, label, sub) => {
+      const toggle = el('button', {
+        type: 'button', class: 'toggle', role: 'switch',
+        'aria-checked': 'false', 'aria-label': label,
+        onclick: async () => {
+          const next = toggle.getAttribute('aria-checked') !== 'true';
+          if (next && !(await requestPermission())) {
+            toast('Your browser blocked notifications for this site');
+            repaint();
+            return;
+          }
+          toggle.setAttribute('aria-checked', String(next));
+          await saveReminders({ [key]: next });
+          haptic(8);
+          repaint();
+        },
+      });
+
+      // Reflect the stored value once it loads.
+      loadReminders().then((r) => {
+        toggle.setAttribute('aria-checked', String(Boolean(r[key])));
+      }).catch(() => {});
+
+      return el('div', { class: 'row' }, [
+        el('span', { class: 'row-label' }, [
+          label,
+          sub && el('span', { class: 'choice-sub', text: sub }),
+        ]),
+        toggle,
+      ]);
+    };
+
+    replace(host, [
+      state === 'unsupported'
+        ? el('div', { class: 'alert alert-info' }, [
+            el('span', { class: 'alert-icon', text: 'i', 'aria-hidden': 'true' }),
+            el('div', { text: 'This browser does not support notifications.' }),
+          ])
+        : el('div', { class: 'rows' }, [
+            row('periodSoon', 'Period coming up', 'A couple of days before it is expected'),
+            row('periodLate', 'Period is late', 'If it has not started when expected'),
+            row('fertile', 'Fertile window opens', 'Only when fertility estimates are shown'),
+            row('pill', 'Birth control', 'A daily nudge'),
+            row('logDaily', 'Log a day', 'If you have not logged anything yet'),
+          ]),
+
+      el('div', { class: 'alert alert-warn', style: { marginTop: 'var(--sp-3)' } }, [
+        el('span', { class: 'alert-icon', text: '!', 'aria-hidden': 'true' }),
+        el('div', {}, [
+          el('strong', { text: 'These only arrive while you are using Kittycal. ' }),
+          'Apps that notify you out of the blue do it by running a server that ' +
+          'pushes to your phone, and that server would know your cycle. ' +
+          'Kittycal has neither, so a reminder fires when you next open the ' +
+          'app on the day it is due — not before.',
+        ]),
+      ]),
+
+      state === 'denied' && el('div', { class: 'alert alert-danger', style: { marginTop: 'var(--sp-3)' } }, [
+        el('span', { class: 'alert-icon', text: '!', 'aria-hidden': 'true' }),
+        el('div', { text:
+          'Notifications are blocked for this site. You can re-enable them in ' +
+          'your browser’s settings for this page.' }),
+      ]),
+    ]);
+  };
+
+  repaint();
+  return host;
+}
+
+/* ── Passcode ───────────────────────────────────────────────────────────── */
+
+function lockRows() {
+  const host = el('div', {});
+
+  const repaint = () => {
+    loadLock().then((lock) => {
+      replace(host, [
+        el('div', { class: 'rows' }, [
+          el('button', {
+            type: 'button', class: 'row',
+            onclick: async () => {
+              if (lock.enabled) {
+                const ok = window.confirm(
+                  'Turn off the passcode? Kittycal will open straight away from now on.',
+                );
+                if (!ok) return;
+                await disableLock();
+                toast('Passcode turned off');
+              } else if (await promptForNewPin()) {
+                toast('Passcode set');
+              } else {
+                return;
+              }
+              repaint();
+            },
+          }, [
+            el('span', { class: 'row-label' }, [
+              lock.enabled ? 'Turn off passcode' : 'Set a passcode',
+              el('span', { class: 'choice-sub', text: lock.enabled
+                ? 'Kittycal asks for 4 digits when it opens'
+                : 'Ask for 4 digits when Kittycal opens' }),
+            ]),
+            el('span', { class: 'row-value', 'aria-hidden': 'true', text: '›' }),
+          ]),
+
+          lock.enabled && el('button', {
+            type: 'button', class: 'row',
+            onclick: async () => {
+              if (await promptForNewPin()) { toast('Passcode changed'); repaint(); }
+            },
+          }, [
+            el('span', { class: 'row-label', text: 'Change passcode' }),
+            el('span', { class: 'row-value', 'aria-hidden': 'true', text: '›' }),
+          ]),
+        ]),
+
+        el('p', { class: 'hint-sm', style: { marginTop: 'var(--sp-2)' }, text:
+          'The passcode is never stored — only a slow hash of it, so the stored ' +
+          'value is useless on its own. It keeps the app shut to whoever picks ' +
+          'up your phone. It is not encryption: someone determined, with your ' +
+          'unlocked device, could still reach the data underneath.' }),
+      ]);
+    }).catch(() => {});
+  };
+
+  repaint();
+  return host;
 }
 
 /* ── Data ───────────────────────────────────────────────────────────────── */

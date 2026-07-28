@@ -54,6 +54,7 @@
 <link rel="stylesheet" href="css/views/log.css"/>
 <link rel="stylesheet" href="css/views/insights.css"/>
 <link rel="stylesheet" href="css/print.css"/>
+<link rel="stylesheet" href="css/views/lock.css"/>
 
 <script>
 /*
@@ -110,6 +111,9 @@
     <circle cx="50" cy="49" r="10" fill="var(--accent)" stroke="var(--line)" stroke-width="3.5"/>
   </svg>
 </div>
+
+<!-- Passcode overlay, shown by lock.js before the app is revealed. -->
+<div id="lock-root" hidden></div>
 
 <!-- First run -->
 <div id="onboarding-root" hidden></div>
