@@ -20,6 +20,8 @@ import { el, replace, haptic } from '../utils/dom.js';
 import { todayKey, fmtDayMonth, fmtRelative, daysBetween } from '../utils/date.js';
 import { plural, listJoin } from '../utils/fmt.js';
 import { labelFor } from '../data/taxonomy.js';
+import { pick } from '../data/tips.js';
+import { loggedIds } from '../domain/stats.js';
 import { openLogSheet } from './log.js';
 import { buildCycles } from '../domain/cycles.js';
 import { predict, conceptionChance } from '../domain/predict.js';
@@ -60,6 +62,7 @@ export function renderToday(host) {
       eyebrow: prediction.cycleDay != null ? `Day ${prediction.cycleDay}` : undefined,
     }),
     ringLegend(prediction),
+    tipsRow({ phase, prediction, log: logs[today], today }),
     el('div', { class: 'section stagger' }, [
       phaseCard(phase, prediction),
       prediction.isLate ? lateCard(prediction) : nextPeriodCard(prediction),
@@ -124,6 +127,50 @@ function ringHeadline(prediction) {
   }
 
   return { value: '—', caption: 'not enough data' };
+}
+
+/**
+ * The daily insight cards — Flo's "My daily insights" row.
+ *
+ * A horizontal scroller, because these are worth glancing at and not worth
+ * three screens of vertical space. Cards are chosen by phase and by what she
+ * actually logged today, and they rotate day to day so the same one doesn't
+ * become wallpaper.
+ *
+ * @param {Object} opts
+ * @param {import('../domain/phases.js').PhaseInfo} opts.phase
+ * @param {import('../domain/predict.js').Prediction} opts.prediction
+ * @param {import('../domain/model.js').DayLog|undefined} opts.log
+ * @param {DateKey} opts.today
+ */
+function tipsRow({ phase, prediction, log, today }) {
+  const loggedToday = log ? loggedIds(log) : [];
+
+  const tips = pick({
+    phase: phase.id,
+    cycleDay: prediction.cycleDay,
+    loggedToday,
+    showFertility: prediction.showFertility,
+    dateSeed: today,
+  });
+
+  if (!tips.length) return null;
+
+  return el('section', { class: 'tips', 'aria-label': 'Things to know today' }, [
+    el('h3', { class: 'tips-heading', text: 'Worth knowing' }),
+    el('ul', {
+      class: 'tips-scroller',
+      // A horizontal scroller is a nuisance with a keyboard unless it's
+      // focusable and scrollable in its own right.
+      tabindex: '0',
+      role: 'list',
+    }, tips.map((tip) =>
+      el('li', { class: 'tip-card' }, [
+        el('h4', { text: tip.title }),
+        el('p', { text: tip.body }),
+      ]),
+    )),
+  ]);
 }
 
 /**

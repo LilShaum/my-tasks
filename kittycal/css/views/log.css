@@ -142,3 +142,80 @@
   gap: var(--sp-2);
   margin-top: var(--sp-2);
 }
+
+/* ── Search over every chip ───────────────────────────────────────────── */
+.search-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) 0;
+  /* The sheet body scrolls under this, so it needs its own backdrop. */
+  background: var(--surface);
+}
+
+.search-input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Chrome's default clear affordance sits awkwardly beside our own button. */
+.search-input::-webkit-search-cancel-button { display: none; }
+
+.search-clear {
+  flex: none;
+  min-height: 40px;
+  padding: 0 var(--sp-3);
+  font-weight: 700;
+}
+
+.search-count {
+  flex-basis: 100%;
+  margin-top: -2px;
+}
+
+/* ── Day summary, above the editing controls ──────────────────────────── */
+.day-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  margin-top: var(--sp-2);
+  background: var(--surface-2);
+  border-radius: var(--r-md);
+}
+
+.day-summary-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.day-summary-phase { font-weight: 700; font-size: var(--fs-sm); }
+
+.day-summary-date {
+  margin-left: auto;
+  font-size: var(--fs-xs);
+  color: var(--ink-2);
+}
+
+.day-summary-list { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+
+/* The panel is --surface-2 and so is a default badge, which made these read as
+   loose text rather than chips. Lift them onto the card colour. */
+.day-summary-list .badge {
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line-soft);
+}
+
+.day-summary-note {
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  font-style: italic;
+  /* Notes are free text — wrap rather than blow out the sheet width. */
+  overflow-wrap: anywhere;
+}

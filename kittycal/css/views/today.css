@@ -149,3 +149,57 @@
 .log-nudge h3 { font-size: var(--fs-md); }
 
 .log-nudge .mascot-host { animation: float-y 5s var(--ease-soft) infinite; }
+
+/* ── Daily insight cards ──────────────────────────────────────────────── */
+.tips { margin-bottom: var(--sp-5); }
+
+.tips-heading {
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-family: var(--font-body);
+  margin-bottom: var(--sp-2);
+}
+
+.tips-scroller {
+  display: flex;
+  gap: var(--sp-3);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  /* Bleed to the screen edges so a partially-visible next card hints that
+     the row scrolls, then pad the content back in. */
+  margin-inline: calc(var(--sp-4) * -1);
+  padding: 2px var(--sp-4) var(--sp-2);
+  scrollbar-width: none;
+}
+
+.tips-scroller::-webkit-scrollbar { display: none; }
+
+.tip-card {
+  flex: 0 0 78%;
+  max-width: 300px;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-4);
+  background: var(--card);
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-sticker);
+}
+
+.tip-card h4 {
+  font-size: var(--fs-md);
+  line-height: 1.2;
+}
+
+.tip-card p {
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  line-height: 1.5;
+}
