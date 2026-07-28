@@ -41,3 +41,10 @@ jobs:
 
       - id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          # The default is 10 minutes, and a deploy has already been aborted
+          # mid-`purging_cdn` at that mark — the CDN purge occasionally takes
+          # longer than that on GitHub's side. A failure here is silent from the
+          # outside: the site simply keeps serving the previous version, so
+          # give it room rather than have changes quietly not ship.
+          timeout: 1200000
