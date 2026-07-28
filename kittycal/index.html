@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="hellokitty" data-pattern="gingham" data-mode="light">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+
+<!--
+  Content Security Policy. This is the app's privacy promise made enforceable
+  rather than merely stated: every directive is 'self' or 'none', so there is no
+  host on the internet this page is permitted to talk to. No external scripts,
+  no external styles, no CDN fonts, no analytics, no beacons. If a future change
+  tries to phone home, the browser blocks it rather than trusting us to have
+  been careful.
+
+  connect-src is 'self' rather than 'none' only so the app can read its own
+  optional assets/mascots/manifest.json. Same-origin still means no outbound
+  request can leave the device.
+-->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'none';
+  script-src 'self' 'unsafe-inline';
+  style-src 'self' 'unsafe-inline';
+  font-src 'self';
+  img-src 'self' blob: data:;
+  connect-src 'self';
+  form-action 'none';
+  base-uri 'none';
+  manifest-src 'self';
+"/>
+
+<title>Kittycal</title>
+<meta name="description" content="A free, private cycle tracker. Your data never leaves your device."/>
+
+<!-- PWA -->
+<meta name="theme-color" content="#fff6f2"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<meta name="apple-mobile-web-app-title" content="Kittycal"/>
+<link rel="manifest" href="manifest.webmanifest"/>
+<link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml"/>
+<link rel="apple-touch-icon" href="assets/icons/icon-180.png"/>
+
+<!-- Fonts are vendored into assets/fonts and declared in reset.css. -->
+<link rel="preload" href="assets/fonts/nunito.woff2" as="font" type="font/woff2" crossorigin/>
+<link rel="preload" href="assets/fonts/fredoka.woff2" as="font" type="font/woff2" crossorigin/>
+
+<link rel="stylesheet" href="css/reset.css"/>
+<link rel="stylesheet" href="css/tokens.css"/>
+<link rel="stylesheet" href="css/themes.css"/>
+<link rel="stylesheet" href="css/components.css"/>
+<link rel="stylesheet" href="css/layout.css"/>
+<link rel="stylesheet" href="css/views/today.css"/>
+<link rel="stylesheet" href="css/views/calendar.css"/>
+<link rel="stylesheet" href="css/views/log.css"/>
+
+<script>
+/*
+  Theme applied before first paint. This has to be a blocking inline script
+  reading localStorage synchronously — going through the module graph or
+  IndexedDB would mean a visible flash of the default palette on every launch,
+  which on a themed app is the first thing you notice.
+*/
+(function () {
+  try {
+    var theme = localStorage.getItem('kittycal.theme');
+    var mode = localStorage.getItem('kittycal.mode') || 'auto';
+    var root = document.documentElement;
+
+    var patterns = {
+      hellokitty: 'gingham', mymelody: 'polka', kuromi: 'checker',
+      cinnamoroll: 'polka', keroppi: 'ripple', gudetama: 'none',
+      twinstars: 'star', badtzmaru: 'stripe', chococat: 'polka',
+      pompompurin: 'checker', aggretsuko: 'stripe', pochacco: 'gingham',
+      hangyodon: 'ripple', plain: 'none'
+    };
+
+    if (theme && patterns[theme]) {
+      root.dataset.theme = theme;
+      root.dataset.pattern = patterns[theme];
+    }
+
+    var dark = mode === 'dark' || (mode === 'auto' &&
+      window.matchMedia('(prefers-color-scheme: dark)').matches);
+    root.dataset.mode = dark ? 'dark' : 'light';
+  } catch (e) {
+    /* storage unavailable — the defaults in the html tag stand */
+  }
+})();
+</script>
+</head>
+
+<body>
+
+<!-- Decorative themed background. Behind everything, no pointer events. -->
+<div class="app-bg" aria-hidden="true"></div>
+
+<!-- Screen-reader announcements. Real feedback always comes through here;
+     animation and particles are decoration and never the only signal. -->
+<div id="live-region" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+
+<!-- Boot splash, removed by main.js once hydration finishes. -->
+<div class="boot" id="boot">
+  <svg class="boot-art" viewBox="0 0 100 100" aria-label="Loading Kittycal" role="img">
+    <path d="M50 48 C36 30 12 30 10 48 C12 66 36 66 50 48Z"
+      fill="var(--primary)" stroke="var(--line)" stroke-width="3.5" stroke-linejoin="round"/>
+    <path d="M50 48 C64 30 88 30 90 48 C88 66 64 66 50 48Z"
+      fill="var(--primary)" stroke="var(--line)" stroke-width="3.5" stroke-linejoin="round"/>
+    <circle cx="50" cy="49" r="10" fill="var(--accent)" stroke="var(--line)" stroke-width="3.5"/>
+  </svg>
+</div>
+
+<!-- First run -->
+<div id="onboarding-root" hidden></div>
+
+<!-- The app -->
+<div id="app-root" hidden>
+  <div class="shell">
+    <header class="app-head">
+      <span class="mascot-mini" aria-hidden="true">
+        <svg viewBox="0 0 100 100" width="30" height="30">
+          <path d="M50 48 C36 30 12 30 10 48 C12 66 36 66 50 48Z"
+            fill="var(--primary)" stroke="var(--line)" stroke-width="4" stroke-linejoin="round"/>
+          <path d="M50 48 C64 30 88 30 90 48 C88 66 64 66 50 48Z"
+            fill="var(--primary)" stroke="var(--line)" stroke-width="4" stroke-linejoin="round"/>
+          <circle cx="50" cy="49" r="10" fill="var(--accent)" stroke="var(--line)" stroke-width="4"/>
+        </svg>
+      </span>
+      <h1><span id="app-title-text">Kittycal</span></h1>
+    </header>
+
+    <main>
+      <section class="view" id="view-today" aria-label="Today"></section>
+      <section class="view" id="view-calendar" aria-label="Calendar" hidden></section>
+      <section class="view" id="view-settings" aria-label="Settings" hidden></section>
+    </main>
+  </div>
+
+  <nav class="tabbar" role="tablist" aria-label="Main navigation">
+    <button class="tab" type="button" role="tab" data-tab="today" aria-selected="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="9"/>
+        <path d="M12 7v5l3 2"/>
+      </svg>
+      <span>Today</span>
+    </button>
+    <button class="tab" type="button" role="tab" data-tab="calendar" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="5" width="18" height="16" rx="3"/>
+        <path d="M3 10h18M8 3v4M16 3v4"/>
+      </svg>
+      <span>Calendar</span>
+    </button>
+    <button class="tab" type="button" role="tab" data-tab="settings" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M12 3v3M12 18v3M4.6 7.5l2.6 1.5M16.8 15l2.6 1.5M4.6 16.5l2.6-1.5M16.8 9l2.6-1.5"/>
+      </svg>
+      <span>Settings</span>
+    </button>
+  </nav>
+</div>
+
+<div class="toast-host" id="toast-host" aria-live="off"></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

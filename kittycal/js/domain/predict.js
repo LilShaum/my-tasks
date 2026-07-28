@@ -1,0 +1,373 @@
+// @ts-check
+/**
+ * predict.js — forecast the next period, ovulation and fertile window.
+ *
+ * Flo's own accuracy documentation describes the parts of its approach that are
+ * worth copying, and they aren't the neural network — they're the honesty
+ * mechanisms:
+ *
+ *   - Under three logged cycles, don't pretend: use her stated average and
+ *     label the result an estimate.
+ *   - Weight recent cycles more heavily than old ones.
+ *   - If cycle length shifts and *stays* shifted for three cycles, re-anchor
+ *     onto those three rather than letting years of history drag the mean.
+ *   - When the data doesn't support a confident fertile window, widen it and say
+ *     so, instead of drawing a narrow window that looks authoritative.
+ *   - If she's on a hormonal method, don't show ovulation at all. It isn't
+ *     happening, so a prediction would be actively misleading.
+ *
+ * Ovulation is derived by the luteal-phase method — next period minus luteal
+ * length — rather than the cycle midpoint. The luteal phase is the stable part
+ * of the cycle; midpoint estimates degrade badly once cycles vary.
+ *
+ * @typedef {import('../utils/date.js').DateKey} DateKey
+ * @typedef {import('./cycles.js').Cycle} Cycle
+ * @typedef {import('./model.js').Settings} Settings
+ */
+
+import { addDays, daysBetween } from '../utils/date.js';
+import {
+  buildCycles, cycleLengths, periodLengths, currentCycle, summarize, periodSpan,
+} from './cycles.js';
+import { HORMONAL_BIRTH_CONTROL } from './model.js';
+import { regularity } from './acog.js';
+
+/** How many recent cycles feed the weighted average. */
+const WINDOW = 6;
+
+/** Cycles needed before we trust logged data over her stated average. */
+const MIN_CYCLES_FOR_MODEL = 3;
+
+/** Sustained-change detection: this many consecutive cycles in one direction. */
+const RECALIBRATE_AFTER = 3;
+const RECALIBRATE_DELTA = 3;
+
+/** Fertile window: ovulation minus this, through ovulation plus one. */
+const FERTILE_BEFORE = 5;
+const FERTILE_AFTER = 1;
+
+/** Widened window used when confidence is low, per Flo's documented fallback. */
+const UNCERTAIN_WINDOW = 14;
+
+export const CYCLE_MIN_CLAMP = 21;
+export const CYCLE_MAX_CLAMP = 45;
+
+/**
+ * @typedef {'none'|'low'|'medium'|'high'} Confidence
+ */
+
+/**
+ * @typedef {Object} Prediction
+ * @property {number} avgCycleLength   the number actually used, rounded
+ * @property {number} avgPeriodLength
+ * @property {Confidence} confidence
+ * @property {string} basis            plain-language account of where the
+ *                                     number came from, shown in the UI
+ * @property {boolean} recalibrated
+ * @property {DateKey|null} lastStart
+ * @property {DateKey|null} nextStart
+ * @property {{start: DateKey, end: DateKey}|null} nextPeriod
+ * @property {DateKey|null} ovulation
+ * @property {{start: DateKey, end: DateKey}|null} fertileWindow
+ * @property {boolean} fertileWidened
+ * @property {boolean} showFertility
+ * @property {number|null} daysUntilPeriod  negative once late
+ * @property {number|null} daysLate
+ * @property {boolean} isLate
+ * @property {number|null} cycleDay
+ * @property {number|null} spread
+ * @property {'regular'|'variable'|'irregular'|null} regularity
+ * @property {number} cyclesLogged
+ * @property {number} lutealDays    luteal length actually used
+ * @property {number} fertileBefore days of fertile window before ovulation
+ */
+
+/**
+ * Weighted mean over the most recent `WINDOW` cycles, newest weighted highest.
+ * A linear ramp (1,2,3…) is enough — it tracks a drifting cycle without
+ * throwing away history, and it's explainable to a user, which an exponential
+ * decay constant is not.
+ * @param {number[]} lengths oldest first
+ * @returns {number|null}
+ */
+export function weightedAverage(lengths) {
+  if (!lengths.length) return null;
+  const recent = lengths.slice(-WINDOW);
+  let total = 0;
+  let weight = 0;
+  recent.forEach((length, i) => {
+    const w = i + 1;
+    total += length * w;
+    weight += w;
+  });
+  return total / weight;
+}
+
+/**
+ * Has cycle length shifted and stayed shifted?
+ *
+ * Compares the last three cycles against the mean of everything before them. If
+ * all three moved the same way by more than a few days, the old mean is stale
+ * and we re-anchor onto the recent three.
+ *
+ * @param {number[]} lengths oldest first
+ * @returns {{recalibrated: boolean, value: number|null}}
+ */
+export function detectRecalibration(lengths) {
+  if (lengths.length < RECALIBRATE_AFTER * 2) return { recalibrated: false, value: null };
+
+  const recent = lengths.slice(-RECALIBRATE_AFTER);
+  const historic = lengths.slice(0, -RECALIBRATE_AFTER);
+  const baseline = historic.reduce((a, b) => a + b, 0) / historic.length;
+
+  const allUp = recent.every((n) => n - baseline > RECALIBRATE_DELTA);
+  const allDown = recent.every((n) => baseline - n > RECALIBRATE_DELTA);
+
+  if (!allUp && !allDown) return { recalibrated: false, value: null };
+  return {
+    recalibrated: true,
+    value: recent.reduce((a, b) => a + b, 0) / recent.length,
+  };
+}
+
+/**
+ * Rate how much to trust the forecast.
+ * @param {number} cyclesLogged
+ * @param {number|null} spread
+ * @returns {Confidence}
+ */
+export function rateConfidence(cyclesLogged, spread) {
+  if (cyclesLogged === 0) return 'none';
+  if (cyclesLogged < 2) return 'low';
+  if (spread != null && spread > 12) return 'low';
+  if (cyclesLogged < MIN_CYCLES_FOR_MODEL) return 'medium';
+  if (spread != null && spread > 9) return 'medium';
+  return 'high';
+}
+
+/**
+ * The whole forecast.
+ *
+ * @param {Object} input
+ * @param {Set<DateKey>|DateKey[]} input.periodDays
+ * @param {Settings} input.settings
+ * @param {DateKey} input.today
+ * @returns {Prediction}
+ */
+export function predict({ periodDays, settings, today }) {
+  const cycles = buildCycles(periodDays);
+  const lengths = cycleLengths(cycles);
+  const periods = periodLengths(cycles, today);
+  const stats = summarize(lengths);
+  const current = currentCycle(cycles);
+
+  const onHormonal = HORMONAL_BIRTH_CONTROL.has(settings.birthControl);
+  const confidence = rateConfidence(lengths.length, stats.spread);
+
+  /* ── Which cycle length do we use? ───────────────────────────────────── */
+  let avg = settings.avgCycleLength;
+  let basis = `your stated average of ${settings.avgCycleLength} days`;
+  let recalibrated = false;
+
+  if (lengths.length >= MIN_CYCLES_FOR_MODEL) {
+    const shift = detectRecalibration(lengths);
+    if (shift.recalibrated && shift.value != null) {
+      avg = shift.value;
+      recalibrated = true;
+      basis = `your last ${RECALIBRATE_AFTER} cycles — your cycle length has changed and stayed changed`;
+    } else {
+      const weighted = weightedAverage(lengths);
+      if (weighted != null) {
+        avg = weighted;
+        basis = `your last ${Math.min(WINDOW, lengths.length)} cycles, weighting recent ones more`;
+      }
+    }
+  } else if (lengths.length > 0) {
+    // One or two cycles: blend what we've seen with her stated prior rather
+    // than swinging fully onto a single observation.
+    const observed = lengths.reduce((a, b) => a + b, 0) / lengths.length;
+    avg = (observed + settings.avgCycleLength) / 2;
+    basis = lengths.length === 1
+      ? 'one logged cycle blended with your stated average'
+      : `${lengths.length} logged cycles blended with your stated average`;
+  }
+
+  avg = clamp(Math.round(avg), CYCLE_MIN_CLAMP, CYCLE_MAX_CLAMP);
+
+  const avgPeriod = periods.length
+    ? clamp(Math.round(periods.reduce((a, b) => a + b, 0) / periods.length), 1, 14)
+    : settings.avgPeriodLength;
+
+  /* ── Next period ─────────────────────────────────────────────────────── */
+  const lastStart = current?.start ?? null;
+  const nextStart = lastStart ? addDays(lastStart, avg) : null;
+
+  let daysUntilPeriod = nextStart ? daysBetween(today, nextStart) : null;
+  let daysLate = null;
+  let isLate = false;
+
+  if (nextStart && daysUntilPeriod != null && daysUntilPeriod < 0) {
+    isLate = true;
+    daysLate = -daysUntilPeriod;
+  }
+
+  /* ── Ovulation and the fertile window ────────────────────────────────── */
+  const showFertility = !onHormonal && settings.showFertility;
+
+  /** @type {DateKey|null} */
+  let ovulation = null;
+  /** @type {{start: DateKey, end: DateKey}|null} */
+  let fertileWindow = null;
+  let fertileWidened = false;
+  let fertileBefore = FERTILE_BEFORE;
+
+  if (showFertility && nextStart) {
+    // Luteal-phase method: the luteal phase is the stable part of the cycle,
+    // so counting back from the next period beats halving the cycle.
+    ovulation = addDays(nextStart, -settings.lutealLength);
+
+    if (confidence === 'low' || confidence === 'none') {
+      // Don't draw a narrow window we can't support. Widen and say so.
+      const half = Math.floor(UNCERTAIN_WINDOW / 2);
+      fertileWindow = {
+        start: addDays(ovulation, -half),
+        end: addDays(ovulation, UNCERTAIN_WINDOW - half - 1),
+      };
+      fertileWidened = true;
+      fertileBefore = half;
+    } else {
+      fertileWindow = {
+        start: addDays(ovulation, -FERTILE_BEFORE),
+        end: addDays(ovulation, FERTILE_AFTER),
+      };
+    }
+  }
+
+  return {
+    avgCycleLength: avg,
+    avgPeriodLength: avgPeriod,
+    confidence,
+    basis,
+    recalibrated,
+    lastStart,
+    nextStart,
+    nextPeriod: nextStart ? periodSpan(nextStart, avgPeriod) : null,
+    ovulation,
+    fertileWindow,
+    fertileWidened,
+    showFertility,
+    daysUntilPeriod,
+    daysLate,
+    isLate,
+    cycleDay: lastStart ? daysBetween(lastStart, today) + 1 : null,
+    spread: stats.spread,
+    regularity: stats.spread == null ? null : regularity(stats.spread),
+    cyclesLogged: lengths.length,
+    lutealDays: settings.lutealLength,
+    fertileBefore,
+  };
+}
+
+/**
+ * Predicted period spans for the next `count` cycles, for drawing the calendar
+ * forward. Each successive one compounds the same average, so uncertainty grows
+ * with distance — the calendar renders later ones more faintly to reflect that.
+ *
+ * @param {Prediction} prediction
+ * @param {number} count
+ * @returns {{start: DateKey, end: DateKey, ordinal: number}[]}
+ */
+export function upcomingPeriods(prediction, count = 4) {
+  if (!prediction.nextStart) return [];
+  /** @type {{start: DateKey, end: DateKey, ordinal: number}[]} */
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const start = addDays(prediction.nextStart, prediction.avgCycleLength * i);
+    const span = periodSpan(start, prediction.avgPeriodLength);
+    out.push({ ...span, ordinal: i });
+  }
+  return out;
+}
+
+/**
+ * Predicted ovulation days and fertile windows for the next `count` cycles.
+ * @param {Prediction} prediction
+ * @param {number} count
+ */
+export function upcomingFertile(prediction, count = 4) {
+  if (!prediction.showFertility || !prediction.ovulation) return [];
+  /** @type {{ovulation: DateKey, start: DateKey, end: DateKey, ordinal: number}[]} */
+  const out = [];
+  const width = prediction.fertileWidened ? UNCERTAIN_WINDOW : FERTILE_BEFORE + FERTILE_AFTER + 1;
+  const before = prediction.fertileWidened ? Math.floor(UNCERTAIN_WINDOW / 2) : FERTILE_BEFORE;
+
+  for (let i = 0; i < count; i++) {
+    const ovulation = addDays(prediction.ovulation, prediction.avgCycleLength * i);
+    out.push({
+      ovulation,
+      start: addDays(ovulation, -before),
+      end: addDays(ovulation, width - before - 1),
+      ordinal: i,
+    });
+  }
+  return out;
+}
+
+/**
+ * Chance of conception on a given day, as a coarse band rather than a decimal.
+ *
+ * Flo reports tiers ("high chance", "a chance") rather than a number, and
+ * that's the right call: the underlying estimate is nowhere near precise enough
+ * to justify a percentage, and a percentage invites treating it as one.
+ *
+ * @param {Prediction} prediction
+ * @param {DateKey} date
+ * @returns {{tier: 'high'|'some'|'low'|'none', label: string}}
+ */
+export function conceptionChance(prediction, date) {
+  if (!prediction.showFertility || !prediction.ovulation || !prediction.fertileWindow) {
+    return { tier: 'none', label: 'Not estimated' };
+  }
+
+  const { ovulation, fertileWindow } = prediction;
+  const offset = daysBetween(ovulation, date);
+
+  if (date < fertileWindow.start || date > fertileWindow.end) {
+    return { tier: 'low', label: 'Low chance of getting pregnant' };
+  }
+  // Peak fertility is the day before ovulation and the day itself.
+  if (offset === 0 || offset === -1) {
+    return { tier: 'high', label: 'High chance of getting pregnant' };
+  }
+  return { tier: 'some', label: 'Some chance of getting pregnant' };
+}
+
+/**
+ * Detect a BBT thermal shift, which retroactively confirms that ovulation
+ * happened. Three consecutive readings at least 0.2°C above the mean of the
+ * previous six is the standard rule.
+ *
+ * Retrospective by nature — it tells you ovulation already occurred, not that
+ * it's coming.
+ *
+ * @param {{date: DateKey, bbt: number}[]} readings chronological, °C
+ * @returns {DateKey|null} the first day of the shift
+ */
+export function detectThermalShift(readings) {
+  const BASELINE_DAYS = 6;
+  const RISE = 0.2;
+  const SUSTAINED = 3;
+
+  for (let i = BASELINE_DAYS; i + SUSTAINED <= readings.length; i++) {
+    const baseline = readings.slice(i - BASELINE_DAYS, i);
+    const mean = baseline.reduce((a, r) => a + r.bbt, 0) / baseline.length;
+    const window = readings.slice(i, i + SUSTAINED);
+    if (window.every((r) => r.bbt - mean >= RISE)) return window[0].date;
+  }
+  return null;
+}
+
+/** @param {number} n @param {number} lo @param {number} hi */
+function clamp(n, lo, hi) {
+  return Math.min(hi, Math.max(lo, n));
+}

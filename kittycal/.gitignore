@@ -1,0 +1,8 @@
+# Your own artwork lives here. Never committed — see assets/mascots/README.md
+assets/mascots/*
+!assets/mascots/README.md
+!assets/mascots/.gitkeep
+
+.DS_Store
+node_modules/
+*.log

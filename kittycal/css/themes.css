@@ -1,0 +1,165 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   themes.css
+
+   A theme is two numbers. --h picks the hue, --c the chroma, and tokens.css
+   derives all 40-odd colours from them at fixed lightness — so every theme
+   is contrast-correct for free, in both light and dark mode.
+
+   Hues are tuned to each character's palette and spaced far enough apart to
+   stay distinguishable. Where a character's accent isn't simply the
+   complement of its primary (Badtz-Maru's yellow on black, Kuromi's magenta
+   on purple), the theme overrides --accent directly.
+   ───────────────────────────────────────────────────────────────────────── */
+
+[data-theme='hellokitty']  { --h: 18;  --c: 0.145; }
+[data-theme='mymelody']    { --h: 355; --c: 0.115; }
+[data-theme='kuromi']      { --h: 305; --c: 0.130;
+  --accent:      oklch(70% 0.19 350);
+  --accent-soft: oklch(89% 0.08 350);
+}
+[data-theme='cinnamoroll'] { --h: 232; --c: 0.090;
+  --accent:      oklch(78% 0.11 12);
+  --accent-soft: oklch(92% 0.05 12);
+}
+[data-theme='keroppi']     { --h: 140; --c: 0.140;
+  --accent:      oklch(70% 0.15 22);
+  --accent-soft: oklch(90% 0.07 22);
+}
+[data-theme='gudetama']    { --h: 85;  --c: 0.130;
+  /* Yellow needs chroma to fall as lightness rises or it turns to mud. */
+  --surface:   oklch(97.5% 0.030 85);
+  --surface-2: oklch(93.5% 0.055 85);
+  --primary:   oklch(80% 0.135 85);
+  --ink:       oklch(31% 0.060 68);
+  --accent:    oklch(62% 0.11 38);
+}
+[data-theme='twinstars']   { --h: 285; --c: 0.085;
+  --accent:      oklch(84% 0.13 95);
+  --accent-soft: oklch(93% 0.07 95);
+}
+/* The three themes below are built on a *dark* primary rather than a pastel
+   one. The global --on-primary is a deep ink, which would be unreadable on
+   them, so each flips its button label to near-white and keeps its fill at or
+   below L46 — the point where white text still clears 4.5:1. */
+[data-theme='badtzmaru']   { --h: 250; --c: 0.035;
+  /* Penguin black + beak yellow: near-monochrome with one loud accent. */
+  --accent:      oklch(80% 0.15 88);
+  --accent-soft: oklch(92% 0.08 88);
+  --primary:     oklch(46% 0.045 250);
+  --primary-line: oklch(40% 0.04 250);
+  --on-primary:  oklch(97% 0.005 250);
+  --line:        oklch(42% 0.03 250);
+}
+[data-theme='chococat']    { --h: 55;  --c: 0.075;
+  --accent:      oklch(62% 0.10 190);
+  --accent-soft: oklch(89% 0.05 190);
+  --primary:     oklch(45% 0.075 55);
+  --primary-line: oklch(40% 0.07 55);
+  --on-primary:  oklch(97% 0.01 55);
+}
+[data-theme='pompompurin'] { --h: 101; --c: 0.105;
+  --accent:      oklch(52% 0.09 62);
+  --accent-soft: oklch(88% 0.05 62);
+  --primary:     oklch(80% 0.115 101);
+  --ink:         oklch(31% 0.055 80);
+}
+[data-theme='aggretsuko']  { --h: 38;  --c: 0.135;
+  --accent:      oklch(45% 0.03 260);
+  --accent-soft: oklch(88% 0.02 260);
+  --primary:     oklch(46% 0.15 32);
+  --primary-line: oklch(41% 0.14 32);
+  --on-primary:  oklch(97% 0.01 32);
+}
+[data-theme='pochacco']    { --h: 252; --c: 0.110;
+  --accent:      oklch(74% 0.14 62);
+  --accent-soft: oklch(91% 0.07 62);
+}
+[data-theme='hangyodon']   { --h: 205; --c: 0.105;
+  --accent:      oklch(78% 0.10 350);
+  --accent-soft: oklch(92% 0.05 350);
+}
+
+/* The exit. Neutral, pattern-free, motion-free — for showing a doctor, for
+   reduced-motion, and as the print baseline. See design rule 4. */
+[data-theme='plain'] { --h: 250; --c: 0;
+  --accent:      oklch(58% 0.10 250);
+  --accent-soft: oklch(90% 0.04 250);
+  --sh-sticker:       0 1px 2px oklch(50% 0 0 / 0.14);
+  --sh-sticker-press: 0 1px 1px oklch(50% 0 0 / 0.14);
+  --bw: 1.5px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Decorative background patterns
+
+   All pure CSS, all sharing the --pat-size and --pat-color knobs from
+   tokens.css so one definition serves every theme. Applied to .app-bg,
+   which sits behind content at low contrast — a pattern under text is a
+   readability problem even when the ratio technically passes.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.app-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-color: var(--surface);
+  pointer-events: none;
+}
+
+[data-pattern='polka'] .app-bg {
+  background-image:
+    radial-gradient(var(--pat-color) 21%, transparent 22%),
+    radial-gradient(var(--pat-color) 21%, transparent 22%);
+  background-size: calc(var(--pat-size) * 1.5) calc(var(--pat-size) * 1.5);
+  background-position: 0 0, calc(var(--pat-size) * 0.75) calc(var(--pat-size) * 0.75);
+}
+
+/* Translucent stripes crossing is what makes gingham gingham — the
+   intersections darken on their own. Opaque stripes give you plaid. */
+[data-pattern='gingham'] .app-bg {
+  background-image:
+    repeating-linear-gradient(0deg,
+      var(--pat-color) 0 var(--pat-size),
+      transparent var(--pat-size) calc(var(--pat-size) * 2)),
+    repeating-linear-gradient(90deg,
+      var(--pat-color) 0 var(--pat-size),
+      transparent var(--pat-size) calc(var(--pat-size) * 2));
+}
+
+[data-pattern='checker'] .app-bg {
+  background-image:
+    linear-gradient(45deg, var(--pat-color) 25%, transparent 25% 75%, var(--pat-color) 75%),
+    linear-gradient(45deg, var(--pat-color) 25%, transparent 25% 75%, var(--pat-color) 75%);
+  background-size: calc(var(--pat-size) * 2) calc(var(--pat-size) * 2);
+  background-position: 0 0, var(--pat-size) var(--pat-size);
+}
+
+[data-pattern='stripe'] .app-bg {
+  background-image: repeating-linear-gradient(-45deg,
+    var(--pat-color) 0 calc(var(--pat-size) * 0.5),
+    transparent calc(var(--pat-size) * 0.5) calc(var(--pat-size) * 1.4));
+}
+
+[data-pattern='ripple'] .app-bg {
+  background-image: repeating-radial-gradient(circle at 50% 50%,
+    transparent 0 calc(var(--pat-size) * 1.2),
+    var(--pat-color) calc(var(--pat-size) * 1.2) calc(var(--pat-size) * 1.35));
+  background-size: calc(var(--pat-size) * 7) calc(var(--pat-size) * 7);
+}
+
+[data-pattern='star'] .app-bg {
+  background-image:
+    radial-gradient(circle, var(--pat-color) 14%, transparent 15%),
+    radial-gradient(circle, var(--pat-color) 8%, transparent 9%);
+  background-size:
+    calc(var(--pat-size) * 3) calc(var(--pat-size) * 3),
+    calc(var(--pat-size) * 1.9) calc(var(--pat-size) * 1.9);
+  background-position: 0 0, calc(var(--pat-size) * 1.1) calc(var(--pat-size) * 1.3);
+}
+
+[data-pattern='none'] .app-bg { background-image: none; }
+
+/* Patterns are decoration. Drop them, don't slow them. */
+@media (prefers-reduced-motion: reduce) {
+  .app-bg { background-image: none !important; }
+}

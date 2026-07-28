@@ -1,0 +1,151 @@
+/* ── Today screen ─────────────────────────────────────────────────────── */
+
+.today-greeting { margin-bottom: var(--sp-3); }
+
+.today-greeting h2 { font-size: var(--fs-xl); }
+
+.today-greeting .hint-sm { letter-spacing: 0.08em; font-weight: 700; }
+
+/* ── The cycle ring ───────────────────────────────────────────────────── */
+.ring-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  margin: var(--sp-3) auto var(--sp-4);
+  width: 240px;
+  height: 240px;
+}
+
+.cycle-ring { display: block; }
+
+.ring-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  text-align: center;
+  padding: 0 44px;
+  pointer-events: none;
+}
+
+.ring-eyebrow {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.ring-headline {
+  font-family: var(--font-display);
+  font-size: var(--fs-3xl);
+  line-height: 1;
+  color: var(--ink);
+}
+
+.ring-caption {
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  line-height: 1.25;
+  max-width: 15ch;
+}
+
+.ring-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--sp-2) var(--sp-4);
+  margin-bottom: var(--sp-5);
+  font-size: var(--fs-xs);
+  color: var(--ink-2);
+  font-weight: 600;
+}
+
+.ring-legend li { display: flex; align-items: center; gap: 5px; }
+
+.legend-dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  border: 1px solid oklch(50% 0 0 / 0.2);
+  flex: none;
+}
+
+/* ── Cards ────────────────────────────────────────────────────────────── */
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+}
+
+.card-head h3 { font-size: var(--fs-md); }
+
+.phase-dot {
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  flex: none;
+  border: 1.5px solid oklch(50% 0 0 / 0.2);
+}
+
+.big-value {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  color: var(--ink);
+  margin: var(--sp-1) 0 var(--sp-2);
+}
+
+/* ── Stat row (data zone) ─────────────────────────────────────────────── */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-2);
+  margin: var(--sp-3) 0;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding: var(--sp-2);
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+}
+
+.stat-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.stat-value {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.stat-unit { font-size: 10px; color: var(--ink-3); }
+
+/* ── ACOG flag list ──────────────────────────────────────────────────── */
+.flag-list { display: flex; flex-direction: column; gap: var(--sp-3); }
+
+.flag-list li { display: flex; flex-direction: column; gap: 2px; }
+
+.flag-list strong { font-size: var(--fs-sm); }
+
+/* ── Log nudge ────────────────────────────────────────────────────────── */
+.log-nudge {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.log-nudge h3 { font-size: var(--fs-md); }
+
+.log-nudge .mascot-host { animation: float-y 5s var(--ease-soft) infinite; }

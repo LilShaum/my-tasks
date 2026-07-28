@@ -1,0 +1,14 @@
+{
+  "name": "kittycal",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A free, private, offline-first cycle tracker. No dependencies, no build step.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"test/*.test.js\"",
+    "typecheck": "npx -y typescript@5 --noEmit -p jsconfig.json",
+    "serve": "python3 -m http.server 8080"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
