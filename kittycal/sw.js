@@ -54,6 +54,7 @@ const PRECACHE = [
   'js/views/insights.js',
   'js/views/report.js',
   'js/data/taxonomy.js',
+  'js/data/tips.js',
   'js/ui/sheet.js',
   'js/ui/image-picker.js',
   'js/ui/chart.js',

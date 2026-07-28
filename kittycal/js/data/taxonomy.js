@@ -306,6 +306,84 @@ export function optionCount() {
 }
 
 /**
+ * Extra words that should find an option.
+ *
+ * Two reasons these are needed. The labels use British spellings, so anyone
+ * typing "diarrhea" or "hot flashes" would otherwise find nothing. And people
+ * search for what they'd actually say — "sore boobs", "the runs", "spots" —
+ * rather than the clinical label on the chip.
+ *
+ * @type {Record<string, string[]>}
+ */
+const SYNONYMS = {
+  diarrhea: ['diarrhea', 'the runs', 'loose'],
+  'hot-flashes': ['hot flashes', 'flashes', 'overheating'],
+  'tender-breasts': ['sore boobs', 'sore breasts', 'breast pain', 'boobs', 'chest'],
+  'breast-lumps': ['lump', 'boobs'],
+  acne: ['spots', 'pimples', 'breakout', 'skin'],
+  cramps: ['cramping', 'period pain', 'pain'],
+  'abdominal-pain': ['stomach ache', 'tummy', 'belly'],
+  nausea: ['sick', 'queasy'],
+  fatigue: ['tired', 'exhausted', 'knackered'],
+  'low-energy': ['tired', 'sluggish'],
+  bloating: ['bloated', 'puffy'],
+  cravings: ['hungry', 'craving', 'snack'],
+  'increased-appetite': ['hungry'],
+  'frequent-urination': ['peeing', 'weeing', 'toilet'],
+  'uti-pain': ['uti', 'cystitis', 'stinging'],
+  thrush: ['yeast', 'itchy'],
+  insomnia: ['cant sleep', 'awake', 'sleepless'],
+  'restless-sleep': ['bad sleep', 'tossing'],
+  'brain-fog': ['foggy', 'forgetful', 'concentration'],
+  'mood-swings': ['moody', 'emotional'],
+  irritable: ['irritated', 'annoyed', 'snappy', 'grumpy'],
+  anxious: ['anxiety', 'worried', 'nervous'],
+  'egg-white': ['ewcm', 'stretchy', 'clear'],
+  unprotected: ['no condom'],
+  protected: ['condom'],
+  spotting: ['light bleeding', 'brown'],
+  heavy: ['flooding'],
+  clots: ['clot'],
+  gym: ['workout', 'weights', 'lifting'],
+  running: ['run', 'jog', 'cardio'],
+  walking: ['walk', 'steps'],
+};
+
+/**
+ * Does an option match a search query?
+ *
+ * Matches on any word boundary rather than only the start of the label, so
+ * "sweat" finds "Night sweats" and "back" finds "Backache". Accent- and
+ * case-insensitive, and synonym-aware.
+ *
+ * @param {Option} option
+ * @param {string} query already normalised by `normalizeQuery`
+ */
+export function optionMatches(option, query) {
+  if (!query) return true;
+
+  const haystacks = [option.label, ...(SYNONYMS[option.id] ?? [])];
+  return haystacks.some((text) => {
+    const normalized = normalizeQuery(text);
+    if (normalized.startsWith(query)) return true;
+    return normalized.split(/[\s-]+/).some((word) => word.startsWith(query));
+  });
+}
+
+/**
+ * Lowercase, strip accents and trim — so "Diarrhoea" is reachable by typing
+ * "diarrhea", and stray spaces don't break a search.
+ * @param {string} text
+ */
+export function normalizeQuery(text) {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')  // combining diacritics, left behind by NFD
+    .trim();
+}
+
+/**
  * Every symptom-ish id paired with a readable label, for the insights heatmap
  * and the doctor report. Excludes the "none" options, which record an absence
  * and would only add noise to a frequency chart.

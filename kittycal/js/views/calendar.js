@@ -25,7 +25,8 @@
 import { el, replace, haptic, announce } from '../utils/dom.js';
 import {
   todayKey, makeKey, daysInMonth, fmtMonthYear, fmtLong, gridColumn, rotateDow,
-  DOW_MIN, addDays, range, month as monthOf, year as yearOf, dayOfMonth,
+  DOW_MIN, MONTHS, MONTHS_SHORT, addDays, range,
+  month as monthOf, year as yearOf, dayOfMonth,
 } from '../utils/date.js';
 import { buildCycles, isPeriodDay } from '../domain/cycles.js';
 import { predict, upcomingPeriods, upcomingFertile } from '../domain/predict.js';
@@ -50,6 +51,15 @@ export function renderCalendar(host) {
   // rather than a scan over every predicted range.
   const marks = buildMarks(prediction, cycles, today);
 
+  if (ui.calView === 'year') {
+    replace(host, [
+      yearHeader(ui.calYear),
+      yearGrid({ year: ui.calYear, today, cycles, marks, firstDayOfWeek: settings.firstDayOfWeek }),
+      legend(prediction, { fertility: false }),
+    ]);
+    return;
+  }
+
   replace(host, [
     monthHeader(ui.calYear, ui.calMonth),
     editModeBar(ui.periodEditMode),
@@ -67,6 +77,85 @@ export function renderCalendar(host) {
     legend(prediction),
     !cycles.length ? firstRunHint() : null,
   ]);
+}
+
+/* ── Year view ──────────────────────────────────────────────────────────── */
+
+/** @param {number} year */
+function yearHeader(year) {
+  return el('div', { class: 'cal-head' }, [
+    el('button', {
+      type: 'button', class: 'btn-icon', 'aria-label': 'Previous year', text: '‹',
+      onclick: () => { haptic(8); store.setUi({ calYear: year - 1 }); },
+    }),
+    el('h2', { class: 'cal-month num', text: String(year), 'aria-live': 'polite' }),
+    el('button', {
+      type: 'button', class: 'btn-icon', 'aria-label': 'Next year', text: '›',
+      onclick: () => { haptic(8); store.setUi({ calYear: year + 1 }); },
+    }),
+    el('button', {
+      type: 'button', class: 'btn btn-secondary cal-today-btn', text: 'Months',
+      onclick: () => { haptic(8); store.setUi({ calView: 'month' }); },
+    }),
+  ]);
+}
+
+/**
+ * Twelve miniature months. Tapping one jumps to it.
+ *
+ * Deliberately shows only logged periods and predicted periods — at this size
+ * a fertile-window tint would be a smear of colour rather than information.
+ * The point of this view is "when did I bleed over the year", which is exactly
+ * the question you bring to a doctor's appointment.
+ *
+ * @param {Object} opts
+ * @param {number} opts.year
+ * @param {DateKey} opts.today
+ * @param {import('../domain/cycles.js').Cycle[]} opts.cycles
+ * @param {ReturnType<typeof buildMarks>} opts.marks
+ * @param {0|1} opts.firstDayOfWeek
+ */
+function yearGrid({ year, today, cycles, marks, firstDayOfWeek }) {
+  const wrap = el('div', { class: 'year-grid' });
+
+  for (let month = 0; month < 12; month++) {
+    const total = daysInMonth(year, month);
+    const lead = gridColumn(makeKey(year, month, 1), firstDayOfWeek);
+
+    const mini = el('div', { class: 'mini-grid', 'aria-hidden': 'true' });
+    for (let i = 0; i < lead; i++) mini.append(el('span', { class: 'mini-cell' }));
+
+    let periodCount = 0;
+    for (let d = 1; d <= total; d++) {
+      const key = makeKey(year, month, d);
+      const logged = isPeriodDay(cycles, key);
+      const predicted = !logged && marks.predictedPeriod.has(key) && key > today;
+      if (logged) periodCount++;
+
+      /** @type {string[]} */
+      const classes = ['mini-cell'];
+      if (logged) classes.push('is-period');
+      else if (predicted) classes.push('is-predicted');
+      if (key === today) classes.push('is-today');
+
+      mini.append(el('span', { class: classes.join(' ') }));
+    }
+
+    wrap.append(el('button', {
+      type: 'button',
+      class: 'mini-month',
+      'aria-label': `${MONTHS[month]} ${year}, ${periodCount} period ${periodCount === 1 ? 'day' : 'days'} logged`,
+      onclick: () => {
+        haptic(8);
+        store.setUi({ calYear: year, calMonth: month, calView: 'month' });
+      },
+    }, [
+      el('span', { class: 'mini-month-name', text: MONTHS_SHORT[month] }),
+      mini,
+    ]));
+  }
+
+  return wrap;
 }
 
 /* ── Forecast lookup sets ───────────────────────────────────────────────── */
@@ -111,7 +200,7 @@ function buildMarks(prediction, cycles, today) {
  * @param {number} month
  */
 function monthHeader(year, month) {
-  return el('div', { class: 'cal-head' }, [
+  return el('div', { class: 'cal-head cal-head-5' }, [
     el('button', {
       type: 'button', class: 'btn-icon', 'aria-label': 'Previous month', text: '‹',
       onclick: () => { haptic(8); store.shiftMonth(-1); },
@@ -128,6 +217,10 @@ function monthHeader(year, month) {
         store.setUi({ calYear: yearOf(now), calMonth: monthOf(now) });
         haptic(8);
       },
+    }),
+    el('button', {
+      type: 'button', class: 'btn btn-secondary cal-today-btn', text: 'Year',
+      onclick: () => { haptic(8); store.setUi({ calView: 'year' }); },
     }),
   ]);
 }
@@ -374,14 +467,21 @@ function onGridKeydown(e, firstDayOfWeek) {
 
 /* ── Legend ─────────────────────────────────────────────────────────────── */
 
-/** @param {import('../domain/predict.js').Prediction} prediction */
-function legend(prediction) {
+/**
+ * @param {import('../domain/predict.js').Prediction} prediction
+ * @param {{fertility?: boolean}} [opts] set fertility:false where the view
+ *   doesn't draw those states — a legend for something not on screen is worse
+ *   than no legend.
+ */
+function legend(prediction, opts = {}) {
+  const { fertility = true } = opts;
+
   /** @type {{class: string, label: string}[]} */
   const items = [
     { class: 'is-period', label: 'Period logged' },
     { class: 'is-predicted', label: 'Period expected' },
   ];
-  if (prediction.showFertility) {
+  if (fertility && prediction.showFertility) {
     items.push({ class: 'is-fertile', label: 'Fertile window' });
     items.push({ class: 'is-ovulation', label: 'Ovulation estimated' });
   }

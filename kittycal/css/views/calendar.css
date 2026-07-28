@@ -162,3 +162,64 @@
 .cal-legend-swatch.is-predicted { border: 2px dashed var(--period-pred); }
 .cal-legend-swatch.is-fertile { background: var(--fertile-soft); border-color: var(--fertile-soft); }
 .cal-legend-swatch.is-ovulation { border: 2px dotted var(--ovulation); background: var(--fertile-soft); }
+
+/* The month header carries five controls once the Year button is there. */
+.cal-head-5 { grid-template-columns: auto 1fr auto auto auto; }
+
+/* ── Year view ────────────────────────────────────────────────────────── */
+.year-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+}
+
+.mini-month {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-2);
+  background: var(--card);
+  border: var(--bw-data) solid var(--line-soft);
+  border-radius: var(--r-md);
+  transition: transform var(--dur-tap) var(--ease-bounce),
+              border-color var(--dur-hover) var(--ease-soft);
+}
+
+.mini-month:active { transform: scale(0.95); }
+.mini-month:hover { border-color: var(--line); }
+
+.mini-month-name {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  text-align: left;
+}
+
+.mini-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1.5px;
+}
+
+.mini-cell {
+  aspect-ratio: 1;
+  border-radius: 1.5px;
+  background: var(--surface-3);
+}
+
+.mini-cell.is-period { background: var(--period); }
+
+/* Predicted stays an outline at this size — a fill would read as recorded. */
+.mini-cell.is-predicted {
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--period-pred);
+}
+
+.mini-cell.is-today { box-shadow: inset 0 0 0 1.5px var(--ink); }
+
+@media (max-width: 380px) {
+  .year-grid { grid-template-columns: repeat(2, 1fr); }
+}

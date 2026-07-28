@@ -17,6 +17,7 @@ import { el, haptic, announce } from '../utils/dom.js';
 import { fmtRelative, fmtLong, todayKey } from '../utils/date.js';
 import {
   CATEGORIES, TESTS, MEASURES, WATER_GLASS_ML, WATER_GOAL_ML, labelFor,
+  optionMatches, normalizeQuery,
 } from '../data/taxonomy.js';
 import { isLogEmpty, isBleeding } from '../domain/model.js';
 import { openSheet, closeSheet } from '../ui/sheet.js';
@@ -24,8 +25,11 @@ import { burst } from '../ui/particles.js';
 import { toast } from '../ui/toast.js';
 import { getTheme } from '../data/themes.js';
 import {
-  cToF, fToC, kgToLb, lbToKg, mlToOz, fmtWater, round,
+  cToF, fToC, kgToLb, lbToKg, mlToOz, fmtWater, fmtTemp, fmtWeight, round,
 } from '../utils/fmt.js';
+import { buildCycles, cycleDay } from '../domain/cycles.js';
+import { predict } from '../domain/predict.js';
+import { phaseFor } from '../domain/phases.js';
 import * as store from '../state/store.js';
 
 /** How many recently-used chips float to the top of a category. */
@@ -44,14 +48,7 @@ export function openLogSheet(date) {
 
   const isFuture = date > todayKey();
 
-  const body = [
-    isFuture && el('div', { class: 'alert alert-warn' }, [
-      el('span', { class: 'alert-icon', text: '!', 'aria-hidden': 'true' }),
-      el('div', { text:
-        'This day hasn’t happened yet. You can still make a note, but logging ' +
-        'flow here would throw off your cycle predictions.' }),
-    ]),
-
+  const sections = [
     ...CATEGORIES.map((cat) => categorySection(cat, draft, settings)),
     customSection(draft, settings),
     testsSection(draft),
@@ -59,6 +56,20 @@ export function openLogSheet(date) {
     waterSection(draft, settings),
     pillSection(draft),
     notesSection(draft),
+  ];
+
+  const body = [
+    daySummary(date, before),
+
+    isFuture && el('div', { class: 'alert alert-warn' }, [
+      el('span', { class: 'alert-icon', text: '!', 'aria-hidden': 'true' }),
+      el('div', { text:
+        'This day hasn’t happened yet. You can still make a note, but logging ' +
+        'flow here would throw off your cycle predictions.' }),
+    ]),
+
+    searchBar(),
+    ...sections,
   ];
 
   const footer = [
@@ -75,6 +86,190 @@ export function openLogSheet(date) {
     body,
     footer,
   });
+}
+
+/* ── Day summary ────────────────────────────────────────────────────────── */
+
+/**
+ * What this day already looks like, shown before any of the editing controls.
+ *
+ * Tapping a date on the calendar used to drop you straight into a wall of
+ * chips, which answers "what do you want to change" but not "what happened
+ * that day" — and the second question is the one you're usually asking when
+ * you tap a date in the past.
+ *
+ * Two parts: where the day sat in the cycle, and a plain list of everything
+ * recorded. Both read-only. This is a data zone, so no bounce and no mascot.
+ *
+ * @param {DateKey} date
+ * @param {DayLog} log  the saved state, not the working draft
+ */
+function daySummary(date, log) {
+  const { settings, periodDays } = store.getState();
+  const cycles = buildCycles(periodDays);
+  const prediction = predict({ periodDays, settings, today: todayKey() });
+  const phase = phaseFor({ date, cycles, prediction });
+  const day = cycleDay(cycles, date);
+
+  const logged = !isLogEmpty(log);
+
+  /** @type {string[]} */
+  const entries = [];
+  if (log.flow !== 'none') entries.push(labelFor('flow', log.flow));
+  for (const [category, ids] of /** @type {[string, string[]][]} */ ([
+    ['moods', log.moods], ['symptoms', log.symptoms], ['discharge', log.discharge],
+    ['sex', log.sex], ['activity', log.activity], ['other', log.other],
+  ])) {
+    for (const id of ids) {
+      if (id === 'none') continue;
+      entries.push(labelFor(category, id));
+    }
+  }
+  for (const name of log.custom) entries.push(name);
+  if (log.drive) entries.push(`${labelFor('drive', log.drive)} sex drive`);
+  if (log.bbt != null) entries.push(fmtTemp(log.bbt, settings.unitTemp));
+  if (log.weight != null) entries.push(fmtWeight(log.weight, settings.unitWeight));
+  if (log.water) entries.push(fmtWater(log.water, settings.unitWater));
+  if (log.sleep != null) entries.push(`${log.sleep}h sleep`);
+  if (log.steps != null) entries.push(`${log.steps} steps`);
+  if (log.pillTaken) entries.push('Birth control taken');
+  if (log.testPregnancy) entries.push(`Pregnancy test: ${log.testPregnancy}`);
+  if (log.testOvulation) entries.push(`Ovulation test: ${log.testOvulation}`);
+
+  return el('div', { class: 'day-summary data-zone' }, [
+    el('div', { class: 'day-summary-head' }, [
+      el('span', {
+        class: 'phase-dot',
+        style: { background: `var(${phase.token})` },
+        'aria-hidden': 'true',
+      }),
+      el('span', { class: 'day-summary-phase', text:
+        day != null ? `Day ${day} · ${phase.name}` : phase.name }),
+      el('span', { class: 'day-summary-date num', text: fmtLong(date) }),
+    ]),
+
+    logged
+      ? el('ul', { class: 'day-summary-list' }, entries.map((entry) =>
+          el('li', { class: 'badge', text: entry }),
+        ))
+      : el('p', { class: 'hint-sm', text: 'Nothing logged for this day yet.' }),
+
+    log.notes.trim() && el('p', { class: 'day-summary-note', text: log.notes }),
+  ]);
+}
+
+/* ── Search ─────────────────────────────────────────────────────────────── */
+
+/**
+ * A search box over every chip in the sheet.
+ *
+ * With ~110 options behind collapsed categories, "where is bloating" is the
+ * commonest thing anyone will want to do. Typing filters chips across all
+ * categories at once, opens the ones that match, and hides the ones that
+ * don't — so the answer is two or three keystrokes away instead of a scroll
+ * and a guess about which category it lives under.
+ *
+ * Operates on the rendered DOM rather than re-rendering, so nothing already
+ * selected in the draft is disturbed by searching.
+ */
+function searchBar() {
+  /** Remembers which sections were open before a search, to restore after. */
+  /** @type {WeakMap<HTMLElement, boolean>} */
+  const wasOpen = new WeakMap();
+  let searching = false;
+
+  const count = el('span', { class: 'search-count hint-sm', 'aria-live': 'polite' });
+
+  const input = /** @type {HTMLInputElement} */ (el('input', {
+    class: 'input search-input',
+    type: 'search',
+    placeholder: 'Search symptoms, moods, anything…',
+    'aria-label': 'Search everything you can log',
+    autocomplete: 'off',
+    autocapitalize: 'none',
+    spellcheck: 'false',
+    oninput: () => apply(input.value),
+  }));
+
+  /** @param {string} raw */
+  function apply(raw) {
+    const query = normalizeQuery(raw);
+    const sheet = input.closest('.sheet-body');
+    if (!sheet) return;
+
+    const sections = /** @type {HTMLElement[]} */ (
+      [...sheet.querySelectorAll('.log-section')]
+    );
+
+    // Entering a search: remember the current open/closed state once, so
+    // clearing the box puts everything back exactly as she left it.
+    if (query && !searching) {
+      for (const section of sections) {
+        wasOpen.set(section, /** @type {HTMLDetailsElement} */ (section).open);
+      }
+      searching = true;
+    }
+
+    if (!query) {
+      for (const section of sections) {
+        section.hidden = false;
+        /** @type {HTMLDetailsElement} */ (section).open = wasOpen.get(section) ?? false;
+        for (const chip of section.querySelectorAll('.chip')) {
+          /** @type {HTMLElement} */ (chip).hidden = false;
+        }
+      }
+      searching = false;
+      count.textContent = '';
+      return;
+    }
+
+    let hits = 0;
+
+    for (const section of sections) {
+      const chips = /** @type {HTMLElement[]} */ ([...section.querySelectorAll('.chip')]);
+
+      // Sections without chips (notes, water, temperature) can't be searched
+      // by label, so match them on their own title instead.
+      if (!chips.length) {
+        const title = section.querySelector('.log-section-title')?.textContent ?? '';
+        const match = normalizeQuery(title).includes(query);
+        section.hidden = !match;
+        if (match) { hits++; /** @type {HTMLDetailsElement} */ (section).open = true; }
+        continue;
+      }
+
+      let sectionHits = 0;
+      for (const chip of chips) {
+        // The chip's own text is the source of truth for what's on screen; the
+        // synonym match needs the option id, which is on the dataset.
+        const label = chip.textContent ?? '';
+        const id = chip.dataset.opt ?? '';
+        const match = optionMatches({ id, label }, query);
+        chip.hidden = !match;
+        if (match) sectionHits++;
+      }
+
+      hits += sectionHits;
+      section.hidden = sectionHits === 0;
+      if (sectionHits) /** @type {HTMLDetailsElement} */ (section).open = true;
+    }
+
+    count.textContent = hits === 0
+      ? 'Nothing matches that'
+      : `${hits} ${hits === 1 ? 'match' : 'matches'}`;
+  }
+
+  return el('div', { class: 'search-wrap' }, [
+    input,
+    el('button', {
+      type: 'button',
+      class: 'btn-ghost search-clear',
+      text: 'Clear',
+      'aria-label': 'Clear search',
+      onclick: () => { input.value = ''; apply(''); input.focus(); },
+    }),
+    count,
+  ]);
 }
 
 /* ── Chip categories ────────────────────────────────────────────────────── */

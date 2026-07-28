@@ -25,6 +25,7 @@ import { todayKey } from '../utils/date.js';
  * @property {string} view          'today'|'calendar'|'insights'|'settings'
  * @property {number} calYear
  * @property {number} calMonth      0-indexed
+ * @property {'month'|'year'} calView
  * @property {DateKey} selectedDate
  * @property {boolean} periodEditMode
  * @property {boolean} locked
@@ -51,6 +52,7 @@ let state = {
     view: 'today',
     calYear: Number(today.slice(0, 4)),
     calMonth: Number(today.slice(5, 7)) - 1,
+    calView: 'month',
     selectedDate: today,
     periodEditMode: false,
     locked: false,
