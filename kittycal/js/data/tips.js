@@ -77,10 +77,11 @@ export const TIPS = [
 
   /* ── Follicular ────────────────────────────────────────────────────── */
   {
-    id: 'follicular-rise',
-    title: 'Oestrogen is climbing now',
-    body: 'This is usually the stretch where energy and mood pick back up. Plenty ' +
-      'of people find it the easiest part of the month.',
+    id: 'follicular-variable',
+    title: 'This is the part that varies',
+    body: 'When a cycle runs long or short, it is almost always this phase ' +
+      'stretching or shrinking — the second half stays roughly fixed. A late ' +
+      'period usually means ovulation came late, not that anything went wrong.',
     phases: ['follicular'],
   },
   {
@@ -95,10 +96,12 @@ export const TIPS = [
   /* ── Ovulatory ─────────────────────────────────────────────────────── */
   {
     id: 'ovulatory-discharge',
-    title: 'Clear and stretchy discharge is a fertility sign',
-    body: 'Around ovulation it thins out to something like raw egg white. It is ' +
-      'one of the more reliable things you can notice without a test.',
+    title: 'Discharge is the sign you can read without a test',
+    body: 'Around ovulation it thins to something like raw egg white, then turns ' +
+      'thicker and cloudier afterwards. Logging it builds a record that does ' +
+      'not depend on remembering.',
     phases: ['ovulatory'],
+    whenLogged: ['egg-white', 'watery', 'creamy', 'sticky'],
     needsFertility: true,
   },
   {
@@ -111,20 +114,23 @@ export const TIPS = [
     needsFertility: true,
   },
   {
-    id: 'ovulatory-drive',
-    title: 'Sex drive often peaks here',
-    body: 'That tracks the oestrogen peak just before ovulation. It is one of the ' +
-      'more consistent patterns across the cycle.',
+    id: 'ovulatory-window',
+    title: 'The fertile window is mostly before, not after',
+    body: 'Sperm can survive around five days; an egg lasts about one. That ' +
+      'asymmetry is why the window opens well before ovulation and closes ' +
+      'almost immediately after it.',
     phases: ['ovulatory'],
     needsFertility: true,
   },
 
   /* ── Luteal ────────────────────────────────────────────────────────── */
   {
-    id: 'luteal-pms',
-    title: 'PMS lives in this phase',
-    body: 'Progesterone rises and then drops away over the week or so before your ' +
-      'period. Sore breasts, bloating and mood shifts usually track that fall.',
+    id: 'luteal-fixed',
+    title: 'This phase barely moves',
+    body: 'The stretch between ovulation and your period is about 14 days for ' +
+      'most people, and it stays put even when cycles vary. That is why ' +
+      'Kittycal counts backwards from your next period to estimate ovulation ' +
+      'rather than halving the cycle.',
     phases: ['luteal'],
   },
   {
@@ -189,6 +195,54 @@ export const TIPS = [
     body: 'Stress, travel, illness, a change in sleep — all of them can shift a ' +
       'cycle by days. A single unusual month on its own means very little.',
   },
+  {
+    id: 'any-range',
+    title: 'There is no such thing as a 28-day rule',
+    body: 'Anywhere from 21 to 35 days is considered typical for an adult. The ' +
+      'number that matters is not 28, it is whether yours is roughly the same ' +
+      'each time.',
+  },
+  {
+    id: 'any-spotting',
+    title: 'Spotting is not the start of a period',
+    body: 'That is why Kittycal keeps them apart — counting spotting as day one ' +
+      'would quietly stretch every cycle length and skew what comes next. Log ' +
+      'it as spotting and the maths stays honest.',
+  },
+  {
+    id: 'any-backfill',
+    title: 'Old periods are worth filling in',
+    body: 'Editing period dates on any past month feeds straight back into the ' +
+      'predictions. Three remembered cycles improve things more than three ' +
+      'perfectly logged days.',
+  },
+  {
+    id: 'any-report',
+    title: 'You can print a summary for an appointment',
+    body: 'Insights has a report covering the last six months — cycle lengths, ' +
+      'recurring symptoms and anything outside the typical ranges. Doctors get ' +
+      'a lot more from that than from "a bit irregular, I think".',
+  },
+  {
+    id: 'any-export',
+    title: 'Your data is yours to take',
+    body: 'Settings can export everything as a plain file you can read, keep or ' +
+      'move to another device. Nothing here is locked in, because nothing here ' +
+      'is anywhere but this device.',
+  },
+  {
+    id: 'any-not-contraception',
+    title: 'Predictions are not contraception',
+    body: 'Fertile windows are estimates from your own history, and ovulation ' +
+      'can move. Worth remembering however neat the calendar looks.',
+    needsFertility: true,
+  },
+  {
+    id: 'any-passcode',
+    title: 'There is a passcode if you want one',
+    body: 'Settings can put four digits in front of the app. Useful if your ' +
+      'phone gets handed around, and it takes about ten seconds to set up.',
+  },
 ];
 
 /**
@@ -230,9 +284,19 @@ export function pick({ phase, cycleDay, loggedToday, showFertility, dateSeed, li
   }
 
   // Deterministic per-day rotation so the generic tips take turns.
+  //
+  // This needs a genuine permutation, and two obvious approaches both fail:
+  // adding a date-derived offset to each id's hash shifts every value equally,
+  // and concatenating the date onto the id is barely better, because a
+  // polynomial hash is linear — `hash(A + S) - hash(B + S)` is just
+  // `(hash(A) - hash(B)) * 31^|S|`, which keeps the same sign. Either way the
+  // same three cards showed every single day.
+  //
+  // XOR the two hashes and run the result through an avalanche mixer, so one
+  // changed bit in the date reshuffles the whole ordering.
   const seed = hash(dateSeed);
   scored.sort((a, b) =>
-    b.score - a.score || ((hash(a.tip.id) + seed) % 97) - ((hash(b.tip.id) + seed) % 97));
+    b.score - a.score || mix(hash(a.tip.id) ^ seed) - mix(hash(b.tip.id) ^ seed));
 
   return scored.slice(0, limit).map((entry) => entry.tip);
 }
@@ -243,4 +307,16 @@ function hash(text) {
   let h = 0;
   for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) | 0;
   return Math.abs(h);
+}
+
+/**
+ * Avalanche mixer (the murmur3 finalizer). Spreads a single changed input bit
+ * across the whole output, which is exactly what the plain polynomial hash
+ * above fails to do and why the rotation needs it.
+ * @param {number} x
+ */
+function mix(x) {
+  x = Math.imul(x ^ (x >>> 16), 2246822507);
+  x = Math.imul(x ^ (x >>> 13), 3266489909);
+  return (x ^ (x >>> 16)) >>> 0;
 }
