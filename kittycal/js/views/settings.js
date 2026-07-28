@@ -8,6 +8,9 @@
  */
 
 import { el, replace, haptic, announce } from '../utils/dom.js';
+import { checkStorage, fmtBytes } from '../storage/persist.js';
+import { todayKey, daysBetween } from '../utils/date.js';
+import { plural } from '../utils/fmt.js';
 import { loadLock, disableLock, promptForNewPin } from '../ui/lock.js';
 import {
   loadReminders, saveReminders, permissionState, requestPermission,
@@ -19,6 +22,7 @@ import { applyTheme } from '../ui/theme.js';
 import { toast } from '../ui/toast.js';
 import { releaseMascotUrls, mascot } from '../ui/mascot.js';
 import { openMascotPicker } from '../ui/image-picker.js';
+import { openHelp } from './help.js';
 import * as store from '../state/store.js';
 import * as repo from '../storage/repo.js';
 import * as backup from '../storage/backup.js';
@@ -69,12 +73,24 @@ export function renderSettings(host) {
 
     el('div', { class: 'section' }, [
       el('div', { class: 'section-title' }, [el('h2', { text: 'Your data' })]),
+      storageHealthCard(),
       dataRows(),
       privacyNote(),
     ]),
 
     el('div', { class: 'section' }, [
       el('div', { class: 'section-title' }, [el('h2', { text: 'About' })]),
+      el('div', { class: 'rows', style: { marginBottom: 'var(--sp-3)' } }, [
+        el('button', { type: 'button', class: 'row',
+          onclick: () => { haptic(); openHelp(); } }, [
+          el('span', { class: 'row-label' }, [
+            'How Kittycal works',
+            el('span', { class: 'choice-sub', text:
+              'What every screen does, and how the predictions are worked out' }),
+          ]),
+          el('span', { class: 'row-value', 'aria-hidden': 'true', text: '›' }),
+        ]),
+      ]),
       aboutCard(),
     ]),
   ]);
@@ -393,6 +409,65 @@ function lockRows() {
 
 /* ── Data ───────────────────────────────────────────────────────────────── */
 
+/**
+ * Whether her data is actually safe from being cleared, stated plainly.
+ *
+ * This is the one place the app admits that local-only storage has a failure
+ * mode. Saying "everything is stored on your device" without saying "and here
+ * is what could remove it" would be the comfortable half of the truth.
+ */
+function storageHealthCard() {
+  const host = el('div', { class: 'card', style: { marginBottom: 'var(--sp-3)' } }, [
+    el('h3', { text: 'Storage' }),
+    el('p', { class: 'hint-sm', text: 'Checking…' }),
+  ]);
+
+  checkStorage().then((health) => {
+    const tone = health.level === 'at-risk' ? 'alert-warn'
+      : health.level === 'safe' ? 'alert-ok' : 'alert-info';
+
+    const lastBackup = store.getState().settings.lastBackup;
+    const daysSince = lastBackup ? daysBetween(lastBackup, todayKey()) : null;
+
+    replace(host, [
+      el('h3', { text: 'Storage' }),
+
+      el('div', { class: `alert ${tone}`, style: { marginTop: 'var(--sp-2)' } }, [
+        el('span', {
+          class: 'alert-icon',
+          text: health.level === 'safe' ? '✓' : health.level === 'ok' ? 'i' : '!',
+          'aria-hidden': 'true',
+        }),
+        el('div', { text: health.summary }),
+      ]),
+
+      health.usedBytes != null && el('p', {
+        class: 'hint-sm',
+        style: { marginTop: 'var(--sp-2)' },
+        text: `Kittycal is using ${fmtBytes(health.usedBytes)} on this device.`,
+      }),
+
+      // A backup is the only copy that survives losing the phone entirely, so
+      // it gets nagged about — gently, and only once it's genuinely stale.
+      el('p', { class: 'hint-sm', style: { marginTop: 'var(--sp-2)' }, text:
+        daysSince == null
+          ? 'You have never exported a backup. An export is the only copy that ' +
+            'survives losing or replacing this phone.'
+          : daysSince === 0
+            ? 'You exported a backup today.'
+            : `Last backup ${plural(daysSince, 'day')} ago.` }),
+    ]);
+  }).catch(() => {
+    replace(host, [
+      el('h3', { text: 'Storage' }),
+      el('p', { class: 'hint-sm', text:
+        'Could not check how this browser is storing your data.' }),
+    ]);
+  });
+
+  return host;
+}
+
 function dataRows() {
   const fileInput = /** @type {HTMLInputElement} */ (el('input', {
     type: 'file',
@@ -437,6 +512,7 @@ async function doExport() {
     periodDays: state.periodDays,
   });
   backup.downloadFile(text, backup.exportFilename());
+  store.updateSettings({ lastBackup: todayKey() });
   const days = Object.keys(state.logs).length;
   toast(`Exported ${days} logged ${days === 1 ? 'day' : 'days'}`);
 }

@@ -122,6 +122,22 @@ const flush = debounce(async () => {
   }
 }, 300);
 
+/**
+ * Schedule a write.
+ *
+ * Debounced by default so holding the water "+" doesn't issue thirty
+ * transactions. `urgent` skips the wait for writes that must not be lost if the
+ * app is swiped away in the next fraction of a second — applying a log entry,
+ * or marking a period day. A 300ms window is small, but losing a period date to
+ * it would be the single worst bug this app could have.
+ *
+ * @param {boolean} [urgent]
+ */
+function scheduleFlush(urgent = false) {
+  if (urgent) { void flushNow(); return; }
+  flush();
+}
+
 /** Force an immediate write — used before unload and after imports. */
 export async function flushNow() {
   if (dirty.settings) { dirty.settings = false; await repo.saveSettings(state.settings); }
@@ -189,7 +205,7 @@ export function putLog(log) {
     dirty.periods = true;
   }
 
-  flush();
+  scheduleFlush(true);
   notify();
 }
 
@@ -255,7 +271,7 @@ export function setPeriodDays(dates, on) {
   state.periodDays = days;
   state.logs = logs;
   dirty.periods = true;
-  flush();
+  scheduleFlush(true);
   notify();
 }
 

@@ -53,6 +53,7 @@
  * @property {'C'|'F'} unitTemp
  * @property {'kg'|'lb'} unitWeight
  * @property {'ml'|'oz'} unitWater
+ * @property {string} lastBackup      DateKey of the last export, or ''
  * @property {boolean} onboarded
  * @property {boolean} disclaimerAck
  * @property {string[]} customSymptoms
@@ -98,6 +99,7 @@ export function defaultSettings() {
     unitTemp: 'C',
     unitWeight: 'kg',
     unitWater: 'ml',
+    lastBackup: '',
     onboarded: false,
     disclaimerAck: false,
     customSymptoms: [],

@@ -55,6 +55,7 @@
 <link rel="stylesheet" href="css/views/insights.css"/>
 <link rel="stylesheet" href="css/print.css"/>
 <link rel="stylesheet" href="css/views/lock.css"/>
+<link rel="stylesheet" href="css/views/help.css"/>
 
 <script>
 /*
@@ -122,16 +123,16 @@
 <div id="app-root" hidden>
   <div class="shell">
     <header class="app-head">
-      <span class="mascot-mini" aria-hidden="true">
-        <svg viewBox="0 0 100 100" width="30" height="30">
-          <path d="M50 48 C36 30 12 30 10 48 C12 66 36 66 50 48Z"
-            fill="var(--primary)" stroke="var(--line)" stroke-width="4" stroke-linejoin="round"/>
-          <path d="M50 48 C64 30 88 30 90 48 C88 66 64 66 50 48Z"
-            fill="var(--primary)" stroke="var(--line)" stroke-width="4" stroke-linejoin="round"/>
-          <circle cx="50" cy="49" r="10" fill="var(--accent)" stroke="var(--line)" stroke-width="4"/>
-        </svg>
-      </span>
+      <span class="mascot-mini" id="header-mascot" aria-hidden="true"></span>
       <h1><span id="app-title-text">Kittycal</span></h1>
+      <button class="btn-icon" type="button" id="help-btn" aria-label="How Kittycal works">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="9"/>
+          <path d="M9.6 9a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6"/>
+          <path d="M12 17.2h.01"/>
+        </svg>
+      </button>
     </header>
 
     <main>
