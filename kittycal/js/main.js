@@ -14,13 +14,19 @@ import * as store from './state/store.js';
 import { applyTheme, readStoredTheme, watchSystemMode } from './ui/theme.js';
 import { renderToday } from './views/today.js';
 import { renderCalendar } from './views/calendar.js';
+import { renderInsights } from './views/insights.js';
 import { renderSettings } from './views/settings.js';
 import { mountOnboarding } from './views/onboarding.js';
+import { loadLock, showLockScreen } from './ui/lock.js';
+import { checkReminders } from './ui/reminders.js';
+import { buildCycles } from './domain/cycles.js';
+import { predict } from './domain/predict.js';
 
 /** view id → renderer */
 const VIEWS = {
   today: renderToday,
   calendar: renderCalendar,
+  insights: renderInsights,
   settings: renderSettings,
 };
 
@@ -49,6 +55,14 @@ async function boot() {
   // pre-paint hint and could be stale after an import.
   applyTheme(settings.theme, settings.colorMode);
   watchSystemMode(() => store.getState().settings.colorMode);
+
+  // The lock goes up before anything is revealed. Onboarding is exempt —
+  // there's nothing to protect yet and no passcode to check against.
+  const lock = await loadLock();
+  if (lock.enabled && settings.onboarded) {
+    hideBootScreen();
+    await showLockScreen(settings.theme);
+  }
 
   if (!settings.onboarded) {
     startOnboarding();
@@ -113,6 +127,7 @@ function render() {
 /** @param {string} view */
 function titleFor(view) {
   if (view === 'calendar') return 'Calendar';
+  if (view === 'insights') return 'Insights';
   if (view === 'settings') return 'Settings';
   return 'Kittycal';
 }
@@ -158,8 +173,30 @@ function watchDayRollover() {
   // Cheap poll, plus an immediate check whenever the app is brought forward.
   setInterval(check, 60_000);
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) check();
+    if (!document.hidden) { check(); void runReminderCheck(); }
   });
+}
+
+/**
+ * Fire any reminders that have come due.
+ *
+ * There is no server, so nothing can wake the phone while the app is closed.
+ * This runs at boot and whenever the app returns to the foreground, which is
+ * the most a serverless PWA can honestly offer. Settings says so plainly.
+ */
+async function runReminderCheck() {
+  const { settings, periodDays, logs } = store.getState();
+  if (!settings.onboarded) return;
+  const today = todayKey();
+  try {
+    await checkReminders({
+      prediction: predict({ periodDays, settings, today }),
+      loggedToday: logs[today] != null,
+      birthControl: settings.birthControl,
+    });
+  } catch (err) {
+    console.warn('kittycal: reminder check failed', err);
+  }
 }
 
 function hideBootScreen() {
@@ -204,4 +241,4 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) void store.flushNow();
 });
 
-boot().then(registerServiceWorker);
+boot().then(registerServiceWorker).then(runReminderCheck);
