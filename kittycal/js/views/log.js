@@ -159,7 +159,17 @@ function daySummary(date, log) {
   if (log.testPregnancy) entries.push(`Pregnancy test: ${log.testPregnancy}`);
   if (log.testOvulation) entries.push(`Ovulation test: ${log.testOvulation}`);
 
-  return el('div', { class: 'day-summary data-zone' }, [
+  /*
+    On a day with nothing logged this collapses to a single line.
+
+    It used to be a two-line block whichever day you opened: a phase line, a
+    date, and a paragraph reading "Nothing logged for this day yet" — roughly a
+    fifth of the first screen spent saying that the controls below are empty,
+    which they visibly are. The sentence earns its space on a *past* day, where
+    "nothing here" is a real answer to why you tapped the date; it earns
+    nothing on today, where you have come to log something.
+  */
+  return el('div', { class: `day-summary data-zone${logged ? '' : ' is-empty'}` }, [
     el('div', { class: 'day-summary-head' }, [
       el('span', {
         class: 'phase-dot',
@@ -168,14 +178,14 @@ function daySummary(date, log) {
       }),
       el('span', { class: 'day-summary-phase', text:
         day != null ? `Day ${day} · ${phase.name}` : phase.name }),
+      !logged && date < todayKey()
+        && el('span', { class: 'hint-sm', text: '· nothing logged' }),
       el('span', { class: 'day-summary-date num', text: fmtLong(date) }),
     ]),
 
-    logged
-      ? el('ul', { class: 'day-summary-list' }, entries.map((entry) =>
-          el('li', { class: 'badge', text: entry }),
-        ))
-      : el('p', { class: 'hint-sm', text: 'Nothing logged for this day yet.' }),
+    logged && el('ul', { class: 'day-summary-list' }, entries.map((entry) =>
+      el('li', { class: 'badge', text: entry }),
+    )),
 
     log.notes.trim() && el('p', { class: 'day-summary-note', text: log.notes }),
   ]);

@@ -188,11 +188,23 @@
   border-radius: var(--r-md);
 }
 
+/* Nothing logged: one line, so the sheet starts with its controls rather than
+   with a paragraph announcing that the controls are empty. */
+.day-summary.is-empty {
+  gap: 0;
+  padding: var(--sp-2) var(--sp-3);
+}
+
 .day-summary-head {
   display: flex;
-  align-items: center;
+  align-items: baseline;
+  flex-wrap: wrap;
   gap: var(--sp-2);
 }
+
+/* The dot is a decoration on a baseline-aligned row, so it needs nudging back
+   onto the text's optical centre. */
+.day-summary-head .phase-dot { align-self: center; }
 
 .day-summary-phase { font-weight: 700; font-size: var(--fs-sm); }
 
