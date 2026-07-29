@@ -90,6 +90,20 @@ export function renderSettings(host) {
           ]),
           el('span', { class: 'row-value', 'aria-hidden': 'true', text: '›' }),
         ]),
+        /*
+          The install guide is a plain page rather than an in-app sheet: the
+          whole point of it is to be sent to someone who does not have the app
+          yet, so it needs a URL of its own.
+        */
+        el('a', { class: 'row', href: 'install.html', target: '_blank',
+                  rel: 'noopener', onclick: () => haptic() }, [
+          el('span', { class: 'row-label' }, [
+            'Share Kittycal',
+            el('span', { class: 'choice-sub', text:
+              'A page with a QR code and how to add it to a Home Screen' }),
+          ]),
+          el('span', { class: 'row-value', 'aria-hidden': 'true', text: '›' }),
+        ]),
       ]),
       aboutCard(),
     ]),
