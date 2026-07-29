@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import {
   buildPeriods, buildCycles, cycleLengths, periodLengths, cycleDay,
   cycleContaining, isPeriodDay, summarize, periodSpan, lastPeriodStart,
+  filledPeriodDays,
 } from '../js/domain/cycles.js';
 import { range, addDays } from '../js/utils/date.js';
 
@@ -182,4 +183,40 @@ test('unsorted input is handled', () => {
   assert.equal(periods.length, 1);
   assert.equal(periods[0].start, '2026-01-01');
   assert.equal(periods[0].end, '2026-01-04');
+});
+
+test('filledPeriodDays covers the span, gaps included', () => {
+  // One period marked 10th, 11th, 13th, 14th — the 12th deliberately missing.
+  // buildPeriods tolerates a one-day gap, so this is one period, and the
+  // calendar should not draw a hole through the middle of it.
+  const cycles = buildCycles([
+    '2026-06-10', '2026-06-11', '2026-06-13', '2026-06-14',
+  ]);
+  const filled = filledPeriodDays(cycles);
+
+  assert.deepEqual([...filled].sort(), [
+    '2026-06-10', '2026-06-11', '2026-06-12', '2026-06-13', '2026-06-14',
+  ]);
+});
+
+test('filledPeriodDays agrees with isPeriodDay, date for date', () => {
+  const days = [];
+  for (let c = 0; c < 6; c++) {
+    for (let i = 0; i < 5; i++) days.push(addDays('2026-01-05', c * 28 + i));
+  }
+  // Punch a hole so the gap-tolerance path is exercised.
+  days.splice(days.indexOf(addDays('2026-01-05', 2 * 28 + 2)), 1);
+
+  const cycles = buildCycles(days);
+  const filled = filledPeriodDays(cycles);
+
+  // Every day across the whole span must give the same answer both ways.
+  for (let i = -10; i < 6 * 28 + 20; i++) {
+    const date = addDays('2026-01-05', i);
+    assert.equal(filled.has(date), isPeriodDay(cycles, date), date);
+  }
+});
+
+test('filledPeriodDays is empty with no cycles', () => {
+  assert.equal(filledPeriodDays([]).size, 0);
 });

@@ -14,7 +14,7 @@
  * @typedef {import('../utils/date.js').DateKey} DateKey
  */
 
-import { addDays, daysBetween } from '../utils/date.js';
+import { addDays, daysBetween, range } from '../utils/date.js';
 
 /**
  * A single unlogged day inside a period doesn't split it. People forget to open
@@ -231,6 +231,26 @@ export function daysSinceLastPeriodStart(cycles, today) {
  */
 export function isPeriodDay(cycles, date) {
   return cycles.some((c) => date >= c.start && date <= c.periodEnd);
+}
+
+/**
+ * Every day covered by a period, as a set.
+ *
+ * Same rule as `isPeriodDay`, answered for a whole screen at once. That scans
+ * every cycle per call, which is fine for one date and wasteful for 365 — five
+ * years of history meant tens of thousands of comparisons to paint the year
+ * view.
+ *
+ * @param {Cycle[]} cycles
+ * @returns {Set<DateKey>}
+ */
+export function filledPeriodDays(cycles) {
+  /** @type {Set<DateKey>} */
+  const out = new Set();
+  for (const cycle of cycles) {
+    for (const day of range(cycle.start, cycle.periodEnd)) out.add(day);
+  }
+  return out;
 }
 
 /**

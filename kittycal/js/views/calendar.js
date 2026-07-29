@@ -28,7 +28,7 @@ import {
   DOW_MIN, MONTHS, MONTHS_SHORT, addDays, range,
   month as monthOf, year as yearOf, dayOfMonth,
 } from '../utils/date.js';
-import { buildCycles, isPeriodDay } from '../domain/cycles.js';
+import { buildCycles, filledPeriodDays } from '../domain/cycles.js';
 import { predict, upcomingPeriods, upcomingFertile } from '../domain/predict.js';
 import { toastUndo } from '../ui/toast.js';
 import { spotArt } from '../ui/mascot.js';
@@ -51,10 +51,20 @@ export function renderCalendar(host) {
   // rather than a scan over every predicted range.
   const marks = buildMarks(prediction, cycles, today);
 
+  // The same treatment for period days. `isPeriodDay` scans every cycle, and
+  // the year view called it 365 times — at five years of history that is
+  // ~24,000 comparisons to draw one screen. Built once here, it is a lookup.
+  //
+  // This is the *filled span*, not the marked days: `buildPeriods` tolerates a
+  // one-day gap, so a period marked 10th, 11th, 13th, 14th is one period and
+  // the 12th is drawn as part of it.
+  const periodFill = filledPeriodDays(cycles);
+
   if (ui.calView === 'year') {
     replace(host, [
       yearHeader(ui.calYear),
-      yearGrid({ year: ui.calYear, today, cycles, marks, firstDayOfWeek: settings.firstDayOfWeek }),
+      yearGrid({ year: ui.calYear, today, periodFill, marks,
+                 firstDayOfWeek: settings.firstDayOfWeek }),
       legend(prediction, { fertility: false }),
     ]);
     return;
@@ -69,7 +79,7 @@ export function renderCalendar(host) {
       today,
       firstDayOfWeek: settings.firstDayOfWeek,
       periodDays,
-      cycles,
+      periodFill,
       logs,
       marks,
       editMode: ui.periodEditMode,
@@ -111,11 +121,11 @@ function yearHeader(year) {
  * @param {Object} opts
  * @param {number} opts.year
  * @param {DateKey} opts.today
- * @param {import('../domain/cycles.js').Cycle[]} opts.cycles
+ * @param {Set<DateKey>} opts.periodFill
  * @param {ReturnType<typeof buildMarks>} opts.marks
  * @param {0|1} opts.firstDayOfWeek
  */
-function yearGrid({ year, today, cycles, marks, firstDayOfWeek }) {
+function yearGrid({ year, today, periodFill, marks, firstDayOfWeek }) {
   const wrap = el('div', { class: 'year-grid' });
 
   for (let month = 0; month < 12; month++) {
@@ -128,7 +138,7 @@ function yearGrid({ year, today, cycles, marks, firstDayOfWeek }) {
     let periodCount = 0;
     for (let d = 1; d <= total; d++) {
       const key = makeKey(year, month, d);
-      const logged = isPeriodDay(cycles, key);
+      const logged = periodFill.has(key);
       const predicted = !logged && marks.predictedPeriod.has(key) && key > today;
       if (logged) periodCount++;
 
@@ -257,12 +267,12 @@ function editModeBar(active) {
  * @param {DateKey} opts.today
  * @param {0|1} opts.firstDayOfWeek
  * @param {Set<DateKey>} opts.periodDays
- * @param {import('../domain/cycles.js').Cycle[]} opts.cycles
+ * @param {Set<DateKey>} opts.periodFill
  * @param {Record<DateKey, import('../domain/model.js').DayLog>} opts.logs
  * @param {ReturnType<typeof buildMarks>} opts.marks
  * @param {boolean} opts.editMode
  */
-function grid({ year, month, today, firstDayOfWeek, periodDays, cycles, logs, marks, editMode }) {
+function grid({ year, month, today, firstDayOfWeek, periodDays, periodFill, logs, marks, editMode }) {
   const total = daysInMonth(year, month);
   const first = makeKey(year, month, 1);
   const lead = gridColumn(first, firstDayOfWeek);
@@ -289,7 +299,7 @@ function grid({ year, month, today, firstDayOfWeek, periodDays, cycles, logs, ma
   for (let day = 1; day <= total; day++) {
     const key = makeKey(year, month, day);
     const cell = dayCell({
-      key, day, today, periodDays, cycles, logs, marks, editMode,
+      key, day, today, periodDays, periodFill, logs, marks, editMode,
       onActivate: () => activate(key, editMode),
       onDragStart: () => {
         if (!editMode) return;
@@ -354,7 +364,7 @@ function activate(key, editMode) {
  * @param {number} opts.day
  * @param {DateKey} opts.today
  * @param {Set<DateKey>} opts.periodDays
- * @param {import('../domain/cycles.js').Cycle[]} opts.cycles
+ * @param {Set<DateKey>} opts.periodFill
  * @param {Record<DateKey, import('../domain/model.js').DayLog>} opts.logs
  * @param {ReturnType<typeof buildMarks>} opts.marks
  * @param {boolean} opts.editMode
@@ -363,18 +373,32 @@ function activate(key, editMode) {
  * @param {() => void} opts.onDragOver
  */
 function dayCell(opts) {
-  const { key, day, today, periodDays, cycles, logs, marks, editMode } = opts;
+  const { key, day, today, periodDays, periodFill, logs, marks, editMode } = opts;
 
   const isToday = key === today;
   const isPast = key <= today;
-  const logged = periodDays.has(key) || isPeriodDay(cycles, key);
+
+  /*
+    Two different truths, and which one to show depends on what the tap does.
+
+    Normally the cell shows the *filled span* — the one-day gap inside a period
+    marked 10th, 11th, 13th, 14th is drawn as period, because that is how the
+    cycle is actually counted.
+
+    In edit mode the tap toggles membership of `periodDays`, so the cell has to
+    show `periodDays`. Otherwise the gap day rendered as selected, and tapping
+    it — which anyone would do to turn it off — turned it *on*, with no visible
+    change. The control was reporting a state its own tap did not control.
+  */
+  const marked = periodDays.has(key);
+  const logged = editMode ? marked : (marked || periodFill.has(key));
   // Never show a prediction over a day that already has real data.
   const predicted = !logged && marks.predictedPeriod.has(key) && key > today;
   const fertile = !logged && !predicted && marks.fertile.has(key);
   const isOvulation = marks.ovulation.has(key) && !logged;
   const luteal = !logged && !predicted && !fertile && marks.luteal.has(key);
   const log = logs[key];
-  const hasOtherData = log != null && !periodDays.has(key);
+  const hasOtherData = log != null && !marked;
   const selected = store.getState().ui.selectedDate === key;
 
   /** @type {string[]} */
