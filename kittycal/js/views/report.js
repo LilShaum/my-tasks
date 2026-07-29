@@ -19,14 +19,11 @@ import { plural } from '../utils/fmt.js';
 import { buildCycles, cycleLengths, periodLengths, summarize } from '../domain/cycles.js';
 import { predict } from '../domain/predict.js';
 import { detectPatterns, symptomFrequency, daysLogged } from '../domain/stats.js';
-import { labelFor, trackableSymptoms } from '../data/taxonomy.js';
+import { labelFor, labelOf } from '../data/taxonomy.js';
 import * as acog from '../domain/acog.js';
 import * as store from '../state/store.js';
 
 const MONTHS_COVERED = 6;
-
-/** @type {Map<string, string>} */
-const LABELS = new Map(trackableSymptoms().map((s) => [s.id, s.label]));
 
 /**
  * Build the report into #report-root and trigger the print dialogue.
@@ -161,21 +158,21 @@ function recurringSection(logs, cycles) {
       'they most often occurred:' }));
     out.push(table(
       patterns.map((pattern) => [
-        LABELS.get(pattern.id) ?? labelFor('symptoms', pattern.id),
+        labelOf(pattern.id),
         `${pattern.cyclesWith} of ${pattern.cyclesTotal}`,
         pattern.peakDays.length ? `day ${pattern.peakDays.slice(0, 3).join(', ')}` : '—',
       ]),
-      ['Symptom', 'Cycles affected', 'Typical cycle day'],
+      ['What was logged', 'Cycles affected', 'Typical cycle day'],
     ));
   }
 
   out.push(el('p', { text: 'Most frequently logged overall:' }));
   out.push(table(
     frequency.map(({ id, count }) => [
-      LABELS.get(id) ?? labelFor('symptoms', id),
+      labelOf(id),
       plural(count, 'day'),
     ]),
-    ['Symptom', 'Days logged'],
+    ['What was logged', 'Days logged'],
   ));
 
   return out;

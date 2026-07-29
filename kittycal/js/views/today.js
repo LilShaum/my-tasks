@@ -16,12 +16,13 @@
  * @typedef {import('../utils/date.js').DateKey} DateKey
  */
 
-import { el, replace, haptic } from '../utils/dom.js';
+import { el, svg, replace, haptic } from '../utils/dom.js';
 import { todayKey, fmtDayMonth, fmtRelative, daysBetween } from '../utils/date.js';
 import { plural, listJoin } from '../utils/fmt.js';
-import { labelFor } from '../data/taxonomy.js';
+import { labelFor, labelOf } from '../data/taxonomy.js';
 import { pick } from '../data/tips.js';
 import { loggedIds } from '../domain/stats.js';
+import { buildRecap, cluster } from '../domain/recap.js';
 import { openLogSheet } from './log.js';
 import { buildCycles, cycleLengths, periodLengths } from '../domain/cycles.js';
 import { predict, conceptionChance } from '../domain/predict.js';
@@ -68,8 +69,13 @@ export function renderToday(host) {
    * And the Log button has moved from the very bottom to directly under the
    * ring: it is the most frequent action in the app and it was below the fold.
    */
+  const recap = buildRecap({ cycles, logs, today });
+  const showRecap = recap && settings.recapSeen !== recap.cycleStart;
+
   replace(host, [
     greeting(settings.name, today),
+
+    showRecap ? recapCard(/** @type {NonNullable<typeof recap>} */ (recap)) : null,
 
     cycleRing({
       prediction,
@@ -89,6 +95,120 @@ export function renderToday(host) {
 
     tipsRow({ phase, prediction, log: logs[today], today }),
     disclaimerNote(),
+  ]);
+}
+
+/**
+ * The look back at the cycle that just closed.
+ *
+ * Sits above the ring because it is the one thing on this screen that is only
+ * true today — everything below it will still be there tomorrow. It appears
+ * for a week after a cycle closes, and once dismissed it does not come back
+ * for that cycle.
+ *
+ * The tone is deliberately flat. A recap is the app telling her something
+ * about her own body, so it reports and does not react: no celebration for a
+ * "textbook" cycle, no concern for a long one. Whether a number matters is a
+ * question for a doctor, and the ACOG cards further down already raise it.
+ *
+ * @param {import('../domain/recap.js').Recap} recap
+ */
+function recapCard(recap) {
+  const lines = [
+    lengthLine('Cycle', recap.length, recap.usualLength),
+    lengthLine('Period', recap.periodLength, recap.usualPeriodLength),
+    ...recap.notable.map(notableLine),
+  ];
+
+  return el('div', { class: 'card data-zone recap' }, [
+    el('div', { class: 'recap-head' }, [
+      el('div', {}, [
+        el('h3', { text: 'Your last cycle' }),
+        el('p', { class: 'hint-sm', text:
+          `${fmtDayMonth(recap.cycleStart)} to ${fmtDayMonth(recap.cycleEnd)}` }),
+      ]),
+      el('button', {
+        type: 'button',
+        class: 'btn-icon recap-close',
+        'aria-label': 'Dismiss last cycle summary',
+        onclick: () => {
+          haptic();
+          // Remembered against the cycle's own start date rather than a
+          // boolean, so dismissing this one cannot suppress the next one.
+          store.updateSettings({ recapSeen: recap.cycleStart });
+        },
+      }, [
+        // `svg()`, not `el()`: createElement builds an HTML element, and an
+        // HTML <svg> is an unknown element that renders as nothing at all.
+        svg('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+                     'stroke-width': '2', 'stroke-linecap': 'round',
+                     'aria-hidden': 'true' }, [
+          svg('path', { d: 'M6 6l12 12M18 6L6 18' }),
+        ]),
+      ]),
+    ]),
+    el('ul', { class: 'recap-lines' }, lines.map((line) => el('li', {}, [line]))),
+    // Outside the list: it counts how much was logged rather than reporting
+    // something that happened, so bulleting it alongside the findings gave it
+    // a weight it does not have.
+    el('p', { class: 'hint-sm recap-foot', text:
+      `You logged something on ${plural(recap.daysLogged, 'day')} of it.` }),
+  ]);
+}
+
+/**
+ * "Cycle: 30 days, 2 longer than usual" — or just the number, when there is
+ * no history to compare against yet.
+ * @param {string} label
+ * @param {number} value
+ * @param {number|null} usual
+ */
+function lengthLine(label, value, usual) {
+  const diff = usual == null ? null : value - usual;
+  const comparison =
+    diff == null ? '.'
+      : diff === 0 ? ', the same as usual.'
+        : `, ${plural(Math.abs(diff), 'day')} ${diff > 0 ? 'longer' : 'shorter'} than usual.`;
+
+  return el('span', {}, [
+    el('strong', { class: 'num', text: `${value}-day ${label.toLowerCase()}` }),
+    comparison,
+  ]);
+}
+
+/**
+ * How each kind of thing is worded.
+ *
+ * Without this the card said "Very low on 2 days", which is a mood label read
+ * aloud with the fact that it is a mood stripped out. Each category gets the
+ * phrasing that makes its labels into a sentence.
+ *
+ * @type {Record<string, (label: string) => string>}
+ */
+const NOTABLE_PHRASING = {
+  moods: (label) => `Felt ${label.toLowerCase()}`,
+  discharge: (label) => `${label} discharge`,
+  activity: (label) => label,
+  other: (label) => label,
+  sex: (label) => label,
+};
+
+/**
+ * "Cramps on 3 days, all around days 1–3."
+ * @param {import('../domain/recap.js').NotableItem} item
+ */
+function notableLine(item) {
+  const span = cluster(item.days);
+  const where = !span ? ''
+    : span.from === span.to
+      ? `, on day ${span.from}`
+      : `, all around days ${span.from}–${span.to}`;
+
+  const phrase = NOTABLE_PHRASING[item.category] ?? ((/** @type {string} */ l) => l);
+
+  return el('span', {}, [
+    el('strong', { text: phrase(labelOf(item.id)) }),
+    ` on ${plural(item.count, 'day')}${where}.`,
   ]);
 }
 

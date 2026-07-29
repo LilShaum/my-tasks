@@ -292,6 +292,66 @@ export function labelFor(categoryId, optionId) {
 }
 
 /**
+ * Categories whose ids are *scale points* rather than occurrences.
+ *
+ * Flow and drive answer "how much", so their ids are things like `low` and
+ * `neutral` — words that also exist as moods. They are always read with their
+ * category known (`labelFor('flow', …)`), never from a flat list, so they are
+ * kept out of the id-only index below. Without this, `low` would resolve to
+ * drive's "Low" and quietly mislabel the mood "Very low".
+ */
+const SCALE_CATEGORIES = new Set(['flow', 'drive']);
+
+/**
+ * Every occurrence id to its label, for lookups that don't know the category.
+ *
+ * `none` is excluded because several categories define their own ("No
+ * bleeding", "No sex", "Didn't exercise") and callers of `labelOf` have
+ * already dropped it — `loggedIds` filters it out, since an absence is not
+ * something that happened.
+ *
+ * `test/taxonomy.test.js` asserts what is left is collision-free, so this
+ * index cannot silently start lying if a future option reuses an id.
+ *
+ * @type {Map<string, string>}
+ */
+const BY_ID = new Map(
+  CATEGORIES
+    .filter((c) => !SCALE_CATEGORIES.has(c.id))
+    .flatMap((c) => c.options
+      .filter((o) => o.id !== 'none')
+      .map((o) => /** @type {[string, string]} */ ([o.id, o.label]))),
+);
+
+/**
+ * Display label for an option id, without knowing which category it came from.
+ *
+ * Anything derived from a `DayLog` — patterns, recaps, the doctor report —
+ * works with flat lists of ids, having lost the category on the way in.
+ * Guessing a category and calling `labelFor` is wrong twice over there: it
+ * mislabels ids that live in a different category, and echoes the raw id back
+ * for the ones it misses.
+ *
+ * Custom symptoms are stored as their own text and echo back, as in
+ * `labelFor`.
+ *
+ * @param {string} optionId
+ * @returns {string}
+ */
+export function labelOf(optionId) {
+  return BY_ID.get(optionId) ?? optionId;
+}
+
+/** The id-only label index, exposed so a test can assert it is unambiguous. */
+export function labelIndexEntries() {
+  return CATEGORIES
+    .filter((c) => !SCALE_CATEGORIES.has(c.id))
+    .flatMap((c) => c.options
+      .filter((o) => o.id !== 'none')
+      .map((o) => ({ category: c.id, id: o.id, label: o.label })));
+}
+
+/**
  * @param {string} categoryId
  * @returns {Category|undefined}
  */

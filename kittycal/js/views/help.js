@@ -69,6 +69,18 @@ export function openHelp() {
           'period, and counting it as day one would throw the maths off.'),
       ]),
 
+      section('The look back at each cycle', [
+        p('When a new period starts, the cycle before it is finally complete — ' +
+          'so Kittycal puts a short summary of it at the top of Today for the ' +
+          'week after.'),
+        p('It says how long the cycle and period were, how that compares with ' +
+          'your usual, and anything that came up on more than one day. If you ' +
+          'have not logged enough cycles for "usual" to mean anything yet, it ' +
+          'leaves the comparison out rather than guessing.'),
+        p('Tap the ✕ to dismiss it. It will not come back for that cycle, and ' +
+          'the next one will still appear.'),
+      ]),
+
       section('Insights and patterns', [
         p('Cycle and period length are charted against the typical ranges, with ' +
           'anything unusual highlighted.'),

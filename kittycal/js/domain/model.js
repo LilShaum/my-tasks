@@ -54,6 +54,7 @@
  * @property {'kg'|'lb'} unitWeight
  * @property {'ml'|'oz'} unitWater
  * @property {string} lastBackup      DateKey of the last export, or ''
+ * @property {string} recapSeen       cycleStart of the last recap dismissed, or ''
  * @property {boolean} onboarded
  * @property {boolean} disclaimerAck
  * @property {string[]} customSymptoms
@@ -100,6 +101,7 @@ export function defaultSettings() {
     unitWeight: 'kg',
     unitWater: 'ml',
     lastBackup: '',
+    recapSeen: '',
     onboarded: false,
     disclaimerAck: false,
     customSymptoms: [],
