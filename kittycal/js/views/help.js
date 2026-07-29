@@ -59,9 +59,13 @@ export function openHelp() {
       section('Logging a day', [
         p(`There are ${optionCount()} things you can record across ` +
           `${CATEGORIES.length} categories, plus anything you add yourself.`),
-        p('Categories start closed so the screen is not a wall of buttons. Use ' +
-          'the search box at the top to find something instantly — it ' +
-          'understands everyday wording, so "sore boobs" and "tired" both work.'),
+        p('Once you have logged a few things, the ones you use most appear as ' +
+          'a row at the very top under "What you log most", so the usual day ' +
+          'is two taps and no scrolling.'),
+        p('Everything else sits in categories that start closed, so the screen ' +
+          'is not a wall of buttons. Use the search box to find something ' +
+          'instantly — it understands everyday wording, so "sore boobs" and ' +
+          '"tired" both work.'),
         p('Nothing is saved until you tap Apply, so you can tap around freely. ' +
           'Closing the sheet throws the changes away.'),
         p('Marking light, medium, heavy or clots also marks that day as a period ' +

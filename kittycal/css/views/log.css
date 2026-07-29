@@ -219,3 +219,24 @@
   /* Notes are free text — wrap rather than blow out the sheet width. */
   overflow-wrap: anywhere;
 }
+
+/* ── Quick row ────────────────────────────────────────────────────────── */
+
+/*
+  The chips she uses most, above everything else in the sheet. Set slightly
+  tighter than the chips inside categories so it reads as a shortcut rather
+  than a first category — but still a full 44px tall, because it is the
+  control most likely to be tapped one-handed.
+*/
+.quick-row {
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--line-soft);
+  margin-bottom: var(--sp-3);
+}
+
+.quick-row .hint-sm { margin-bottom: var(--sp-2); }
+
+.chip-quick {
+  padding-inline: var(--sp-3);
+  font-size: var(--fs-sm);
+}
