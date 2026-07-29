@@ -55,6 +55,8 @@
  * @property {'ml'|'oz'} unitWater
  * @property {string} lastBackup      DateKey of the last export, or ''
  * @property {string} recapSeen       cycleStart of the last recap dismissed, or ''
+ * @property {number} lastBackupAt    epoch ms of the last export, or 0
+ * @property {string} backupSnoozed   DateKey the backup prompt was dismissed, or ''
  * @property {boolean} onboarded
  * @property {boolean} disclaimerAck
  * @property {string[]} customSymptoms
@@ -102,6 +104,8 @@ export function defaultSettings() {
     unitWater: 'ml',
     lastBackup: '',
     recapSeen: '',
+    lastBackupAt: 0,
+    backupSnoozed: '',
     onboarded: false,
     disclaimerAck: false,
     customSymptoms: [],

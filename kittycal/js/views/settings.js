@@ -23,6 +23,7 @@ import { toast } from '../ui/toast.js';
 import { releaseMascotUrls, mascot } from '../ui/mascot.js';
 import { openMascotPicker } from '../ui/image-picker.js';
 import { openHelp } from './help.js';
+import { exportEverything } from '../storage/export-action.js';
 import * as store from '../state/store.js';
 import * as repo from '../storage/repo.js';
 import * as backup from '../storage/backup.js';
@@ -501,7 +502,7 @@ function dataRows() {
     buttonRow({
       label: 'Export everything',
       value: 'JSON file',
-      onClick: doExport,
+      onClick: exportEverything,
     }),
     buttonRow({
       label: 'Import from a backup',
@@ -515,20 +516,6 @@ function dataRows() {
       onClick: doErase,
     }),
   ]);
-}
-
-async function doExport() {
-  const state = store.getState();
-  await store.flushNow();
-  const text = backup.toJSON({
-    settings: state.settings,
-    logs: state.logs,
-    periodDays: state.periodDays,
-  });
-  backup.downloadFile(text, backup.exportFilename());
-  store.updateSettings({ lastBackup: todayKey() });
-  const days = Object.keys(state.logs).length;
-  toast(`Exported ${days} logged ${days === 1 ? 'day' : 'days'}`);
 }
 
 /** @param {File} file */

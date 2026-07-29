@@ -23,6 +23,8 @@ import { labelFor, labelOf } from '../data/taxonomy.js';
 import { pick } from '../data/tips.js';
 import { loggedIds } from '../domain/stats.js';
 import { buildRecap, cluster } from '../domain/recap.js';
+import { backupNudge } from '../domain/backup-health.js';
+import { exportEverything } from '../storage/export-action.js';
 import { openLogSheet } from './log.js';
 import { buildCycles, cycleLengths, periodLengths } from '../domain/cycles.js';
 import { predict, conceptionChance } from '../domain/predict.js';
@@ -94,7 +96,70 @@ export function renderToday(host) {
     ]),
 
     tipsRow({ phase, prediction, log: logs[today], today }),
+    backupPrompt({ logs, periodDays, settings, today }),
     disclaimerNote(),
+  ]);
+}
+
+/**
+ * The one thing that can lose all of this.
+ *
+ * Kittycal has no server, so an exported file is the only copy that survives
+ * the phone. Settings has said so from the start, which is no use at all —
+ * nobody opens Settings to be reminded of something they have not thought of.
+ *
+ * It sits near the bottom rather than at the top: it is important but never
+ * urgent, and it must not be the first thing she sees on a screen whose job is
+ * to answer "where am I in my cycle". It is also silent almost always —
+ * `backupNudge` returns null until there is a fortnight of unprotected data,
+ * and dismissing it buys a month.
+ *
+ * @param {Object} input
+ * @param {Record<DateKey, import('../domain/model.js').DayLog>} input.logs
+ * @param {Set<DateKey>} input.periodDays
+ * @param {import('../domain/model.js').Settings} input.settings
+ * @param {DateKey} input.today
+ */
+function backupPrompt({ logs, periodDays, settings, today }) {
+  const nudge = backupNudge({ logs, periodDays, settings, today });
+  if (!nudge) return null;
+
+  return el('div', { class: 'card data-zone backup-nudge' }, [
+    el('h3', { text: 'Worth backing up' }),
+    el('p', { class: 'hint-sm', text:
+      nudge.neverBackedUp
+        ? `${plural(nudge.daysAtRisk, 'day')} of your history is only on this ` +
+          'phone. A backup file is the only copy that survives losing or ' +
+          'replacing it.'
+        : `${plural(nudge.daysAtRisk, 'day')} logged since your last backup ` +
+          `${plural(/** @type {number} */ (nudge.daysSinceBackup), 'day')} ago.` }),
+    el('div', { class: 'backup-nudge-actions' }, [
+      el('button', {
+        type: 'button', class: 'btn',
+        onclick: async (/** @type {Event} */ e) => {
+          haptic();
+          const btn = /** @type {HTMLButtonElement} */ (e.currentTarget);
+          // The file is built from the whole store, so on a long history this
+          // is not instant. Disabling prevents a second tap producing a second
+          // download of the same thing.
+          btn.disabled = true;
+          try {
+            await exportEverything();
+          } finally {
+            btn.disabled = false;
+          }
+        },
+      }, ['Back up now']),
+      el('button', {
+        type: 'button', class: 'btn btn-ghost',
+        onclick: () => {
+          haptic();
+          // Snoozed, not silenced: the data is still only in one place, and
+          // there will be more of it in a month.
+          store.updateSettings({ backupSnoozed: today });
+        },
+      }, ['Not now']),
+    ]),
   ]);
 }
 

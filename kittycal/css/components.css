@@ -70,6 +70,15 @@
 
 .btn-ghost:active { transform: scale(0.96); box-shadow: none; }
 
+/* Used while an export is being written: a second tap would produce a second
+   download of the same file. */
+.btn:disabled {
+  opacity: 0.55;
+  box-shadow: var(--sh-sticker-press);
+  transform: translate(2px, 3px);
+  pointer-events: none;
+}
+
 .btn-block { width: 100%; }
 
 .btn-lg {

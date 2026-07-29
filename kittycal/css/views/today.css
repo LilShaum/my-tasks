@@ -312,3 +312,25 @@
   border-radius: 50%;
   background: var(--primary-line);
 }
+
+/* ── Backup prompt ────────────────────────────────────────────────────── */
+
+/*
+  Deliberately plain. This is housekeeping, not a health warning — dressing it
+  as an alert would train her to dismiss the alert styling everywhere else,
+  including where it means something. It earns its visibility by being rare
+  (nothing until a fortnight of unbacked-up data, then a month's silence if
+  dismissed), not by shouting.
+*/
+.backup-nudge { margin-top: var(--sp-4); }
+
+.backup-nudge-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+
+/* Both buttons stay full 44px targets; on a narrow phone they stack rather
+   than shrinking below that. */
+.backup-nudge-actions .btn { flex: 1 1 auto; }
