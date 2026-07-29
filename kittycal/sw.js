@@ -6,15 +6,24 @@
  * app itself: there is no remote data to be stale about. Once installed,
  * Kittycal works on a plane, in a basement, with the wifi off, forever.
  *
- * Bump CACHE_VERSION when shipping changes, otherwise installed copies keep
- * serving the old files.
+ * The catch with cache-first is that an installed copy keeps serving what it
+ * cached until this script's own bytes change — that is the only signal a
+ * browser uses to reinstall a worker. So the version is not written by hand,
+ * where it would eventually be forgotten and a release would ship to the site
+ * without ever reaching the phone. The deploy workflow substitutes the commit
+ * SHA for __BUILD__, so every deploy changes these bytes and every installed
+ * copy re-fetches everything on next launch.
+ *
+ * Served straight from the repo (a local server, say), __BUILD__ is left as-is
+ * and behaves like any other fixed version string.
  */
 
-const CACHE_VERSION = 'kittycal-v1';
+const CACHE_VERSION = 'kittycal-__BUILD__';
 
 const PRECACHE = [
   './',
   'index.html',
+  'install.html',
   'manifest.webmanifest',
 
   'css/reset.css',

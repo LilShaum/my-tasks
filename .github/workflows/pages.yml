@@ -35,6 +35,24 @@ jobs:
         with:
           enablement: true
 
+      # Stamp the service worker with this commit.
+      #
+      # Kittycal's service worker is cache-first, which is what makes an
+      # installed copy open instantly and work with no signal. The cost is that
+      # an installed copy keeps serving whatever it cached until the *worker
+      # script itself* changes — browsers only reinstall a service worker when
+      # its bytes differ. With a hand-written version constant, forgetting to
+      # bump it means a deploy that ships to the website and silently never
+      # reaches the phones that already have the app.
+      #
+      # So the version isn't hand-written. Every deploy stamps in the commit
+      # SHA, which guarantees the bytes change, which guarantees the worker
+      # reinstalls and re-fetches every file. There is nothing left to remember.
+      - name: Version the service worker
+        run: |
+          sed -i "s|__BUILD__|${GITHUB_SHA}|" kittycal/sw.js
+          grep -n 'CACHE_VERSION' kittycal/sw.js
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .

@@ -263,6 +263,11 @@
   padding: var(--sp-3) var(--sp-4);
   text-align: left;
   background: none;
+  /* A row is a row whether it is a button or a link. Without this, an <a>
+     row arrives underlined and in the browser's link blue, sitting directly
+     beside identical <button> rows that are neither. */
+  color: inherit;
+  text-decoration: none;
 }
 
 .row + .row { border-top: 1px solid var(--line-soft); }
@@ -271,8 +276,8 @@
 
 .row-value { color: var(--ink-2); font-size: var(--fs-sm); }
 
-button.row { transition: background var(--dur-hover) var(--ease-soft); }
-button.row:active { background: var(--surface-2); }
+button.row, a.row { transition: background var(--dur-hover) var(--ease-soft); }
+button.row:active, a.row:active { background: var(--surface-2); }
 
 /* ── Loading / boot ───────────────────────────────────────────────────── */
 .boot {
