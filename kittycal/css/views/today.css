@@ -250,3 +250,65 @@
 .confidence-medium { border-left-color: var(--info); }
 .confidence-low,
 .confidence-none { border-left-color: var(--warn); }
+
+/* ── End-of-cycle recap ───────────────────────────────────────────────── */
+
+/*
+  Appears for a week after a cycle closes, then never again for that cycle.
+  Because it is transient it gets a slightly warmer surface than the data
+  cards below it — enough to read as "this is new", not enough to read as an
+  alert. It stays inside the data zone otherwise: 1.5px border, tabular
+  numbers, no decorative motion.
+*/
+.recap {
+  background: var(--surface-2);
+  border-color: var(--primary-line);
+  margin-bottom: var(--sp-4);
+}
+
+.recap-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+}
+
+.recap-head > div { flex: 1; }
+.recap-head h3 { font-size: var(--fs-md); }
+
+/* Pulled up and out so the 44px tap target does not add a visible gap above
+   the heading it sits beside. The target stays 44px; only the glyph shrinks —
+   a dismiss control should be findable, not the loudest thing on the card. */
+.recap-close {
+  flex: none;
+  margin: calc(var(--sp-2) * -1) calc(var(--sp-2) * -1) 0 0;
+  color: var(--ink-2);
+}
+
+.recap-close svg { width: 18px; height: 18px; }
+
+.recap-foot { margin-top: var(--sp-3); }
+
+.recap-lines {
+  list-style: none;
+  margin: var(--sp-3) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.recap-lines li {
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+  padding-left: var(--sp-3);
+  position: relative;
+}
+
+.recap-lines li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--primary-line);
+}

@@ -23,15 +23,12 @@ import { phaseFor, PHASES } from '../domain/phases.js';
 import {
   detectPatterns, symptomPattern, series, bbtForCycle, daysLogged, loggingStreak,
 } from '../domain/stats.js';
-import { labelFor, trackableSymptoms } from '../data/taxonomy.js';
+import { labelOf } from '../data/taxonomy.js';
 import * as acog from '../domain/acog.js';
 import { barChart, lineChart, dayHeatmap } from '../ui/chart.js';
 import { spotArt } from '../ui/mascot.js';
 import { openReport } from './report.js';
 import * as store from '../state/store.js';
-
-/** @type {Map<string, string>} */
-const LABELS = new Map(trackableSymptoms().map((s) => [s.id, s.label]));
 
 /** @param {HTMLElement} host */
 export function renderInsights(host) {
@@ -196,7 +193,7 @@ function patternsCard(logs, cycles, prediction) {
     el('ul', { class: 'pattern-list' }, patterns.map((pattern) => {
       const detail = symptomPattern(pattern.id, logs, cycles);
       const max = Math.max(0, ...detail.byDay.values());
-      const label = LABELS.get(pattern.id) ?? labelFor('symptoms', pattern.id);
+      const label = labelOf(pattern.id);
       const peaks = pattern.peakDays.slice(0, 3);
       const where = peaks.length
         ? `most often on day ${peaks.length > 1

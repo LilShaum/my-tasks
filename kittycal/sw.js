@@ -55,6 +55,7 @@ const PRECACHE = [
   'js/domain/phases.js',
   'js/domain/acog.js',
   'js/domain/stats.js',
+  'js/domain/recap.js',
   'js/data/themes.js',
   'js/data/mascots.js',
   'js/views/onboarding.js',
