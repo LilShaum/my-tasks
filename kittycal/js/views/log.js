@@ -36,6 +36,21 @@ import * as store from '../state/store.js';
 const RECENT_LIMIT = 6;
 
 /**
+ * How many chips the quick row shows at most.
+ *
+ * Six, not eight: eight wrapped to three rows on a phone and pushed the Flow
+ * section — the reason most people open this sheet at all — off the first
+ * screen. A shortcut that buries the main control is not a shortcut.
+ */
+const QUICK_LIMIT = 6;
+
+/**
+ * And how few it takes before showing it at all. Two chips is not a shortcut,
+ * it is a row of clutter above the thing she was going to use anyway.
+ */
+const QUICK_MIN = 3;
+
+/**
  * Open the logging sheet for a date.
  * @param {DateKey} date
  */
@@ -48,8 +63,12 @@ export function openLogSheet(date) {
 
   const isFuture = date > todayKey();
 
+  const chips = chipRegistry(draft);
+  // A day with no saved log has never been answered — see chipRegistry.
+  chips.setFlowAnswered(store.getState().logs[date] != null);
+
   const sections = [
-    ...CATEGORIES.map((cat) => categorySection(cat, draft, settings)),
+    ...CATEGORIES.map((cat) => categorySection(cat, draft, settings, chips)),
     customSection(draft, settings),
     testsSection(draft),
     ...MEASURES.map((measure) => measureSection(measure, draft, settings)),
@@ -68,9 +87,14 @@ export function openLogSheet(date) {
         'flow here would throw off your cycle predictions.' }),
     ]),
 
+    quickRow(draft, settings, chips),
     searchBar(),
     ...sections,
   ];
+
+  // Paint every chip from the draft once the whole tree exists, so the quick
+  // row and its section counterparts start out agreeing.
+  chips.sync();
 
   const footer = [
     el('button', {
@@ -191,11 +215,29 @@ function searchBar() {
     oninput: () => apply(input.value),
   }));
 
+  const clear = el('button', {
+    type: 'button',
+    class: 'btn-ghost search-clear',
+    text: 'Clear',
+    'aria-label': 'Clear search',
+    hidden: true,
+    onclick: () => { input.value = ''; apply(''); input.focus(); },
+  });
+
   /** @param {string} raw */
   function apply(raw) {
     const query = normalizeQuery(raw);
     const sheet = input.closest('.sheet-body');
     if (!sheet) return;
+
+    // Nothing to clear when the box is empty, and a permanently-lit Clear
+    // button beside an empty field reads as an action that does something.
+    clear.hidden = raw === '';
+
+    // The quick row is a shortcut past searching. While a search is running it
+    // is just chips that ignore the filter, sitting above chips that obey it.
+    const quick = /** @type {HTMLElement|null} */ (sheet.querySelector('.quick-row'));
+    if (quick) quick.hidden = query !== '';
 
     const sections = /** @type {HTMLElement[]} */ (
       [...sheet.querySelectorAll('.log-section')]
@@ -259,17 +301,7 @@ function searchBar() {
       : `${hits} ${hits === 1 ? 'match' : 'matches'}`;
   }
 
-  return el('div', { class: 'search-wrap' }, [
-    input,
-    el('button', {
-      type: 'button',
-      class: 'btn-ghost search-clear',
-      text: 'Clear',
-      'aria-label': 'Clear search',
-      onclick: () => { input.value = ''; apply(''); input.focus(); },
-    }),
-    count,
-  ]);
+  return el('div', { class: 'search-wrap' }, [input, clear, count]);
 }
 
 /* ── Chip categories ────────────────────────────────────────────────────── */
@@ -279,7 +311,7 @@ function searchBar() {
  * @param {DayLog} draft
  * @param {import('../domain/model.js').Settings} settings
  */
-function categorySection(cat, draft, settings) {
+function categorySection(cat, draft, settings, chips) {
   const single = cat.select === 'single';
 
   /** Current value(s) for this category on the draft. */
@@ -302,33 +334,156 @@ function categorySection(cat, draft, settings) {
   const row = el('div', { class: 'chip-row' });
 
   for (const option of /** @type {import('../data/taxonomy.js').Option[]} */ (ordered)) {
-    const chip = el('button', {
-      type: 'button',
-      class: 'chip',
-      'aria-pressed': String(current().includes(option.id)),
-      dataset: { opt: option.id },
-      onclick: () => {
-        toggle(cat, draft, option.id, single);
-        // Repaint the whole row: single-select needs the others cleared, and
-        // "none" clears its siblings in multi-select.
-        for (const other of row.children) {
-          const id = /** @type {HTMLElement} */ (other).dataset.opt;
-          other.setAttribute('aria-pressed', String(id != null && current().includes(id)));
-        }
-        haptic(8);
-      },
-    }, [
-      option.emoji && el('span', { 'aria-hidden': 'true', text: option.emoji }),
-      el('span', { text: option.label }),
-    ]);
-    row.append(chip);
+    row.append(chips.make(cat, option, draft));
   }
 
   // Flow leads and stays open — it's the reason most people open this sheet.
-  return section(cat.name, cat.hint, [row], {
+  const node = section(cat.name, cat.hint, [row], {
     open: cat.id === 'flow',
     count: selectionCount(cat, draft),
   });
+
+  const badge = /** @type {HTMLElement|null} */ (node.querySelector('.count-badge'));
+  if (badge) chips.watchBadge(cat, badge);
+
+  return node;
+}
+
+/**
+ * Every chip in the sheet, wherever it is drawn.
+ *
+ * The same option can now appear twice — once in its category and once in the
+ * quick row at the top — and the two must never disagree about whether it is
+ * selected. Rather than have the quick row reach into the sections and fake
+ * clicks, both are built here and registered against their option, so one
+ * `sync()` repaints all of them from the draft.
+ *
+ * That also fixes something that was already slightly wrong: tapping a chip
+ * used to repaint only its own row, so "none" clearing its siblings was
+ * correct on screen but any duplicate elsewhere would have gone stale.
+ *
+ * @param {DayLog} draft
+ */
+function chipRegistry(draft) {
+  /** @type {{cat: import('../data/taxonomy.js').Category, id: string, node: HTMLElement}[]} */
+  const all = [];
+
+  /**
+   * What is selected in a category right now.
+   * @param {import('../data/taxonomy.js').Category} cat
+   */
+  const current = (cat) => {
+    const value = /** @type {any} */ (draft)[cat.id];
+    if (cat.select === 'single') return value == null ? [] : [String(value)];
+    return Array.isArray(value) ? value : [];
+  };
+
+  /**
+   * Flow is single-select with `none` as its stored default, so an untouched
+   * day would otherwise open with "No bleeding" already ticked — presenting an
+   * assumption as her answer, while the summary directly above it says nothing
+   * is logged. Until she actually answers, flow shows nothing selected.
+   */
+  let flowAnswered = false;
+
+  /** @param {boolean} answered */
+  const setFlowAnswered = (answered) => { flowAnswered = answered; };
+
+  /** @type {{cat: import('../data/taxonomy.js').Category, node: HTMLElement}[]} */
+  const badges = [];
+
+  const sync = () => {
+    for (const { cat, id, node } of all) {
+      const selected = cat.id === 'flow' && !flowAnswered
+        ? false
+        : current(cat).includes(id);
+      node.setAttribute('aria-pressed', String(selected));
+    }
+
+    for (const { cat, node } of badges) {
+      const count = cat.id === 'flow' && !flowAnswered ? 0 : selectionCount(cat, draft);
+      node.textContent = String(count);
+      node.hidden = count === 0;
+    }
+  };
+
+  return {
+    setFlowAnswered,
+    sync,
+
+    /**
+     * @param {import('../data/taxonomy.js').Category} cat
+     * @param {HTMLElement} node
+     */
+    watchBadge(cat, node) { badges.push({ cat, node }); },
+
+    /**
+     * @param {import('../data/taxonomy.js').Category} cat
+     * @param {import('../data/taxonomy.js').Option} option
+     * @param {DayLog} d
+     * @param {{compact?: boolean}} [opts]
+     */
+    make(cat, option, d, opts = {}) {
+      const node = el('button', {
+        type: 'button',
+        class: opts.compact ? 'chip chip-quick' : 'chip',
+        'aria-pressed': 'false',
+        dataset: { opt: option.id },
+        onclick: () => {
+          if (cat.id === 'flow') flowAnswered = true;
+          toggle(cat, d, option.id, cat.select === 'single');
+          sync();
+          haptic(8);
+        },
+      }, [
+        option.emoji && el('span', { 'aria-hidden': 'true', text: option.emoji }),
+        el('span', { text: option.label }),
+      ]);
+
+      all.push({ cat, id: option.id, node });
+      return node;
+    },
+  };
+}
+
+/**
+ * The chips she actually uses, at the top, before any section is opened.
+ *
+ * This is the change that matters most for everyday use. Recently-used options
+ * were already floated to the top *within* each category — but every category
+ * starts collapsed, so logging "cramps" meant opening the sheet, finding
+ * Symptoms, expanding it, scrolling, tapping, and applying. The chips she uses
+ * most were the ones buried deepest.
+ *
+ * Nothing appears here until she has actually logged a few things, so a new
+ * user never sees an empty row asking to be filled.
+ *
+ * @param {DayLog} draft
+ * @param {import('../domain/model.js').Settings} settings
+ * @param {ReturnType<typeof chipRegistry>} chips
+ */
+function quickRow(draft, settings, chips) {
+  /** @type {{cat: import('../data/taxonomy.js').Category, option: import('../data/taxonomy.js').Option}[]} */
+  const picks = [];
+
+  for (const id of settings.recentChips) {
+    if (picks.length >= QUICK_LIMIT) break;
+    for (const cat of CATEGORIES) {
+      // Flow lives in its own always-open section directly below, so
+      // duplicating it here would just be the same control twice.
+      if (cat.id === 'flow') continue;
+      const option = cat.options.find((o) => o.id === id && o.id !== 'none');
+      if (option) { picks.push({ cat, option }); break; }
+    }
+  }
+
+  if (picks.length < QUICK_MIN) return null;
+
+  return el('div', { class: 'quick-row' }, [
+    el('p', { class: 'hint-sm', text: 'What you log most' }),
+    el('div', { class: 'chip-row' },
+      picks.map(({ cat, option }) => chips.make(cat, option, draft, { compact: true }))),
+  ]);
 }
 
 /**
@@ -646,10 +801,20 @@ function notesSection(draft) {
 function section(title, hint, children, opts = {}) {
   const { open = false, count = 0 } = opts;
 
+  // Always built, shown only when non-zero. The badge has to be able to appear
+  // and disappear as she edits — a category can now be changed from the quick
+  // row while its own section is collapsed, so a badge rendered once from the
+  // saved state would sit there contradicting the draft.
+  const badge = el('span', {
+    class: 'badge badge-primary num count-badge',
+    text: String(count),
+    hidden: count === 0,
+  });
+
   return el('details', { class: 'log-section', open: open || count > 0 || null }, [
     el('summary', { class: 'log-section-head' }, [
       el('span', { class: 'log-section-title', text: title }),
-      count > 0 && el('span', { class: 'badge badge-primary num', text: String(count) }),
+      badge,
       el('span', { class: 'log-chevron', 'aria-hidden': 'true', text: '⌄' }),
     ]),
     el('div', { class: 'log-section-body' }, [
