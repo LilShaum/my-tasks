@@ -66,6 +66,9 @@ export function openHelp() {
           'is not a wall of buttons. Use the search box to find something ' +
           'instantly — it understands everyday wording, so "sore boobs" and ' +
           '"tired" both work.'),
+        p('Anything with a number — temperature, weight, sleep, steps, water — ' +
+          'lives together under Measurements, and the two test results under ' +
+          'Tests. If you never use them, they are one closed row each.'),
         p('Nothing is saved until you tap Apply, so you can tap around freely. ' +
           'Closing the sheet throws the changes away.'),
         p('Marking light, medium, heavy or clots also marks that day as a period ' +

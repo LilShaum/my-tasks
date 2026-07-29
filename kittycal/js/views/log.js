@@ -13,7 +13,7 @@
  * @typedef {import('../domain/model.js').DayLog} DayLog
  */
 
-import { el, haptic, announce } from '../utils/dom.js';
+import { el, svg, haptic, announce } from '../utils/dom.js';
 import { fmtRelative, fmtLong, todayKey } from '../utils/date.js';
 import {
   CATEGORIES, TESTS, MEASURES, WATER_GLASS_ML, WATER_GOAL_ML, labelFor,
@@ -63,16 +63,15 @@ export function openLogSheet(date) {
 
   const isFuture = date > todayKey();
 
-  const chips = chipRegistry(draft);
+  const chips = sheetState(draft);
   // A day with no saved log has never been answered — see chipRegistry.
   chips.setFlowAnswered(store.getState().logs[date] != null);
 
   const sections = [
     ...CATEGORIES.map((cat) => categorySection(cat, draft, settings, chips)),
     customSection(draft, settings),
-    testsSection(draft),
-    ...MEASURES.map((measure) => measureSection(measure, draft, settings)),
-    waterSection(draft, settings),
+    testsSection(draft, chips),
+    measurementsSection(draft, settings, chips),
     pillSection(draft),
     notesSection(draft),
   ];
@@ -350,7 +349,7 @@ function categorySection(cat, draft, settings, chips) {
 }
 
 /**
- * Every chip in the sheet, wherever it is drawn.
+ * The sheet's live UI state: every chip, and every count badge.
  *
  * The same option can now appear twice — once in its category and once in the
  * quick row at the top — and the two must never disagree about whether it is
@@ -364,7 +363,7 @@ function categorySection(cat, draft, settings, chips) {
  *
  * @param {DayLog} draft
  */
-function chipRegistry(draft) {
+function sheetState(draft) {
   /** @type {{cat: import('../data/taxonomy.js').Category, id: string, node: HTMLElement}[]} */
   const all = [];
 
@@ -389,7 +388,7 @@ function chipRegistry(draft) {
   /** @param {boolean} answered */
   const setFlowAnswered = (answered) => { flowAnswered = answered; };
 
-  /** @type {{cat: import('../data/taxonomy.js').Category, node: HTMLElement}[]} */
+  /** @type {{node: HTMLElement, count: () => number}[]} */
   const badges = [];
 
   const sync = () => {
@@ -400,10 +399,10 @@ function chipRegistry(draft) {
       node.setAttribute('aria-pressed', String(selected));
     }
 
-    for (const { cat, node } of badges) {
-      const count = cat.id === 'flow' && !flowAnswered ? 0 : selectionCount(cat, draft);
-      node.textContent = String(count);
-      node.hidden = count === 0;
+    for (const { node, count } of badges) {
+      const n = count();
+      node.textContent = String(n);
+      node.hidden = n === 0;
     }
   };
 
@@ -415,7 +414,22 @@ function chipRegistry(draft) {
      * @param {import('../data/taxonomy.js').Category} cat
      * @param {HTMLElement} node
      */
-    watchBadge(cat, node) { badges.push({ cat, node }); },
+    watchBadge(cat, node) {
+      badges.push({
+        node,
+        // Flow reads as zero until she answers it, matching its chips.
+        count: () => (cat.id === 'flow' && !flowAnswered ? 0 : selectionCount(cat, draft)),
+      });
+    },
+
+    /**
+     * Same, for a section whose contents are not chips — Measurements and
+     * Tests count typed values and tapped glasses, so they hand over their own
+     * counting function rather than a category.
+     * @param {HTMLElement} node
+     * @param {() => number} count
+     */
+    watchCount(node, count) { badges.push({ node, count }); },
 
     /**
      * @param {import('../data/taxonomy.js').Category} cat
@@ -460,7 +474,7 @@ function chipRegistry(draft) {
  *
  * @param {DayLog} draft
  * @param {import('../domain/model.js').Settings} settings
- * @param {ReturnType<typeof chipRegistry>} chips
+ * @param {ReturnType<typeof sheetState>} chips
  */
 function quickRow(draft, settings, chips) {
   /** @type {{cat: import('../data/taxonomy.js').Category, option: import('../data/taxonomy.js').Option}[]} */
@@ -588,8 +602,8 @@ function customSection(draft, settings) {
 /* ── Tests ──────────────────────────────────────────────────────────────── */
 
 /** @param {DayLog} draft */
-function testsSection(draft) {
-  return el('div', {}, TESTS.map((test) => {
+function testsSection(draft, chips) {
+  const rows = TESTS.map((test) => {
     const row = el('div', { class: 'chip-row' });
 
     for (const option of test.options) {
@@ -605,6 +619,7 @@ function testsSection(draft) {
             const id = /** @type {HTMLElement} */ (other).dataset.opt;
             other.setAttribute('aria-pressed', String(target[test.id] === id));
           }
+          chips.sync();
           haptic(8);
         },
       }, [
@@ -614,9 +629,24 @@ function testsSection(draft) {
       row.append(chip);
     }
 
-    return section(test.name, /** @type {any} */ (test).hint, [row],
-      { count: /** @type {any} */ (draft)[test.id] ? 1 : 0 });
-  }));
+    return el('div', { class: 'measure-row measure-row-block' }, [
+      el('div', { class: 'measure-label' }, [
+        el('span', { text: test.name }),
+        /** @type {any} */ (test).hint
+          && el('span', { class: 'hint-sm', text: /** @type {any} */ (test).hint }),
+      ]),
+      row,
+    ]);
+  });
+
+  const count = () => TESTS.filter((t) => /** @type {any} */ (draft)[t.id]).length;
+
+  const node = section('Tests', null, rows, { count: count() });
+
+  const badge = /** @type {HTMLElement|null} */ (node.querySelector('.count-badge'));
+  if (badge) chips.watchCount(badge, count);
+
+  return node;
 }
 
 /* ── Numeric measures ───────────────────────────────────────────────────── */
@@ -626,7 +656,7 @@ function testsSection(draft) {
  * @param {DayLog} draft
  * @param {import('../domain/model.js').Settings} settings
  */
-function measureSection(measure, draft, settings) {
+function measureRow(measure, draft, settings, chips) {
   const unit = measure.unitSetting
     ? /** @type {any} */ (settings)[measure.unitSetting]
     : null;
@@ -651,50 +681,89 @@ function measureSection(measure, draft, settings) {
     : measure.id === 'sleep' ? 'hours'
     : 'steps';
 
-  const input = el('input', {
-    class: 'input num',
+  const clear = el('button', {
+    type: 'button',
+    class: 'btn-icon measure-clear',
+    'aria-label': `Clear ${measure.name.toLowerCase()}`,
+    hidden: /** @type {any} */ (draft)[measure.id] == null,
+    onclick: () => {
+      /** @type {any} */ (draft)[measure.id] = null;
+      input.value = '';
+      clear.hidden = true;
+      chips.sync();
+    },
+  }, [
+    svg('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+                 'stroke-width': '2', 'stroke-linecap': 'round',
+                 'aria-hidden': 'true' }, [
+      svg('path', { d: 'M6 6l12 12M18 6L6 18' }),
+    ]),
+  ]);
+
+  const input = /** @type {HTMLInputElement} */ (el('input', {
+    class: 'input num measure-input',
     type: 'number',
     inputmode: 'decimal',
     step: String(measure.step),
     placeholder: '—',
     value: toDisplay(/** @type {any} */ (draft)[measure.id]),
     'aria-label': `${measure.name} in ${unitLabel}`,
-    style: { maxWidth: '140px' },
     oninput: (/** @type {Event} */ e) => {
       const raw = /** @type {HTMLInputElement} */ (e.target).value;
       const target = /** @type {any} */ (draft);
-      if (raw === '') { target[measure.id] = null; return; }
+      clear.hidden = raw === '';
+      if (raw === '') { target[measure.id] = null; chips.sync(); return; }
       const parsed = Number(raw);
       if (!Number.isFinite(parsed)) return;
       target[measure.id] = toStored(parsed);
+      chips.sync();
     },
-  });
+  }));
 
-  return section(measure.name, /** @type {any} */ (measure).hint, [
-    el('div', { style: { display: 'flex', alignItems: 'center', gap: 'var(--sp-3)' } }, [
-      input,
-      el('span', { class: 'hint-sm', text: unitLabel }),
-      el('button', {
-        type: 'button',
-        class: 'btn-ghost',
-        text: 'Clear',
-        style: { marginLeft: 'auto', minHeight: '36px', padding: '0 var(--sp-3)' },
-        onclick: () => {
-          /** @type {any} */ (draft)[measure.id] = null;
-          /** @type {HTMLInputElement} */ (input).value = '';
-        },
-      }),
+  return el('div', { class: 'measure-row' }, [
+    el('label', { class: 'measure-label' }, [
+      el('span', { text: measure.name }),
+      measure.hint && el('span', { class: 'hint-sm', text: measure.hint }),
     ]),
-  ], { count: /** @type {any} */ (draft)[measure.id] != null ? 1 : 0 });
+    el('div', { class: 'measure-control' }, [
+      input,
+      el('span', { class: 'hint-sm measure-unit', text: unitLabel }),
+      clear,
+    ]),
+  ]);
 }
 
-/* ── Water ──────────────────────────────────────────────────────────────── */
-
 /**
+ * Everything numeric, in one place.
+ *
+ * These were five top-level sections — temperature, weight, sleep, steps,
+ * water — sitting at the same weight as Symptoms and Mood in a list of
+ * seventeen. Most people never open any of them, so their only effect on a
+ * typical visit was five more rows to scroll past before reaching Notes.
+ *
+ * As one section they are still one tap away for anyone charting BBT, and
+ * invisible to everyone else.
+ *
  * @param {DayLog} draft
  * @param {import('../domain/model.js').Settings} settings
  */
-function waterSection(draft, settings) {
+function measurementsSection(draft, settings, chips) {
+  const count = () =>
+    MEASURES.filter((m) => /** @type {any} */ (draft)[m.id] != null).length
+    + (draft.water > 0 ? 1 : 0);
+
+  const node = section('Measurements', null, [
+    ...MEASURES.map((measure) => measureRow(measure, draft, settings, chips)),
+    waterRow(draft, settings, chips),
+  ], { count: count() });
+
+  const badge = /** @type {HTMLElement|null} */ (node.querySelector('.count-badge'));
+  if (badge) chips.watchCount(badge, count);
+
+  return node;
+}
+
+function waterRow(draft, settings, chips) {
   const readout = el('span', { class: 'water-readout num' });
   const glasses = el('div', { class: 'water-glasses' });
 
@@ -717,6 +786,7 @@ function waterSection(draft, settings) {
           // Tapping the last filled glass empties it; otherwise fill to here.
           draft.water = (total() === i + 1) ? i * WATER_GLASS_ML : (i + 1) * WATER_GLASS_ML;
           paint();
+          chips.sync();
           haptic(6);
         },
       }));
@@ -725,10 +795,15 @@ function waterSection(draft, settings) {
 
   paint();
 
-  return section('Water', `One glass is ${fmtWater(WATER_GLASS_ML, settings.unitWater)}.`, [
+  return el('div', { class: 'measure-row measure-row-block' }, [
+    el('div', { class: 'measure-label' }, [
+      el('span', { text: 'Water' }),
+      el('span', { class: 'hint-sm', text:
+        `One glass is ${fmtWater(WATER_GLASS_ML, settings.unitWater)}.` }),
+    ]),
     glasses,
     readout,
-  ], { count: total() });
+  ]);
 }
 
 /* ── Pill ───────────────────────────────────────────────────────────────── */

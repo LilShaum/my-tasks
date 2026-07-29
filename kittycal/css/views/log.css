@@ -240,3 +240,65 @@
   padding-inline: var(--sp-3);
   font-size: var(--fs-sm);
 }
+
+/* ── Measurements ─────────────────────────────────────────────────────── */
+
+/*
+  Temperature, weight, sleep, steps and water were five top-level sections
+  each. As rows inside one section they need to read as a list rather than as
+  five collapsed things that forgot their chevrons — so: label left, control
+  right, a hairline between.
+*/
+.measure-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) 0;
+}
+
+.measure-row + .measure-row { border-top: 1px solid var(--line-soft); }
+
+/* Water and the test chips need the full width, so their label sits above. */
+.measure-row-block {
+  display: block;
+}
+
+.measure-label {
+  flex: 1;
+  /* Without min-width:0 a flex item refuses to shrink below its content, so
+     the temperature hint pushed the input and its unit off the right edge. */
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-weight: 600;
+}
+
+.measure-label .hint-sm { font-weight: 500; }
+
+.measure-row-block .measure-label { margin-bottom: var(--sp-2); }
+
+.measure-control {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: none;
+}
+
+.measure-input {
+  width: 4.75rem;
+  padding-inline: var(--sp-2);
+  text-align: right;
+}
+
+.measure-unit { white-space: nowrap; }
+
+/* Only present once the row holds a value, so an empty list is a column of
+   inputs rather than a column of inputs and dead buttons. */
+.measure-clear {
+  width: 32px;
+  height: 32px;
+  flex: none;
+}
+
+.measure-clear svg { width: 16px; height: 16px; }
