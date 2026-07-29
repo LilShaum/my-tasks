@@ -154,6 +154,13 @@ export function openHelp() {
         p('Settings → Export everything saves a file with all of it. That file ' +
           'is the only copy that survives losing or replacing the phone, so it ' +
           'is worth doing occasionally.'),
+        p('Because that is easy to forget, Kittycal keeps an eye on it. Once ' +
+          'there are about two weeks of entries that are not in any backup, a ' +
+          '"Worth backing up" card appears near the bottom of Today with a ' +
+          'button that does it in one tap.'),
+        p('"Not now" hides it for a month rather than for good — the data is ' +
+          'still only in one place, and by then there is more of it. Backing ' +
+          'up makes it go away properly.'),
         p('On a new phone, open Kittycal and use Import to bring it all back.'),
       ]),
 
