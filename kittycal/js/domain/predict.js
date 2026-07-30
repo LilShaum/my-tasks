@@ -49,6 +49,20 @@ const FERTILE_AFTER = 1;
 /** Widened window used when confidence is low, per Flo's documented fallback. */
 const UNCERTAIN_WINDOW = 14;
 
+/**
+ * Past this many days since the last logged period, the app stops predicting.
+ *
+ * Lateness is real and worth surfacing — a period can genuinely be weeks late,
+ * and that is information. But at some point "late" stops describing a cycle
+ * and starts describing a person who put the app down for a while, and every
+ * number derived from that point is fiction.
+ *
+ * Ninety days is chosen to sit well past any ordinary delay, past the ACOG
+ * threshold for absent periods (which the flags already raise separately), and
+ * comfortably inside the "I forgot about this app" range.
+ */
+export const STALE_AFTER_DAYS = 90;
+
 export const CYCLE_MIN_CLAMP = 21;
 export const CYCLE_MAX_CLAMP = 45;
 
@@ -74,6 +88,8 @@ export const CYCLE_MAX_CLAMP = 45;
  * @property {number|null} daysUntilPeriod  negative once late
  * @property {number|null} daysLate
  * @property {boolean} isLate
+ * @property {boolean} stale        history too old to predict from
+ * @property {number|null} daysSinceStart
  * @property {number|null} cycleDay
  * @property {number|null} spread
  * @property {'regular'|'variable'|'irregular'|null} regularity
@@ -206,13 +222,28 @@ export function predict({ periodDays, settings, today }) {
   let daysLate = null;
   let isLate = false;
 
-  if (nextStart && daysUntilPeriod != null && daysUntilPeriod < 0) {
+  /*
+    Beyond `STALE_AFTER_DAYS` the record has simply stopped, and everything
+    downstream of it is invention. Left alone, a year away from the app
+    produced a screen reading "Day 431", "402 days late", "Luteal phase", a
+    fertile window from the previous summer, and — worst of all — "Good
+    confidence, based on 5 complete cycles".
+
+    Every one of those is asserted from a single fact: the last period she
+    bothered to log. Nobody's period is 402 days late; nobody is 431 days into
+    a luteal phase. The honest output is to stop, say the data has gone stale,
+    and ask for a fresh period date.
+  */
+  const daysSinceStart = lastStart ? daysBetween(lastStart, today) : null;
+  const stale = daysSinceStart != null && daysSinceStart > STALE_AFTER_DAYS;
+
+  if (!stale && nextStart && daysUntilPeriod != null && daysUntilPeriod < 0) {
     isLate = true;
     daysLate = -daysUntilPeriod;
   }
 
   /* ── Ovulation and the fertile window ────────────────────────────────── */
-  const showFertility = !onHormonal && settings.showFertility;
+  const showFertility = !onHormonal && settings.showFertility && !stale;
 
   /** @type {DateKey|null} */
   let ovulation = null;
@@ -246,20 +277,25 @@ export function predict({ periodDays, settings, today }) {
   return {
     avgCycleLength: avg,
     avgPeriodLength: avgPeriod,
-    confidence,
+    // A confident-sounding badge over a stale forecast is the most misleading
+    // thing on the screen, so staleness overrides however many cycles are on
+    // record.
+    confidence: stale ? 'none' : confidence,
     basis,
     recalibrated,
     lastStart,
-    nextStart,
-    nextPeriod: nextStart ? periodSpan(nextStart, avgPeriod) : null,
+    nextStart: stale ? null : nextStart,
+    nextPeriod: !stale && nextStart ? periodSpan(nextStart, avgPeriod) : null,
     ovulation,
     fertileWindow,
     fertileWidened,
     showFertility,
-    daysUntilPeriod,
+    daysUntilPeriod: stale ? null : daysUntilPeriod,
     daysLate,
     isLate,
-    cycleDay: lastStart ? daysBetween(lastStart, today) + 1 : null,
+    stale,
+    daysSinceStart,
+    cycleDay: stale || daysSinceStart == null ? null : daysSinceStart + 1,
     spread: stats.spread,
     regularity: stats.spread == null ? null : regularity(stats.spread),
     cyclesLogged: lengths.length,
