@@ -1,0 +1,36 @@
+# Secrets. Kittycal has no server, no API keys and no build step, so nothing
+# here should ever produce a .env — which is exactly why this belongs in the
+# repo rather than being left to memory. The cost of the guard is a few lines;
+# the cost of missing it once, on a public repository, is a leaked credential
+# in the permanent history.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+secrets.json
+credentials.json
+.netrc
+.npmrc
+id_rsa*
+id_ed25519*
+
+# Tooling and OS clutter
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+.cache/
+.venv/
+__pycache__/
+
+# Editor state
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*~
