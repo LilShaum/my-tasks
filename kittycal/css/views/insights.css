@@ -80,3 +80,58 @@
 }
 
 .pattern-head strong { font-size: var(--fs-sm); }
+
+/* ── Mood by phase ────────────────────────────────────────────────────── */
+
+.mood-list {
+  list-style: none;
+  display: grid;
+  gap: var(--sp-4);
+  margin-top: var(--sp-3);
+}
+
+.mood-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+}
+
+/* The day count is context, not a finding, so it sits right and stays quiet. */
+.mood-head .hint-sm { margin-left: auto; }
+
+.mood-bars { display: grid; gap: var(--sp-2); }
+
+.mood-bar-row {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr 2.5rem;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+}
+
+.mood-bar-label {
+  /* Long mood labels ("Very self-critical") must ellipsize rather than push
+     the bar out of the card. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mood-bar-track {
+  height: 10px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  border: 1px solid var(--line-soft);
+  overflow: hidden;
+}
+
+.mood-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+  border-radius: var(--r-pill);
+}
+
+.mood-bar-pct { text-align: right; color: var(--ink-2); }
