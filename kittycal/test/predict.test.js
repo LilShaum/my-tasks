@@ -13,9 +13,11 @@ import assert from 'node:assert/strict';
 import {
   predict, weightedAverage, detectRecalibration, rateConfidence,
   upcomingPeriods, upcomingFertile, conceptionChance, detectThermalShift,
-  CYCLE_MIN_CLAMP, CYCLE_MAX_CLAMP,
+  CYCLE_MIN_CLAMP, CYCLE_MAX_CLAMP, STALE_AFTER_DAYS,
 } from '../js/domain/predict.js';
 import { defaultSettings } from '../js/domain/model.js';
+import { phaseFor, PHASES } from '../js/domain/phases.js';
+import { buildCycles } from '../js/domain/cycles.js';
 import { range, addDays, daysBetween } from '../js/utils/date.js';
 
 const period = (start, len) => range(start, addDays(start, len - 1));
@@ -427,4 +429,88 @@ test('a year of slightly variable logging produces a sane forecast', () => {
   assert.equal(p.cycleDay, 1, 'today is the first day of the newest period');
   assert.ok(p.nextStart && p.ovulation && p.fertileWindow);
   assert.equal(p.fertileWidened, false);
+});
+
+test('stops predicting once the history has gone stale', () => {
+  const today = '2026-07-20';
+  const settings = defaultSettings();
+
+  // Six normal cycles, then silence for well over the staleness threshold.
+  const days = [];
+  for (let c = 5; c >= 0; c--) {
+    const start = addDays(today, -430 - c * 28);
+    for (let i = 0; i < 5; i++) days.push(addDays(start, i));
+  }
+
+  const p = predict({ periodDays: new Set(days), settings, today });
+
+  assert.equal(p.stale, true);
+  assert.equal(p.isLate, false, '402 days is not a late period, it is a gap');
+  assert.equal(p.daysLate, null);
+  assert.equal(p.cycleDay, null, 'nobody is on day 431 of a cycle');
+  assert.equal(p.nextStart, null);
+  assert.equal(p.nextPeriod, null);
+  assert.equal(p.daysUntilPeriod, null);
+  assert.equal(p.showFertility, false, 'no fertile window from last summer');
+  assert.equal(p.ovulation, null);
+  assert.equal(p.confidence, 'none',
+    'claiming good confidence over a stale forecast is the worst of it');
+});
+
+test('an ordinary late period is still reported as late', () => {
+  const today = '2026-07-20';
+  const settings = defaultSettings();
+
+  const days = [];
+  for (let c = 5; c >= 0; c--) {
+    const start = addDays(today, -40 - c * 28);
+    for (let i = 0; i < 5; i++) days.push(addDays(start, i));
+  }
+
+  const p = predict({ periodDays: new Set(days), settings, today });
+
+  assert.equal(p.stale, false, 'twelve days late is a real, useful fact');
+  assert.equal(p.isLate, true);
+  assert.ok(p.daysLate && p.daysLate > 0);
+  assert.ok(p.cycleDay && p.cycleDay > 0);
+});
+
+test('staleness turns on just past the threshold, not before', () => {
+  const today = '2026-07-20';
+  const settings = defaultSettings();
+  const build = (gap) => {
+    const days = [];
+    for (let i = 0; i < 5; i++) days.push(addDays(today, -gap + i));
+    return predict({ periodDays: new Set(days), settings, today });
+  };
+
+  assert.equal(build(STALE_AFTER_DAYS).stale, false);
+  assert.equal(build(STALE_AFTER_DAYS + 1).stale, true);
+});
+
+test('the phase stops claiming luteal once badly overdue', () => {
+  const today = '2026-07-20';
+  const settings = defaultSettings();
+
+  const build = (gap) => {
+    const days = [];
+    for (let c = 3; c >= 0; c--) {
+      const start = addDays(today, -gap - c * 28);
+      for (let i = 0; i < 5; i++) days.push(addDays(start, i));
+    }
+    const periodDays = new Set(days);
+    const prediction = predict({ periodDays, settings, today });
+    return phaseFor({ date: today, cycles: buildCycles(periodDays), prediction });
+  };
+
+  // A few days over: luteal length varies, so this is still plausible.
+  assert.equal(build(28 + 3).id, 'luteal');
+
+  // Later than an entire luteal phase: she is definitionally not still in the
+  // two-week window that was supposed to end with a period.
+  assert.equal(build(28 + 30).id, 'overdue');
+
+  // And "overdue" is not the same as the new-user state — the copy for
+  // someone with four cycles logged must not tell her to log a period first.
+  assert.notEqual(build(28 + 30).summary, PHASES.unknown.summary);
 });

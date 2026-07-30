@@ -90,7 +90,8 @@ export function renderToday(host) {
     logButton(logs[today], today),
 
     el('div', { class: 'section stagger' }, [
-      prediction.isLate ? lateCard(prediction) : nextPeriodCard(prediction),
+      prediction.stale ? staleCard(prediction)
+        : prediction.isLate ? lateCard(prediction) : nextPeriodCard(prediction),
       prediction.showFertility && prediction.ovulation ? fertileCard(prediction, today) : null,
       ...acogCards(cycles, today, prediction),
     ]),
@@ -340,6 +341,10 @@ function greeting(name, today) {
  * @param {import('../domain/predict.js').Prediction} prediction
  */
 function ringHeadline(prediction) {
+  // Nothing to count down to, and nothing honest to put in the middle of a
+  // ring that is meant to show where you are in a cycle.
+  if (prediction.stale) return { value: '—', caption: 'no recent period logged' };
+
   if (prediction.isLate && prediction.daysLate != null) {
     return {
       value: String(prediction.daysLate),
@@ -469,6 +474,45 @@ function confidenceLine(prediction) {
     class: `confidence confidence-${prediction.confidence}`,
     text: copy[prediction.confidence],
   });
+}
+
+/**
+ * What to say when the history has simply stopped.
+ *
+ * Every prediction hangs off the last period she logged, so once that is
+ * months old the whole screen becomes confident fiction. Before this existed,
+ * coming back after a year showed "Day 431", "402 days late", "Luteal phase",
+ * a fertile window from the previous summer, and "Good confidence — based on
+ * 5 complete cycles".
+ *
+ * Nobody's period is 402 days late. The number was arithmetic, not a fact
+ * about her body, and presenting it as one is the kind of thing that would
+ * frighten someone opening a period tracker after a gap.
+ *
+ * So it says the plain thing instead, and asks for the one piece of
+ * information that makes everything work again.
+ *
+ * @param {import('../domain/predict.js').Prediction} prediction
+ */
+function staleCard(prediction) {
+  const months = Math.round((prediction.daysSinceStart ?? 0) / 30);
+
+  return el('div', { class: 'card data-zone' }, [
+    el('h3', { text: 'Let\u2019s pick this back up' }),
+    el('p', { class: 'hint-sm', text:
+      `Your last logged period was ${plural(months, 'month')} ago, which is too ` +
+      'far back to predict from. Mark when your most recent period started and ' +
+      'everything starts working again.' }),
+    el('button', {
+      type: 'button',
+      class: 'btn',
+      style: { marginTop: 'var(--sp-3)' },
+      onclick: () => {
+        haptic();
+        store.setUi({ view: 'calendar', periodEditMode: true });
+      },
+    }, ['Mark my last period']),
+  ]);
 }
 
 /**

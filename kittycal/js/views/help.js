@@ -124,6 +124,16 @@ export function openHelp() {
           'be worse than nothing. Period tracking carries on as normal.'),
       ]),
 
+      section('When it goes quiet', [
+        p('If your period is later than about two weeks, Kittycal stops naming ' +
+          'a phase. It cannot know where you are once its own prediction has ' +
+          'passed, and guessing would be worse than saying so.'),
+        p('If it has been more than three months since your last logged period, ' +
+          'it stops predicting altogether and asks you to mark your most recent ' +
+          'one. Everything before that stays exactly where it is — nothing is ' +
+          'lost, it just needs a fresh starting point.'),
+      ]),
+
       section('What it will not do', [
         p('Kittycal is not contraception. Predicted fertile windows are ' +
           'estimates from your own history, and ovulation moves.'),

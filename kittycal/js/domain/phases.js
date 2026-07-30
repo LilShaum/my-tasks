@@ -18,7 +18,7 @@
 
 import { isPeriodDay } from './cycles.js';
 
-/** @typedef {'menstrual'|'follicular'|'ovulatory'|'luteal'|'unknown'} PhaseId */
+/** @typedef {'menstrual'|'follicular'|'ovulatory'|'luteal'|'unknown'|'overdue'} PhaseId */
 
 /**
  * @typedef {Object} PhaseInfo
@@ -70,6 +70,24 @@ export const PHASES = {
       'cycle.',
     token: '--line-soft',
   },
+  /*
+    Distinct from `unknown`, which is the brand-new-user state. Someone whose
+    period is well overdue has logged plenty — telling her to "log a period so
+    Kittycal can start working out where you are" would be both wrong and
+    faintly insulting. What is true is that the model has run past its own
+    prediction and no longer knows.
+
+    The copy deliberately does not speculate about why. Naming causes on a
+    screen someone opens while waiting for a late period is not this app's job.
+  */
+  overdue: {
+    id: 'overdue',
+    name: 'Past your expected date',
+    summary:
+      'Your period was expected before now, so Kittycal cannot say which phase ' +
+      'you are in. Logging it when it arrives puts everything back on track.',
+    token: '--line-soft',
+  },
 };
 
 /**
@@ -86,6 +104,22 @@ export function phaseFor({ date, cycles, prediction }) {
   if (isPeriodDay(cycles, date)) return PHASES.menstrual;
 
   if (!prediction.lastStart || date < prediction.lastStart) return PHASES.unknown;
+
+  // Once the history has gone stale there is no cycle to be at a point in.
+  // Naming a phase here asserted things like "luteal phase" 431 days after the
+  // last logged period, which is not a claim any data supports.
+  if (prediction.stale) return PHASES.unknown;
+
+  /*
+    Past the expected start, every extra day is a day the model did not
+    predict. A few days late is still plausibly luteal — luteal length varies
+    by a day or two either way. Being late by longer than an entire luteal
+    phase is not: whatever is happening, she is definitionally not still in
+    the two-week window that was supposed to end with a period.
+  */
+  if (prediction.isLate && (prediction.daysLate ?? 0) > prediction.lutealDays) {
+    return PHASES.overdue;
+  }
 
   const { ovulation, fertileWindow, nextStart } = prediction;
 
