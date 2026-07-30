@@ -11,9 +11,10 @@ import assert from 'node:assert/strict';
 
 import {
   loggedIds, symptomFrequency, symptomPattern, detectPatterns, series,
-  loggingStreak, daysLogged, bbtForCycle,
+  loggingStreak, daysLogged, bbtForCycle, moodByPhase,
 } from '../js/domain/stats.js';
 import { buildCycles } from '../js/domain/cycles.js';
+import { phaseInCycle } from '../js/domain/phases.js';
 import { emptyLog } from '../js/domain/model.js';
 import { addDays, range } from '../js/utils/date.js';
 
@@ -181,4 +182,115 @@ test('a gap of two days ends the streak', () => {
 
 test('no logs at all is a streak of zero, not a crash', () => {
   assert.equal(loggingStreak({}, '2026-07-27', addDays), 0);
+});
+
+/* ── Mood by phase ──────────────────────────────────────────────────────── */
+
+/** Six 28-day cycles ending with a period that started 3 days ago. */
+function sixCycles(today = '2026-07-20') {
+  const days = [];
+  for (let c = 5; c >= 0; c--) {
+    const start = addDays(today, -3 - c * 28);
+    for (let i = 0; i < 5; i++) days.push(addDays(start, i));
+  }
+  return buildCycles(days);
+}
+
+/** @param {Record<string, string[]>} byDate */
+function moodLogs(byDate) {
+  /** @type {Record<string, any>} */
+  const logs = {};
+  for (const [date, moods] of Object.entries(byDate)) {
+    logs[date] = {
+      date, flow: 'none', symptoms: [], moods, discharge: [], activity: [],
+      other: [], sex: [], custom: [], drive: null, bbt: null, weight: null,
+      water: 0, sleep: null, steps: null, pillTaken: false,
+      testPregnancy: null, testOvulation: null, notes: '', updated: 0,
+    };
+  }
+  return logs;
+}
+
+test('phaseInCycle covers a whole historical cycle', () => {
+  const cycles = sixCycles();
+  const cycle = cycles[1];
+
+  /** @type {Record<string, number>} */
+  const seen = {};
+  for (let i = 0; i < 28; i++) {
+    const id = phaseInCycle(addDays(cycle.start, i), cycle, 14).id;
+    seen[id] = (seen[id] ?? 0) + 1;
+  }
+
+  // Every day is accounted for, and each phase actually appears — the whole
+  // point, since `phaseFor` returns `unknown` for 23 of these 28 days.
+  assert.equal(Object.values(seen).reduce((a, b) => a + b, 0), 28);
+  assert.ok(!seen.unknown, `unclassified days: ${seen.unknown}`);
+  for (const id of ['menstrual', 'follicular', 'ovulatory', 'luteal']) {
+    assert.ok(seen[id] > 0, `no ${id} days`);
+  }
+});
+
+test('phaseInCycle refuses an incomplete cycle', () => {
+  const cycles = sixCycles();
+  const open = cycles[cycles.length - 1];
+  assert.equal(open.complete, false);
+  assert.equal(phaseInCycle(open.start, open, 14).id, 'unknown');
+});
+
+test('moodByPhase buckets moods into the phase they happened in', () => {
+  const cycles = sixCycles();
+  const cycle = cycles[1];
+
+  const logs = moodLogs({
+    [cycle.start]: ['irritable'],                    // day 1 — menstrual
+    [addDays(cycle.start, 1)]: ['irritable', 'sad'], // day 2 — menstrual
+    [addDays(cycle.start, 7)]: ['happy'],            // follicular
+    [addDays(cycle.start, 13)]: ['happy'],           // ovulatory
+    [addDays(cycle.start, 24)]: ['irritable'],       // luteal
+  });
+
+  const out = moodByPhase(logs, cycles, 14);
+
+  assert.deepEqual(out.get('menstrual')?.moods.map((m) => [m.id, m.count]),
+    [['irritable', 2], ['sad', 1]]);
+  assert.equal(out.get('menstrual')?.total, 2, 'two days, three mood entries');
+  assert.equal(out.get('follicular')?.moods[0].id, 'happy');
+  assert.equal(out.get('luteal')?.moods[0].id, 'irritable');
+});
+
+test('moodByPhase ignores the open cycle and undated noise', () => {
+  const cycles = sixCycles();
+  const open = cycles[cycles.length - 1];
+
+  const logs = moodLogs({
+    [addDays(open.start, 1)]: ['happy'],   // inside the still-open cycle
+    '2019-01-01': ['sad'],                 // long before any cycle
+  });
+
+  assert.equal(moodByPhase(logs, cycles, 14).size, 0,
+    'a phase needs the next period to exist before it can be located');
+});
+
+test('moodByPhase reports totals so shares can be compared', () => {
+  const cycles = sixCycles();
+  const cycle = cycles[1];
+
+  // Luteal is roughly twice the fertile window, so raw counts would always
+  // favour it. The total is what lets the UI divide.
+  /** @type {Record<string, string[]>} */
+  const byDate = {};
+  for (let i = 20; i < 26; i++) byDate[addDays(cycle.start, i)] = ['calm'];
+  byDate[addDays(cycle.start, 13)] = ['happy'];
+
+  const out = moodByPhase(byDate && moodLogs(byDate), cycles, 14);
+  assert.equal(out.get('luteal')?.total, 6);
+  assert.equal(out.get('ovulatory')?.total, 1);
+});
+
+test('moodByPhase drops the "none" mood', () => {
+  const cycles = sixCycles();
+  const cycle = cycles[1];
+  const out = moodByPhase(moodLogs({ [cycle.start]: ['none'] }), cycles, 14);
+  assert.equal(out.get('menstrual')?.moods.length, 0);
 });

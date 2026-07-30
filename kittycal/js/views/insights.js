@@ -22,6 +22,7 @@ import { predict, detectThermalShift } from '../domain/predict.js';
 import { phaseFor, PHASES } from '../domain/phases.js';
 import {
   detectPatterns, symptomPattern, series, bbtForCycle, daysLogged, loggingStreak,
+  moodByPhase,
 } from '../domain/stats.js';
 import { labelOf } from '../data/taxonomy.js';
 import * as acog from '../domain/acog.js';
@@ -51,6 +52,7 @@ export function renderInsights(host) {
       cycleLengthCard(lengths, prediction),
       periodLengthCard(periods),
       patternsCard(logs, cycles, prediction),
+      moodCard(logs, cycles, settings),
       bbtCard(logs, cycles, settings),
       trendCard(logs, settings),
       reportCard(),
@@ -159,6 +161,86 @@ function periodLengthCard(periods) {
       summary: `Bar chart of your last ${recent.length} period lengths, ` +
         `from ${stats.min} to ${stats.max} days.`,
     }),
+  ]);
+}
+
+/* ── Mood by phase ──────────────────────────────────────────────────────── */
+
+/**
+ * Days with a mood logged before a phase is worth comparing.
+ *
+ * Three: enough that a single unusual day cannot own a whole phase, low enough
+ * that the card appears within a couple of months of ordinary use.
+ */
+const MIN_DAYS_PER_PHASE = 3;
+
+/**
+ * How she tends to feel at each point in the cycle.
+ *
+ * Shares, not counts. The luteal stretch is about twice the length of the
+ * fertile window, so whatever she feels then would top any raw table simply by
+ * having more days in it — the bar would be measuring the calendar rather than
+ * her mood.
+ *
+ * Only complete cycles count, and only phases with enough days behind them get
+ * a row: one cheerful Tuesday in the follicular phase is not a finding.
+ *
+ * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
+ * @param {import('../domain/cycles.js').Cycle[]} cycles
+ * @param {import('../domain/model.js').Settings} settings
+ */
+function moodCard(logs, cycles, settings) {
+  const byPhase = moodByPhase(logs, cycles, settings.lutealLength);
+
+  // Drawn in cycle order rather than by size, so the card reads as a journey
+  // through the month.
+  const order = ['menstrual', 'follicular', 'ovulatory', 'luteal'];
+  const rows = order
+    .map((id) => ({ id, data: byPhase.get(id) }))
+    .filter((r) => r.data && r.data.total >= MIN_DAYS_PER_PHASE);
+
+  if (rows.length < 2) {
+    return el('div', { class: 'card' }, [
+      el('h3', { text: 'Mood by phase' }),
+      el('p', { class: 'hint-sm', text:
+        'Log how you are feeling on a few more days and this fills in — it ' +
+        'needs a handful in each part of the cycle before the comparison ' +
+        'means anything.' }),
+    ]);
+  }
+
+  const total = rows.reduce((n, r) => n + (r.data?.total ?? 0), 0);
+
+  return el('div', { class: 'card' }, [
+    el('h3', { text: 'Mood by phase' }),
+    el('p', { class: 'hint-sm', text:
+      `What you logged most at each point in your cycle, as a share of the ` +
+      `days you recorded a mood. Based on ${plural(total, 'day')}.` }),
+
+    el('ul', { class: 'mood-list' }, rows.map(({ id, data }) => {
+      const phase = PHASES[/** @type {'menstrual'} */ (id)];
+      const top = (data?.moods ?? []).slice(0, 2);
+      const denom = data?.total ?? 1;
+
+      return el('li', { class: 'mood-row' }, [
+        el('div', { class: 'mood-head' }, [
+          el('span', { class: 'phase-dot', 'aria-hidden': 'true',
+                       style: { background: `var(${phase.token})` } }),
+          el('strong', { text: phase.name }),
+          el('span', { class: 'hint-sm', text: plural(denom, 'day') }),
+        ]),
+        el('div', { class: 'mood-bars' }, top.map((m) => {
+          const pct = Math.round((m.count / denom) * 100);
+          return el('div', { class: 'mood-bar-row' }, [
+            el('span', { class: 'mood-bar-label', text: labelOf(m.id) }),
+            el('span', { class: 'mood-bar-track', 'aria-hidden': 'true' }, [
+              el('span', { class: 'mood-bar-fill', style: { width: `${pct}%` } }),
+            ]),
+            el('span', { class: 'mood-bar-pct num', text: `${pct}%` }),
+          ]);
+        })),
+      ]);
+    })),
   ]);
 }
 

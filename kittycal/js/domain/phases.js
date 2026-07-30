@@ -17,6 +17,7 @@
  */
 
 import { isPeriodDay } from './cycles.js';
+import { addDays } from '../utils/date.js';
 
 /** @typedef {'menstrual'|'follicular'|'ovulatory'|'luteal'|'unknown'|'overdue'} PhaseId */
 
@@ -89,6 +90,57 @@ export const PHASES = {
     token: '--line-soft',
   },
 };
+
+/**
+ * How many days before and after ovulation count as the fertile window.
+ *
+ * Same figures `predict.js` uses forward; repeated rather than imported
+ * because phases.js is imported *by* the prediction path and a cycle between
+ * the two modules would be worse than two constants.
+ */
+const FERTILE_BEFORE = 5;
+const FERTILE_AFTER = 1;
+
+/**
+ * The phase a *past* date fell in, worked out from its own cycle.
+ *
+ * `phaseFor` answers "where am I now" and is anchored to the current
+ * prediction — it deliberately returns `unknown` for anything before the last
+ * period started. That makes it the wrong tool for looking backwards: walking
+ * a historical 28-day cycle through it returns `unknown` for 23 of the 28
+ * days, so anything built on it would have charted almost nothing.
+ *
+ * This looks at the cycle the date actually belongs to. It needs a *complete*
+ * cycle, because the ovulation estimate counts backwards from the next
+ * period's start — which is exactly the reason the estimate is worth trusting
+ * in hindsight, when the next period is a fact rather than a forecast.
+ *
+ * @param {DateKey} date
+ * @param {Cycle} cycle          the cycle containing `date`; must be complete
+ * @param {number} lutealDays
+ * @returns {PhaseInfo}
+ */
+export function phaseInCycle(date, cycle, lutealDays) {
+  if (!cycle.complete || !cycle.nextStart) return PHASES.unknown;
+  if (date < cycle.start || date >= cycle.nextStart) return PHASES.unknown;
+
+  if (date <= cycle.periodEnd) return PHASES.menstrual;
+
+  const ovulation = addDays(cycle.nextStart, -lutealDays);
+  const fertileStart = addDays(ovulation, -FERTILE_BEFORE);
+  const fertileEnd = addDays(ovulation, FERTILE_AFTER);
+
+  // A short cycle can put the estimated fertile window inside the period
+  // itself. The bleeding is a fact and the estimate is not, so the fact wins
+  // and the days after it are simply follicular.
+  if (fertileStart <= cycle.periodEnd) {
+    return date > ovulation ? PHASES.luteal : PHASES.follicular;
+  }
+
+  if (date < fertileStart) return PHASES.follicular;
+  if (date <= fertileEnd) return PHASES.ovulatory;
+  return PHASES.luteal;
+}
 
 /**
  * Which phase a date falls in.

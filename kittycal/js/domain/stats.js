@@ -15,6 +15,7 @@
 
 import { daysBetween, range, addDays } from '../utils/date.js';
 import { cycleContaining } from './cycles.js';
+import { phaseInCycle } from './phases.js';
 
 /**
  * The last day belonging to a cycle.
@@ -184,29 +185,69 @@ export function bbtForCycle(logs, cycle) {
 }
 
 /**
- * Which cycle phase each mood was logged in, for the mood-by-phase breakdown.
+ * Which moods she logs at each point in the cycle.
+ *
+ * Counted per phase and returned with the phase total, because raw counts are
+ * not comparable between phases: the luteal stretch is roughly twice the
+ * length of the fertile window, so whatever she feels then would top any
+ * table simply by having more days in it. The caller divides.
+ *
+ * Only *complete* cycles are counted. The phase of a past day is worked out
+ * from its own cycle by counting back from the next period's start, which
+ * needs that next period to exist.
+ *
+ * Takes the luteal length rather than a phase function on purpose. The
+ * obvious thing to pass would be `phaseFor`, which is anchored to the current
+ * prediction and returns `unknown` for almost every historical date — an easy
+ * mistake that would have produced a chart of nothing.
+ *
  * @param {Record<DateKey, DayLog>} logs
  * @param {Cycle[]} cycles
- * @param {(date: DateKey) => string} phaseOf
- * @returns {Map<string, Map<string, number>>} phase → mood → count
+ * @param {number} lutealDays
+ * @returns {Map<string, {total: number, moods: {id: string, count: number}[]}>}
+ *   keyed by phase id, moods most frequent first
  */
-export function moodByPhase(logs, cycles, phaseOf) {
+export function moodByPhase(logs, cycles, lutealDays) {
+  const complete = cycles.filter((c) => c.complete);
+
   /** @type {Map<string, Map<string, number>>} */
-  const out = new Map();
+  const raw = new Map();
+  /** @type {Map<string, number>} */
+  const totals = new Map();
 
   for (const [date, log] of Object.entries(logs)) {
     if (!log.moods.length) continue;
-    if (!cycleContaining(cycles, date)) continue;
-    const phase = phaseOf(date);
-    if (!out.has(phase)) out.set(phase, new Map());
-    const bucket = /** @type {Map<string, number>} */ (out.get(phase));
+
+    const cycle = complete.find((c) => date >= c.start && date < /** @type {string} */ (c.nextStart));
+    if (!cycle) continue;
+
+    const phase = phaseInCycle(date, cycle, lutealDays).id;
+    if (phase === 'unknown') continue;
+
+    totals.set(phase, (totals.get(phase) ?? 0) + 1);
+
+    if (!raw.has(phase)) raw.set(phase, new Map());
+    const bucket = /** @type {Map<string, number>} */ (raw.get(phase));
     for (const mood of log.moods) {
+      if (mood === 'none') continue;
       bucket.set(mood, (bucket.get(mood) ?? 0) + 1);
     }
   }
 
+  /** @type {Map<string, {total: number, moods: {id: string, count: number}[]}>} */
+  const out = new Map();
+  for (const [phase, bucket] of raw) {
+    out.set(phase, {
+      total: totals.get(phase) ?? 0,
+      moods: [...bucket.entries()]
+        .map(([id, count]) => ({ id, count }))
+        // Ties broken by id so the order is stable between renders.
+        .sort((a, b) => b.count - a.count || a.id.localeCompare(b.id)),
+    });
+  }
   return out;
 }
+
 
 /**
  * Consecutive days logged, ending today or yesterday.

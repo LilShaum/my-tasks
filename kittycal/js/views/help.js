@@ -97,6 +97,10 @@ export function openHelp() {
           'and 2" is something you can act on.'),
         p('It is deliberately cautious: something has to show up in most of your ' +
           'cycles before it is called a pattern.'),
+        p('Mood by phase shows what you tend to feel at each point in the cycle. ' +
+          'It is shown as a share rather than a count, because the second half ' +
+          'of a cycle is roughly twice as long as the fertile window — counts ' +
+          'alone would just be measuring the calendar.'),
       ]),
 
       section('The report for a doctor', [
