@@ -334,3 +334,36 @@
 /* Both buttons stay full 44px targets; on a narrow phone they stack rather
    than shrinking below that. */
 .backup-nudge-actions .btn { flex: 1 1 auto; }
+
+/* ── Inline quick logging ─────────────────────────────────────────────── */
+
+/*
+  Sits where the single big "Log today" button used to. It is doing more work,
+  so it gets a surface of its own rather than floating on the page — but a
+  quiet one, because it must not compete with the ring above it.
+*/
+.quick-log {
+  display: grid;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  background: var(--surface-2);
+  border-radius: var(--r-lg);
+}
+
+.quick-block { display: grid; gap: var(--sp-2); }
+
+.quick-block .hint-sm { font-weight: 600; }
+
+/* The route to the full diary. Secondary, because the chips above it handle
+   the common case and this is the "something unusual today" path. */
+.quick-log-more { margin-top: var(--sp-1); }
+
+.quick-log .chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+/* Chips here are the primary control, so they keep the full 44px target and
+   grow to fill the row rather than huddling at the left. */
+.quick-log .chip { flex: 1 1 auto; justify-content: center; }

@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 
 import {
   CATEGORIES, labelOf, labelFor, labelIndexEntries, optionCount,
+  optionMatches, normalizeQuery,
 } from '../js/data/taxonomy.js';
 import { loggedIds } from '../js/domain/stats.js';
 
@@ -83,4 +84,39 @@ test('an unknown id echoes back, so custom symptoms display as typed', () => {
 
 test('optionCount matches the advertised taxonomy size', () => {
   assert.ok(optionCount() >= 100, `only ${optionCount()} options`);
+});
+
+test('every option is findable by a prefix of its own label', () => {
+  /** @type {string[]} */
+  const unfindable = [];
+
+  for (const category of CATEGORIES) {
+    for (const option of category.options) {
+      // What someone would actually type: the first word, truncated.
+      const firstWord = option.label.split(/[\s-]+/)[0];
+      const typed = normalizeQuery(firstWord.slice(0, Math.max(3, firstWord.length - 1)));
+      if (!optionMatches({ id: option.id, label: option.label }, typed)) {
+        unfindable.push(`${category.id}/${option.label} (typed "${typed}")`);
+      }
+    }
+  }
+
+  assert.deepEqual(unfindable, [], unfindable.slice(0, 6).join('; '));
+});
+
+test('an emoji in front of a label does not hide it from search', () => {
+  /*
+    The regression this exists for. Chips render the emoji as a sibling span,
+    so reading the label back out of `textContent` produced "🤢Nausea" — which
+    normalises to "🤢nausea" and starts with neither the query nor any word in
+    it. Every one of the 104 options was unsearchable by its own name, and it
+    went unnoticed because the ~20 options carrying hand-written synonyms
+    still matched.
+  */
+  const option = { id: 'nausea', label: 'Nausea' };
+  assert.equal(optionMatches(option, normalizeQuery('nausea')), true);
+
+  const glued = { id: 'nausea', label: '🤢Nausea' };
+  assert.equal(optionMatches(glued, normalizeQuery('nausea')), false,
+    'if this ever passes, the guard above has stopped guarding anything');
 });
