@@ -94,12 +94,6 @@ export function daysBetween(a, b) {
   return Math.round((fromKey(b).getTime() - fromKey(a).getTime()) / MS_DAY);
 }
 
-/** @param {DateKey} a @param {DateKey} b */
-export const isBefore = (a, b) => a < b; // lexicographic works for ISO-ordered keys
-
-/** @param {DateKey} a @param {DateKey} b */
-export const isAfter = (a, b) => a > b;
-
 /**
  * @param {DateKey} key
  * @param {DateKey} start inclusive
@@ -129,15 +123,6 @@ export const year = (key) => Number(key.slice(0, 4));
 export const month = (key) => Number(key.slice(5, 7)) - 1;
 /** @param {DateKey} key */
 export const dayOfMonth = (key) => Number(key.slice(8, 10));
-
-/**
- * Age in whole years from a birth year, or null.
- * @param {number|null} birthYear
- */
-export function ageFromYear(birthYear) {
-  if (!birthYear) return null;
-  return new Date().getFullYear() - birthYear;
-}
 
 /* ── Display formatting ─────────────────────────────────────────────────── */
 

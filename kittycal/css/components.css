@@ -211,6 +211,21 @@
   transition: background var(--dur-hover) var(--ease-soft);
 }
 
+/*
+  An invisible 44px hit area around a 32px switch.
+
+  The visual switch is deliberately small — a chunky one would dominate the
+  settings rows — but a 52x32 target misses the 44px minimum this app committed
+  to. Growing the element itself would move its border and pill shape, so the
+  target is extended with a pseudo-element instead: no layout change, no visual
+  change, six more pixels of forgiveness above and below.
+*/
+.toggle::before {
+  content: '';
+  position: absolute;
+  inset: -6px 0;
+}
+
 .toggle::after {
   content: '';
   position: absolute;

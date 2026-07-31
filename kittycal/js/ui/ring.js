@@ -123,25 +123,3 @@ function buildRingLabel(prediction, headline, caption) {
   return parts.join(' ');
 }
 
-/**
- * A compact legend for the ring's colours. Each entry pairs the swatch with a
- * text label — colour alone never carries the meaning.
- * @param {Prediction} prediction
- */
-export function ringLegend(prediction) {
-  const ids = prediction.showFertility
-    ? ['menstrual', 'follicular', 'ovulatory', 'luteal']
-    : ['menstrual', 'follicular'];
-
-  return el('ul', { class: 'ring-legend' }, ids.map((id) => {
-    const phase = PHASES[/** @type {keyof typeof PHASES} */ (id)];
-    return el('li', {}, [
-      el('span', {
-        class: 'legend-dot',
-        style: { background: `var(${phase.token})` },
-        'aria-hidden': 'true',
-      }),
-      el('span', { text: phase.name }),
-    ]);
-  }));
-}

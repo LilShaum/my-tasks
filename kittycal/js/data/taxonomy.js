@@ -443,21 +443,3 @@ export function normalizeQuery(text) {
     .trim();
 }
 
-/**
- * Every symptom-ish id paired with a readable label, for the insights heatmap
- * and the doctor report. Excludes the "none" options, which record an absence
- * and would only add noise to a frequency chart.
- * @returns {{id: string, label: string, category: string}[]}
- */
-export function trackableSymptoms() {
-  /** @type {{id: string, label: string, category: string}[]} */
-  const out = [];
-  for (const c of CATEGORIES) {
-    if (c.id === 'flow' || c.id === 'drive') continue;
-    for (const option of c.options) {
-      if (option.id === 'none') continue;
-      out.push({ id: option.id, label: option.label, category: c.id });
-    }
-  }
-  return out;
-}

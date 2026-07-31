@@ -71,25 +71,6 @@ export async function loadLogs() {
   return out;
 }
 
-/**
- * Write one log, or delete it if it holds nothing. Pruning empties matters:
- * otherwise opening a day and closing it again leaves a record behind, and
- * the calendar sprouts a dot for a day with no data in it.
- * @param {DayLog} log
- */
-export async function saveLog(log) {
-  if (isLogEmpty(log)) {
-    await db.del(db.STORE_LOGS, log.date);
-    return;
-  }
-  await db.put(db.STORE_LOGS, { ...log, updated: Date.now() });
-}
-
-/** @param {DateKey} date */
-export async function deleteLog(date) {
-  await db.del(db.STORE_LOGS, date);
-}
-
 /** @param {DayLog[]} logs */
 export async function saveLogs(logs) {
   const keep = logs.filter((l) => !isLogEmpty(l));
@@ -125,16 +106,6 @@ export async function deleteMascot(themeId) {
   await db.del(db.STORE_BLOBS, `mascot:${themeId}`);
 }
 
-/** @returns {Promise<string[]>} theme ids that have a custom image */
-export async function listCustomMascots() {
-  /** @type {any[]} */
-  const rows = await db.getAll(db.STORE_BLOBS);
-  return rows
-    .map((r) => String(r?.id ?? ''))
-    .filter((id) => id.startsWith('mascot:'))
-    .map((id) => id.slice('mascot:'.length));
-}
-
 /* ── Whole-database operations ──────────────────────────────────────────── */
 
 /**
@@ -150,15 +121,8 @@ export async function loadAll() {
   return { settings, logs, periodDays };
 }
 
-/** Wipe cycle data but keep settings — "start over" without losing her theme. */
-export async function clearCycleData() {
-  await db.clear(db.STORE_LOGS);
-  await db.setMeta(META_PERIODS, []);
-}
-
 /** Erase everything, including settings and images. */
 export async function eraseEverything() {
   await db.destroy();
 }
 
-export const storageUsage = db.usage;

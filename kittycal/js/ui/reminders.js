@@ -219,7 +219,3 @@ export async function checkReminders({ prediction, loggedToday, birthControl }) 
   return sent;
 }
 
-/** Clear the fired log, so reminders can fire again today. For testing. */
-export async function resetFired() {
-  await db.setMeta(META_FIRED, []);
-}

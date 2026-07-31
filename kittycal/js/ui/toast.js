@@ -80,6 +80,3 @@ export function toastUndo(message, onUndo) {
   return toast(message, { ms: 5200, action: { label: 'Undo', onAction: onUndo } });
 }
 
-export function clearToasts() {
-  for (const node of [...live]) dismiss(node);
-}
