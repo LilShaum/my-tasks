@@ -291,9 +291,20 @@ function searchBar() {
 
       let sectionHits = 0;
       for (const chip of chips) {
-        // The chip's own text is the source of truth for what's on screen; the
-        // synonym match needs the option id, which is on the dataset.
-        const label = chip.textContent ?? '';
+        /*
+          `dataset.label`, not `textContent`.
+
+          Every option carries an emoji, and the chip renders it as a sibling
+          span — so `textContent` came back as "🤢Nausea", which normalises to
+          "🤢nausea" and starts with neither the query nor any word in it.
+          Searching for an option by its own name matched nothing, for all 104
+          of them, from the day the search was added.
+
+          It looked like it worked because roughly twenty options also carry
+          hand-written synonyms, and those are clean strings — so "sore boobs"
+          found tender breasts while "tender" did not.
+        */
+        const label = chip.dataset.label ?? chip.textContent ?? '';
         const id = chip.dataset.opt ?? '';
         const match = optionMatches({ id, label }, query);
         chip.hidden = !match;
@@ -452,7 +463,10 @@ function sheetState(draft) {
         type: 'button',
         class: opts.compact ? 'chip chip-quick' : 'chip',
         'aria-pressed': 'false',
-        dataset: { opt: option.id },
+        // The label travels as data. Reading it back out of `textContent`
+        // concatenated the emoji onto the front of the word — "🤢Nausea" —
+        // and nothing matched.
+        dataset: { opt: option.id, label: option.label },
         onclick: () => {
           if (cat.id === 'flow') flowAnswered = true;
           toggle(cat, d, option.id, cat.select === 'single');
@@ -621,7 +635,7 @@ function testsSection(draft, chips) {
         type: 'button',
         class: 'chip',
         'aria-pressed': String(/** @type {any} */ (draft)[test.id] === option.id),
-        dataset: { opt: option.id },
+        dataset: { opt: option.id, label: option.label },
         onclick: () => {
           const target = /** @type {any} */ (draft);
           target[test.id] = target[test.id] === option.id ? null : option.id;

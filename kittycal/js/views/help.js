@@ -33,13 +33,24 @@ export function openHelp() {
           'well by only marking your period each month.'),
       ]),
 
+      section('Logging without opening anything', [
+        p('Under the ring is a small set of chips: the things you log most, ' +
+          'plus Light, Medium and Heavy on the days a period could be running ' +
+          'or is about due.'),
+        p('One tap logs. Tap the same chip again to undo it — nothing to ' +
+          'confirm, nothing to regret. It saves the moment you tap.'),
+        p('The chips change as you go: whatever you have been logging recently ' +
+          'moves up here on its own, so the row is always the handful you ' +
+          'actually use. "Log something else" opens the full diary.'),
+      ]),
+
       section('The Today screen', [
         p('The ring is your whole cycle. The marker shows where today sits, and ' +
           'the big number counts down to whatever comes next — your period, or ' +
           'ovulation if that is sooner.'),
-        p('Under it is the phase you are in and what tends to happen during it. ' +
-          '"Log today" opens the diary. Below that are the next period, the ' +
-          'fertile window if it applies to you, and a few cards worth knowing.'),
+        p('Under it is the phase you are in and what tends to happen during it, ' +
+          'then the quick chips. Below those are the next period, the fertile ' +
+          'window if it applies to you, and a few cards worth knowing.'),
       ]),
 
       section('The calendar and its colours', [

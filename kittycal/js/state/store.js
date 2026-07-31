@@ -188,7 +188,7 @@ export function getLog(date) {
  * act — there's no way to get the two out of step.
  * @param {DayLog} log
  */
-export function putLog(log) {
+export function putLog(log, { quiet = false } = {}) {
   state.logs = { ...state.logs, [log.date]: log };
   dirty.logs.add(log.date);
 
@@ -206,7 +206,22 @@ export function putLog(log) {
   }
 
   scheduleFlush(true);
-  notify();
+
+  /*
+    `quiet` writes still persist and still update state — they just skip the
+    subscriber notification, and so skip a full re-render of the visible view.
+
+    That matters for logging a symptom straight from the Today screen. Nothing
+    on that screen depends on which symptoms are ticked except the row of chips
+    itself, but a re-render rebuilds the prediction cards, and those carry an
+    entrance animation — so every tap would have made the screen jump.
+
+    It is safe because only the active view renders, and switching views
+    re-renders from state that is already correct. Flow is the exception and
+    never uses it: marking bleeding moves the ring and every prediction under
+    it, so that genuinely needs the repaint.
+  */
+  if (!quiet) notify();
 }
 
 /**

@@ -19,7 +19,7 @@
 import { el, svg, replace, haptic } from '../utils/dom.js';
 import { todayKey, fmtDayMonth, fmtRelative, daysBetween } from '../utils/date.js';
 import { plural, listJoin } from '../utils/fmt.js';
-import { labelFor, labelOf } from '../data/taxonomy.js';
+import { labelFor, labelOf, CATEGORIES } from '../data/taxonomy.js';
 import { pick } from '../data/tips.js';
 import { loggedIds } from '../domain/stats.js';
 import { buildRecap, cluster } from '../domain/recap.js';
@@ -87,7 +87,7 @@ export function renderToday(host) {
     }),
 
     phaseLine(phase),
-    logButton(logs[today], today),
+    logButton(logs[today], today, prediction, settings),
 
     el('div', { class: 'section stagger' }, [
       prediction.stale ? staleCard(prediction)
@@ -305,19 +305,203 @@ function phaseLine(phase) {
  * @param {import('../domain/model.js').DayLog|undefined} log
  * @param {DateKey} today
  */
-function logButton(log, today) {
-  const logged = log != null;
+/** How many of her most-used chips sit inline on Today. */
+const INLINE_CHIPS = 4;
 
-  return el('div', { class: 'log-cta' }, [
+/** Flow appears inline within this many days of the expected start. */
+const FLOW_WINDOW = 3;
+
+/**
+ * Logging, without going anywhere.
+ *
+ * The two things she does daily — mark bleeding, tick a symptom — both used to
+ * mean: tap the button, wait for a sheet, find the control, tap it, tap Apply,
+ * wait for the sheet to close. Five interactions and a modal for one fact.
+ * That is what makes a tracker feel like homework, and it is why people stop.
+ *
+ * Both are now one tap, in place, saved immediately. Tapping again undoes it,
+ * so there is nothing to confirm and nothing to regret — the forgiving version
+ * is what lets the confirmation step go away.
+ *
+ * The full diary is still one tap below, unchanged: a hundred-odd options,
+ * search, and nothing written until Apply. This row is the shortcut for the
+ * handful she reaches for constantly, not a replacement for it.
+ *
+ * @param {import('../domain/model.js').DayLog|undefined} log
+ * @param {DateKey} today
+ * @param {import('../domain/predict.js').Prediction} prediction
+ * @param {import('../domain/model.js').Settings} settings
+ */
+function logButton(log, today, prediction, settings) {
+  const flowRow = inlineFlow(log, today, prediction);
+  const chipsRow = inlineChips(log, today, settings);
+
+  // Nothing to shortcut yet — a new user has no history to draw chips from and
+  // no cycle to place her in. She gets the plain call to action.
+  if (!flowRow && !chipsRow) {
+    return el('div', { class: 'log-cta' }, [
+      el('button', {
+        type: 'button',
+        class: 'btn btn-block btn-lg',
+        onclick: () => { haptic(); openLogSheet(today); },
+      }, ['Log today']),
+    ]);
+  }
+
+  return el('div', { class: 'log-cta quick-log' }, [
+    flowRow,
+    chipsRow,
     el('button', {
       type: 'button',
-      class: 'btn btn-block btn-lg',
+      class: 'btn btn-secondary btn-block quick-log-more',
       onclick: () => { haptic(); openLogSheet(today); },
-    }, [
-      el('span', { text: logged ? 'Add to today’s log' : 'Log today' }),
-    ]),
-    logged && el('p', { class: 'hint-sm log-cta-summary', text: summariseLog(log) }),
+    }, [log ? 'Add anything else' : 'Log something else']),
   ]);
+}
+
+/**
+ * Light / Medium / Heavy, inline, on the days it could plausibly matter.
+ *
+ * Shown while she is bleeding, and for a few days either side of the expected
+ * start — the window where "has it arrived" is the live question. Outside that
+ * it would be a control asking something nobody is asking, so it is not drawn.
+ *
+ * @param {import('../domain/model.js').DayLog|undefined} log
+ * @param {DateKey} today
+ * @param {import('../domain/predict.js').Prediction} prediction
+ */
+function inlineFlow(log, today, prediction) {
+  const bleeding = log != null && log.flow !== 'none';
+
+  // Around the expected start: "has it arrived yet".
+  const near = prediction.nextStart != null
+    && Math.abs(daysBetween(today, prediction.nextStart)) <= FLOW_WINDOW;
+
+  // And through the days a period would still be running: "is it still going".
+  // Without this the row vanished on day three of a period, which is exactly
+  // when the question is live — the first version only appeared once she had
+  // already logged bleeding, which is the answer, not the question.
+  const during = prediction.cycleDay != null
+    && prediction.cycleDay <= prediction.avgPeriodLength + FLOW_WINDOW;
+
+  if (!bleeding && !near && !during && !prediction.isLate) return null;
+
+  /** @type {[string, string][]} */
+  const levels = [['light', 'Light'], ['medium', 'Medium'], ['heavy', 'Heavy']];
+
+  const row = el('div', { class: 'chip-row' },
+    levels.map(([id, label]) => el('button', {
+      type: 'button',
+      class: 'chip',
+      'aria-pressed': String(log?.flow === id),
+      dataset: { opt: id },
+      onclick: () => {
+        haptic(10);
+        const draft = store.getLog(today);
+        // Tapping the active level clears it, which is how a mis-tap gets
+        // corrected without hunting for an undo.
+        draft.flow = /** @type {any} */ (draft.flow === id ? 'none' : id);
+        // Not quiet: flow moves periodDays, the ring, and every prediction
+        // below it, so the screen genuinely needs the repaint.
+        store.putLog(draft);
+      },
+    }, [el('span', { text: label })])),
+  );
+
+  return el('div', { class: 'quick-block' }, [
+    el('p', { class: 'hint-sm', text: bleeding ? 'Bleeding today' : 'Period today?' }),
+    row,
+  ]);
+}
+
+/**
+ * Her most-used chips, saved on tap.
+ *
+ * @param {import('../domain/model.js').DayLog|undefined} log
+ * @param {DateKey} today
+ * @param {import('../domain/model.js').Settings} settings
+ */
+function inlineChips(log, today, settings) {
+  /** @type {{cat: string, id: string, label: string}[]} */
+  const picks = [];
+
+  for (const id of settings.recentChips) {
+    if (picks.length >= INLINE_CHIPS) break;
+    for (const cat of CATEGORIES) {
+      if (cat.id === 'flow' || cat.id === 'drive') continue;
+      const option = cat.options.find((o) => o.id === id && o.id !== 'none');
+      if (option) { picks.push({ cat: cat.id, id, label: option.label }); break; }
+    }
+  }
+
+  if (!picks.length) return null;
+
+  /*
+    Only counts what the row above cannot already show.
+
+    With the chips carrying their own pressed state, a full summary underneath
+    them repeated what was on screen — and on a day with one flow level it read
+    as the stray fragment "medium.". So it now mentions only the extras: things
+    logged from the diary that have no chip up here.
+  */
+  const summary = el('p', { class: 'hint-sm log-cta-summary' });
+  const shown = new Set(picks.map((pick) => `${pick.cat}:${pick.id}`));
+
+  const paintSummary = () => {
+    const current = store.getState().logs[today];
+    if (!current) { summary.hidden = true; return; }
+
+    let extras = 0;
+    for (const [cat, ids] of /** @type {[string, string[]][]} */ ([
+      ['symptoms', current.symptoms], ['moods', current.moods],
+      ['discharge', current.discharge], ['activity', current.activity],
+      ['other', current.other], ['sex', current.sex],
+    ])) {
+      for (const id of ids) {
+        if (id !== 'none' && !shown.has(`${cat}:${id}`)) extras++;
+      }
+    }
+    extras += current.custom.length;
+    if (current.bbt != null || current.weight != null || current.water > 0) extras++;
+    if (current.notes.trim()) extras++;
+
+    summary.textContent = extras
+      ? `Plus ${extras} more logged today.` : '';
+    summary.hidden = extras === 0;
+  };
+
+  const row = el('div', { class: 'chip-row' }, picks.map((pick) => {
+    const current = () => {
+      const list = /** @type {any} */ (store.getLog(today))[pick.cat];
+      return Array.isArray(list) && list.includes(pick.id);
+    };
+
+    const chip = el('button', {
+      type: 'button',
+      class: 'chip',
+      'aria-pressed': String(current()),
+      onclick: () => {
+        haptic(8);
+        const draft = store.getLog(today);
+        const list = Array.isArray(/** @type {any} */ (draft)[pick.cat])
+          ? [.../** @type {string[]} */ (/** @type {any} */ (draft)[pick.cat])]
+          : [];
+        const at = list.indexOf(pick.id);
+        if (at >= 0) list.splice(at, 1);
+        else list.push(pick.id);
+        /** @type {any} */ (draft)[pick.cat] = list.filter((x) => x !== 'none');
+
+        store.putLog(draft, { quiet: true });
+        chip.setAttribute('aria-pressed', String(at < 0));
+        paintSummary();
+      },
+    }, [el('span', { text: pick.label })]);
+
+    return chip;
+  }));
+
+  paintSummary();
+  return el('div', { class: 'quick-block' }, [row, summary]);
 }
 
 /* ── Pieces ─────────────────────────────────────────────────────────────── */
