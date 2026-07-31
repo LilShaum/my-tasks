@@ -5,7 +5,10 @@
 
 #view-insights .card { margin-bottom: var(--sp-4); }
 
-#view-insights .card h3 {
+/* The app header's h1 already names this view, so its cards are the level
+   below it. They were h3, which skipped a level for anyone navigating by
+   headings. */
+#view-insights .card h2 {
   font-size: var(--fs-md);
   margin-bottom: var(--sp-1);
 }

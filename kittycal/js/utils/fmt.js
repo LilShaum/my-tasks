@@ -21,8 +21,6 @@ export const kgToLb = (kg) => kg * 2.2046226;
 export const lbToKg = (lb) => lb / 2.2046226;
 /** @param {number} ml @returns {number} */
 export const mlToOz = (ml) => ml / 29.5735296;
-/** @param {number} oz @returns {number} */
-export const ozToMl = (oz) => oz * 29.5735296;
 
 /**
  * Basal body temperature. Two decimals in °C, one in °F — BBT charting turns
@@ -59,14 +57,6 @@ export function fmtWater(ml, unit) {
     : ml >= 1000 ? `${(ml / 1000).toFixed(1)} L` : `${Math.round(ml)} ml`;
 }
 
-/** @param {number|null} hours */
-export function fmtSleep(hours) {
-  if (hours == null) return '—';
-  const h = Math.floor(hours);
-  const m = Math.round((hours - h) * 60);
-  return m ? `${h}h ${m}m` : `${h}h`;
-}
-
 /**
  * A count with its noun pluralised.
  * @param {number} n
@@ -85,26 +75,6 @@ export function round(n, places = 0) {
 
 /** @param {number} n @param {number} lo @param {number} hi */
 export const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
-
-/**
- * Ordinal day-of-cycle label: 'Day 1', 'Day 14'. Kept as a bare number
- * rather than '1st' — it reads better beside a chart axis.
- * @param {number} n
- */
-export const fmtCycleDay = (n) => `Day ${n}`;
-
-/** @param {number} ratio 0..1 @param {number} [places] */
-export const fmtPct = (ratio, places = 0) => `${(ratio * 100).toFixed(places)}%`;
-
-/**
- * Title-case a taxonomy id for display when no label is supplied.
- * @param {string} id
- */
-export function humanize(id) {
-  return id
-    .replace(/[-_]/g, ' ')
-    .replace(/^./, (c) => c.toUpperCase());
-}
 
 /**
  * Join a list the way a person would: 'a', 'a and b', 'a, b and c'.

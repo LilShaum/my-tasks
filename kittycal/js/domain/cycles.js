@@ -212,17 +212,6 @@ export function lastPeriodStart(cycles) {
 }
 
 /**
- * Days since the most recent period *started*.
- * @param {Cycle[]} cycles
- * @param {DateKey} today
- * @returns {number|null}
- */
-export function daysSinceLastPeriodStart(cycles, today) {
-  const start = lastPeriodStart(cycles);
-  return start ? daysBetween(start, today) : null;
-}
-
-/**
  * Is `date` inside a logged period? Uses the period span rather than the raw
  * day set, so a single skipped day inside a period still reads as a period day
  * on the calendar.

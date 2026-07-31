@@ -243,10 +243,3 @@ function drawShape(c, shape, s) {
   }
 }
 
-/** Stop everything and clear the canvas. */
-export function stopParticles() {
-  particles = [];
-  if (frame != null) cancelAnimationFrame(frame);
-  frame = null;
-  if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
-}

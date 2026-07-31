@@ -224,33 +224,6 @@ export function putLog(log, { quiet = false } = {}) {
   if (!quiet) notify();
 }
 
-/**
- * Apply a patch to a date's log in one call.
- * @param {DateKey} date
- * @param {Partial<DayLog>} patch
- */
-export function patchLog(date, patch) {
-  putLog({ ...getLog(date), ...patch });
-}
-
-/** @param {DateKey} date */
-export function removeLog(date) {
-  const next = { ...state.logs };
-  delete next[date];
-  state.logs = next;
-  dirty.logs.add(date);
-
-  if (state.periodDays.has(date)) {
-    const days = new Set(state.periodDays);
-    days.delete(date);
-    state.periodDays = days;
-    dirty.periods = true;
-  }
-
-  flush();
-  notify();
-}
-
 /* ── Period-day actions ─────────────────────────────────────────────────── */
 
 /**
@@ -288,11 +261,6 @@ export function setPeriodDays(dates, on) {
   dirty.periods = true;
   scheduleFlush(true);
   notify();
-}
-
-/** @param {DateKey} date */
-export function togglePeriodDay(date) {
-  setPeriodDays([date], !state.periodDays.has(date));
 }
 
 /* ── UI actions (not persisted) ─────────────────────────────────────────── */

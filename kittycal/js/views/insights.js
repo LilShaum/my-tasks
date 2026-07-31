@@ -74,7 +74,7 @@ function overviewCard(logs, cycles, lengths, today) {
   const streak = loggingStreak(logs, today, addDays);
 
   return el('div', { class: 'card' }, [
-    el('h3', { text: 'Your history' }),
+    el('h2', { text: 'Your history' }),
     el('div', { class: 'stat-row' }, [
       stat('Cycles', String(cycles.length), cycles.length === 1 ? 'logged' : 'logged'),
       stat('Days', String(daysLogged(logs)), 'tracked'),
@@ -114,7 +114,7 @@ function cycleLengthCard(lengths, prediction) {
   };
 
   return el('div', { class: 'card' }, [
-    el('h3', { text: 'Cycle length' }),
+    el('h2', { text: 'Cycle length' }),
     el('p', { class: 'hint-sm', text:
       `Last ${plural(recent.length, 'cycle')}. The green band is the typical ` +
       `range, ${acog.CYCLE_MIN}–${acog.CYCLE_MAX} days.` }),
@@ -145,7 +145,7 @@ function periodLengthCard(periods) {
   const recent = periods.slice(-12);
 
   return el('div', { class: 'card' }, [
-    el('h3', { text: 'Period length' }),
+    el('h2', { text: 'Period length' }),
     el('p', { class: 'hint-sm', text:
       `Typical is ${acog.PERIOD_MIN}–${acog.PERIOD_MAX} days of bleeding.` }),
     barChart({
@@ -201,7 +201,7 @@ function moodCard(logs, cycles, settings) {
 
   if (rows.length < 2) {
     return el('div', { class: 'card' }, [
-      el('h3', { text: 'Mood by phase' }),
+      el('h2', { text: 'Mood by phase' }),
       el('p', { class: 'hint-sm', text:
         'Log how you are feeling on a few more days and this fills in — it ' +
         'needs a handful in each part of the cycle before the comparison ' +
@@ -212,7 +212,7 @@ function moodCard(logs, cycles, settings) {
   const total = rows.reduce((n, r) => n + (r.data?.total ?? 0), 0);
 
   return el('div', { class: 'card' }, [
-    el('h3', { text: 'Mood by phase' }),
+    el('h2', { text: 'Mood by phase' }),
     el('p', { class: 'hint-sm', text:
       `What you logged most at each point in your cycle, as a share of the ` +
       `days you recorded a mood. Based on ${plural(total, 'day')}.` }),
@@ -257,7 +257,7 @@ function patternsCard(logs, cycles, prediction) {
 
   if (!patterns.length) {
     return el('div', { class: 'card' }, [
-      el('h3', { text: 'Patterns' }),
+      el('h2', { text: 'Patterns' }),
       el('p', { class: 'hint-sm', text: complete < 3
         ? `Kittycal starts looking for patterns after three complete cycles. ` +
           `You have ${plural(complete, 'so far')}.`
@@ -267,7 +267,7 @@ function patternsCard(logs, cycles, prediction) {
   }
 
   return el('div', { class: 'card' }, [
-    el('h3', { text: 'Patterns' }),
+    el('h2', { text: 'Patterns' }),
     el('p', { class: 'hint-sm', text:
       `Things that show up in most of your cycles, and where in the cycle they ` +
       `land. Based on ${plural(complete, 'complete cycle')}.` }),
@@ -334,7 +334,7 @@ function bbtCard(logs, cycles, settings) {
     settings.unitTemp === 'F' ? c * 9 / 5 + 32 : c;
 
   return el('div', { class: 'card' }, [
-    el('h3', { text: 'Basal body temperature' }),
+    el('h2', { text: 'Basal body temperature' }),
     el('p', { class: 'hint-sm', text: `This cycle, ${plural(readings.length, 'reading')}.` }),
     lineChart({
       data: readings.map((r) => ({ x: r.day, y: toDisplay(r.bbt) })),
@@ -372,7 +372,7 @@ function trendCard(logs, settings) {
   if (weights.length < 3 && sleeps.length < 3) return null;
 
   return el('div', { class: 'card' }, [
-    el('h3', { text: 'Trends' }),
+    el('h2', { text: 'Trends' }),
 
     weights.length >= 3 && el('div', {}, [
       el('p', { class: 'hint-sm', text:
@@ -408,7 +408,7 @@ function trendCard(logs, settings) {
 
 function reportCard() {
   return el('div', { class: 'card' }, [
-    el('h3', { text: 'Report for a doctor' }),
+    el('h2', { text: 'Report for a doctor' }),
     el('p', { class: 'hint-sm', text:
       'A printable summary of your last six months — cycle lengths, period ' +
       'lengths, recurring symptoms and anything outside the typical ranges. ' +
@@ -448,7 +448,7 @@ function stat(label, value, unit) {
 function notEnoughYet(cycleCount) {
   return el('div', { class: 'empty' }, [
     spotArt('chart'),
-    el('h3', { text: 'Not enough to analyse yet' }),
+    el('h2', { text: 'Not enough to analyse yet' }),
     el('p', { text: cycleCount === 0
       ? 'Once you have logged a couple of periods, this is where your cycle ' +
         'length, patterns and trends show up.'

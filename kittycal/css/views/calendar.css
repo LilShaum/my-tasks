@@ -20,7 +20,9 @@
 }
 
 .cal-today-btn {
-  min-height: 36px;
+  /* 36px missed the 44px minimum. These sit in a row with icon buttons that
+     are already 44, so matching them tidies the header as well. */
+  min-height: var(--tap);
   padding: var(--sp-1) var(--sp-3);
   font-size: var(--fs-sm);
 }

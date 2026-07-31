@@ -116,4 +116,3 @@ export function closeSheet() {
   }
 }
 
-export const isSheetOpen = () => open != null;
