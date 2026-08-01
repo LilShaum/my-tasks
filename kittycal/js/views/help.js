@@ -45,6 +45,14 @@ export function openHelp() {
         p('The first question moves on the moment you tap, which is what makes ' +
           'it quick. If you hit the wrong one, "← Back" at the top returns you ' +
           'to it with nothing lost.'),
+        p('On a day when there is genuinely nothing going on, ' +
+          '"Nothing to report today" under the first question answers all ' +
+          'three at once — one tap, and it counts as a proper answer rather ' +
+          'than a day you skipped.'),
+        p('When Kittycal has something useful to say about what you just ' +
+          'logged, it appears under the tick on Today — usually that a symptom ' +
+          'you recorded turns up around this point in most of your cycles. It ' +
+          'stays quiet when it has nothing to add, which is most days.'),
         p('Close it and it will not ask again until tomorrow — the button on ' +
           'Today opens it whenever you want. "Add more detail" at the end ' +
           'takes you into the full diary with your answers already filled in.'),

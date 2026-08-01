@@ -126,6 +126,18 @@ async function completeCheckin(p, flow = 'No bleeding') {
   await p.waitForTimeout(1000);
 }
 
+/** Medium flow plus a symptom, so there is something to respond to. */
+async function completeCheckinWithSymptom(p) {
+  await p.locator('.checkin-option', { hasText: 'Medium' }).click();
+  await p.waitForTimeout(300);
+  await p.locator('.checkin-next').click();
+  await p.waitForTimeout(300);
+  await p.locator('.checkin-option', { hasText: 'Cramps' }).click();
+  await p.waitForTimeout(200);
+  await p.locator('.checkin-next').click();
+  await p.waitForTimeout(1400);
+}
+
 const browser = await chromium.launch({ executablePath: CHROME });
 
 /** @param {(p: import('playwright').Page) => Promise<void>} fn */
@@ -559,6 +571,133 @@ await withPage(async (p) => {
   const dots = await p.locator('.cal-dot').count();
   check(dots <= 3, 'the dot still means something', `${dots} dots on a fully checked-in month`);
   check(await p.locator('.cal-cell.is-period').count() > 0, 'period days are still drawn');
+});
+
+/* ── 11. The quiet day, in one tap ──────────────────────────────────────
+   "No bleeding, no moods, nothing bothering me" is the most common day there
+   is, and it cost three taps to say — the last two being Next buttons over
+   questions whose answer is already "none". */
+console.log('\nthe quiet day in one tap');
+await withPage(async (p) => {
+  await p.goto(BASE, { waitUntil: 'networkidle' });
+  await seed(p, true);
+  await p.reload({ waitUntil: 'networkidle' });
+  await p.waitForTimeout(1500);
+
+  check(await p.locator('.checkin-shortcut').count() === 1, 'the shortcut is offered');
+
+  await p.locator('.checkin-shortcut').click();
+  await p.waitForTimeout(1400);
+
+  check(await p.locator('.checkin-step').count() === 0, 'one tap finishes the day');
+  check(await logsOnDisk(p) === 1, 'and stores it');
+
+  const stored = await p.evaluate(async () => {
+    const db = await new Promise((res) => {
+      const r = indexedDB.open('kittycal', 1); r.onsuccess = () => res(r.result);
+    });
+    return new Promise((res) => {
+      const tx = db.transaction(['logs'], 'readonly');
+      const g = tx.objectStore('logs').getAll();
+      g.onsuccess = () => res(g.result[0]);
+    });
+  });
+  check(stored.flow === 'none' && stored.moods.length === 0
+    && stored.symptoms.length === 0 && stored.checkedIn === true,
+    'as a real answer of "nothing", not as a skip',
+    JSON.stringify({ flow: stored.flow, checkedIn: stored.checkedIn }));
+
+  await p.reload({ waitUntil: 'networkidle' });
+  await p.waitForTimeout(1500);
+  check(await p.locator('.checkin-step').count() === 0, 'and it does not ask again');
+});
+
+/* ── 12. The shortcut must not throw away an answer ─────────────────────
+   Once she has said something, "nothing to report" would be a lie about her
+   own data — so it stops being offered. */
+console.log('\nthe shortcut after she has answered something');
+await withPage(async (p) => {
+  await p.goto(BASE, { waitUntil: 'networkidle' });
+  await seed(p, true);
+  await p.reload({ waitUntil: 'networkidle' });
+  await p.waitForTimeout(1500);
+
+  await p.locator('.checkin-option', { hasText: 'No bleeding' }).click();
+  await p.waitForTimeout(400);
+  await p.locator('.checkin-option', { hasText: 'Anxious' }).click();
+  await p.waitForTimeout(200);
+  await p.locator('.btn-back').click();
+  await p.waitForTimeout(500);
+
+  check(await p.locator('.checkin-title').innerText() === 'Any bleeding today?',
+    'back on the first question');
+  check(await p.locator('.checkin-shortcut').count() === 0,
+    'the shortcut is gone, because it would discard the mood she picked');
+});
+
+/* ── 13. Saying something back ──────────────────────────────────────────
+   The loop used to end in a receipt for what she had just typed. This is the
+   only part of the exchange that gives her something she did not already
+   know, and it is the whole reason the check-in asks about symptoms daily. */
+console.log('\nwhat it says back');
+await withPage(async (p) => {
+  await p.goto(BASE, { waitUntil: 'networkidle' });
+  // Four complete cycles with cramps on day 2 of each; today is day 2 of a
+  // fifth, still unlogged.
+  await p.evaluate(async () => {
+    const db = await new Promise((res, rej) => {
+      const r = indexedDB.open('kittycal', 1);
+      r.onupgradeneeded = () => {
+        const d = r.result;
+        d.createObjectStore('logs', { keyPath: 'date' });
+        d.createObjectStore('meta', { keyPath: 'key' });
+        d.createObjectStore('blobs', { keyPath: 'id' });
+      };
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+    const pad = (/** @type {number} */ n) => String(n).padStart(2, '0');
+    const shift = (/** @type {number} */ n) => {
+      const d = new Date(); d.setDate(d.getDate() + n);
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    };
+    const blank = (/** @type {string} */ date) => ({ date, flow: 'medium', symptoms: [],
+      moods: [], discharge: [], activity: [], other: [], sex: [], drive: null, custom: [],
+      bbt: null, weight: null, water: 0, sleep: null, steps: null, pillTaken: false,
+      testPregnancy: null, testOvulation: null, notes: '', checkedIn: true, updated: Date.now() });
+    const days = [];
+    await new Promise((res) => {
+      const tx = db.transaction(['meta', 'logs'], 'readwrite');
+      for (const startBack of [113, 85, 57, 29, 1]) {
+        const span = startBack === 1 ? 1 : 5;   // today is day 2, left unlogged
+        for (let i = 0; i < span; i += 1) {
+          const key = shift(-startBack + i);
+          days.push(key);
+          const l = blank(key);
+          if (i === 1) l.symptoms = ['cramps'];
+          tx.objectStore('logs').put(l);
+        }
+      }
+      tx.objectStore('meta').put({ key: 'settings', value: {
+        theme: 'hellokitty', onboarded: true, disclaimerAck: true, avgCycleLength: 28,
+        avgPeriodLength: 5, name: 'Sam', lastBackup: shift(0), lastBackupAt: Date.now() } });
+      tx.objectStore('meta').put({ key: 'periodDays', value: days });
+      tx.oncomplete = () => res(undefined);
+    });
+  });
+  await p.reload({ waitUntil: 'networkidle' });
+  await p.waitForTimeout(1500);
+
+  await completeCheckinWithSymptom(p);
+
+  const said = await p.locator('.today-said').innerText().catch(() => '');
+  check(/cramps/.test(said) && /cycles/.test(said),
+    'it names the pattern she just matched', said);
+  check(!/sorry|hope|great|well done|good job/i.test(said),
+    'and does not editorialise about it', said);
+
+  const receipt = await p.locator('.today-logged p').first().innerText();
+  check(/cramps/.test(receipt), 'the receipt names what she logged, not a count', receipt);
 });
 
 await browser.close();
