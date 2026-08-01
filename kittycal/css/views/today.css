@@ -458,3 +458,93 @@
   color: var(--on-primary);
   font-weight: 800;
 }
+
+/* ── The last seven days ──────────────────────────────────────────────── */
+
+/*
+  Seven equal columns rather than a scroller: a week fits on the narrowest
+  phone we target (320px leaves ~40px a column), and a strip you can scroll
+  hides the very days it exists to surface.
+*/
+.week-strip { margin-bottom: var(--sp-5); }
+
+.week-strip-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--sp-1);
+}
+
+.week-day {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: var(--sp-2) 0;
+  min-height: 60px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--ink-2);
+  font: inherit;
+  cursor: pointer;
+}
+
+.week-day-dow {
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+}
+
+/* Tabular, because seven numbers in a row that don't line up look broken. */
+.week-day-num {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+  The tick's box is always there, ticked or not. Without it the day numbers
+  jump up and down the row as days get logged.
+*/
+.week-day-mark {
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  line-height: 1;
+  min-height: 12px;
+  color: var(--primary-line);
+}
+
+.week-day.is-logged {
+  background: var(--surface-2);
+  border-color: var(--primary-line);
+}
+
+/*
+  Missed days are dashed — the same language the calendar uses for "this is
+  not a record". Nothing is red: a day she didn't log is not a failure, and an
+  app that scolds is an app that gets deleted.
+*/
+.week-day.is-missed { border-style: dashed; }
+
+/*
+  Layered on top of logged-or-missed rather than replacing it, so today stays
+  findable after it has been checked in. An unlogged today therefore keeps the
+  dashed edge and gains the heavier primary border: open, and it is now.
+*/
+.week-day.is-today {
+  border-color: var(--primary);
+  border-width: 2px;
+  color: var(--ink);
+}
+
+/*
+  A period day keeps its own mark here, so the strip agrees with the calendar
+  at a glance. A thick underline rather than a fill, because a filled cell
+  would fight the logged/missed distinction the strip is actually for.
+*/
+.week-day.is-period {
+  box-shadow: inset 0 -4px 0 0 var(--period);
+}
+
+.week-strip-note {
+  text-align: center;
+  margin-top: var(--sp-2);
+}

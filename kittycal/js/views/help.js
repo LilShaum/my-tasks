@@ -47,6 +47,18 @@ export function openHelp() {
           'takes you into the full diary with your answers already filled in.'),
       ]),
 
+      section('Catching up on a day you missed', [
+        p('Under the check-in is a row of the last seven days. A tick means ' +
+          'that day is logged; a dashed outline means it is not.'),
+        p('Tap a dashed day and it asks the same three questions it would have ' +
+          'asked at the time, so a day you missed costs the same fifteen ' +
+          'seconds the day itself would have. Tap a day that already has a ' +
+          'tick and it opens the full diary for it instead, since the three ' +
+          'questions have nothing left to ask.'),
+        p('Backing out of a past day does not count as skipping today — you ' +
+          'will still be asked about today.'),
+      ]),
+
       section('The Today screen', [
         p('The ring is your whole cycle. The marker shows where today sits, and ' +
           'the big number counts down to whatever comes next — your period, or ' +

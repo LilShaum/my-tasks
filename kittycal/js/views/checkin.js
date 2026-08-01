@@ -27,7 +27,7 @@
  */
 
 import { el, haptic, announce } from '../utils/dom.js';
-import { todayKey } from '../utils/date.js';
+import { todayKey, fmtRelative } from '../utils/date.js';
 import { CATEGORIES, DEFAULT_CHIPS, labelFor } from '../data/taxonomy.js';
 import { openSheet, closeSheet } from '../ui/sheet.js';
 import { openLogSheet } from './log.js';
@@ -85,6 +85,11 @@ export function needsCheckin(date) {
 /**
  * Open the check-in for a date.
  *
+ * Any date, not just today. A day that got skipped is reachable from the week
+ * strip on Today, and it runs the same three questions rather than dropping her
+ * into the full diary — a missed day should cost the same fifteen seconds the
+ * day itself would have.
+ *
  * @param {DateKey} [date]
  */
 export function openCheckin(date = todayKey()) {
@@ -106,16 +111,26 @@ export function openCheckin(date = todayKey()) {
   */
   const flowAnswered = store.getState().logs[date] != null;
 
+  const isToday = date === todayKey();
+
+  // 'Today' | 'Yesterday' | 'Tue 28 Jul'. The last of those reads wrong dropped
+  // into a sentence bare or lowercased, so it gets an 'on' and keeps its caps.
+  const when = fmtRelative(date);
+  const whenLabel = when === 'Yesterday' ? 'yesterday' : when;
+  const whenPhrase = when === 'Yesterday' ? 'yesterday' : `on ${when}`;
+
   let step = 0;
   const steps = [flowStep, moodStep, symptomStep];
 
   const sheet = openSheet({
-    title: 'Today',
+    title: when,
     body: [],
     onClose: () => {
       // Closing without finishing is a skip, not a refusal forever — it just
-      // stops the app asking again until tomorrow.
-      if (step < steps.length) store.updateSettings({ checkinSkipped: date });
+      // stops the app asking again until tomorrow. Only today's check-in can
+      // do that: backing out of Tuesday's must not cancel the question the app
+      // still owes her for today.
+      if (isToday && step < steps.length) store.updateSettings({ checkinSkipped: date });
     },
   });
 
@@ -139,14 +154,14 @@ export function openCheckin(date = todayKey()) {
 
     const theme = getTheme(store.getState().settings.theme);
     burst({ shape: theme.particle });
-    announce('Checked in for today');
+    announce(isToday ? 'Checked in for today' : `Checked in for ${whenLabel}`);
   };
 
   /* ── 1. Flow ───────────────────────────────────────────────────────── */
 
   function flowStep() {
     return question({
-      title: 'Any bleeding today?',
+      title: isToday ? 'Any bleeding today?' : `Any bleeding ${whenPhrase}?`,
       hint: 'This is the one that matters most — it is what every prediction ' +
         'is built from.',
       options: FLOW_STEPS.map(([id, label]) => ({
@@ -167,7 +182,7 @@ export function openCheckin(date = todayKey()) {
 
   function moodStep() {
     return question({
-      title: 'How are you feeling?',
+      title: isToday ? 'How are you feeling?' : 'How were you feeling?',
       hint: 'Pick as many as fit, or none.',
       multi: true,
       current: () => draft.moods,
