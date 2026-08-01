@@ -367,3 +367,94 @@
 /* Chips here are the primary control, so they keep the full 44px target and
    grow to fill the row rather than huddling at the left. */
 .quick-log .chip { flex: 1 1 auto; justify-content: center; }
+
+/* ── Daily check-in ───────────────────────────────────────────────────── */
+
+.checkin-progress {
+  display: flex;
+  justify-content: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) 0 var(--sp-4);
+}
+
+.checkin-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--line-soft);
+  transition: background var(--dur-hover) var(--ease-soft),
+              transform var(--dur-hover) var(--ease-soft);
+}
+
+.checkin-dot.is-done { background: var(--primary-line); }
+.checkin-dot.is-active { background: var(--primary); transform: scale(1.4); }
+
+.checkin-step { display: grid; gap: var(--sp-3); }
+
+.checkin-title {
+  font-size: var(--fs-lg);
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+/*
+  Two columns of large targets. The whole point of the check-in is that it can
+  be answered one-handed without aiming, so these are much bigger than the
+  chips elsewhere — 64px tall rather than 44.
+*/
+.checkin-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+.checkin-option {
+  min-height: 64px;
+  padding: var(--sp-3);
+  border-radius: var(--r-lg);
+  border: var(--bw) solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  font-weight: 500;
+  text-align: center;
+  transition: transform var(--dur-tap) var(--ease-bounce),
+              background var(--dur-hover) var(--ease-soft);
+}
+
+.checkin-option:active { transform: scale(0.96); }
+
+.checkin-option[aria-pressed='true'] {
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: var(--primary-line);
+}
+
+.checkin-next { margin-top: var(--sp-2); }
+
+/* ── Today, once the day is logged ────────────────────────────────────── */
+
+.today-logged {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  margin-bottom: var(--sp-3);
+  background: var(--surface-2);
+  border-radius: var(--r-lg);
+  font-size: var(--fs-sm);
+}
+
+.today-logged-tick {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-weight: 800;
+}

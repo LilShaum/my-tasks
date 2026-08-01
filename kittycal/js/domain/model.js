@@ -57,6 +57,7 @@
  * @property {string} recapSeen       cycleStart of the last recap dismissed, or ''
  * @property {number} lastBackupAt    epoch ms of the last export, or 0
  * @property {string} backupSnoozed   DateKey the backup prompt was dismissed, or ''
+ * @property {string} checkinSkipped  DateKey the daily check-in was skipped, or ''
  * @property {boolean} onboarded
  * @property {boolean} disclaimerAck
  * @property {string[]} customSymptoms
@@ -106,6 +107,7 @@ export function defaultSettings() {
     recapSeen: '',
     lastBackupAt: 0,
     backupSnoozed: '',
+    checkinSkipped: '',
     onboarded: false,
     disclaimerAck: false,
     customSymptoms: [],
