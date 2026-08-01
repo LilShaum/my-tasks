@@ -14,6 +14,17 @@ import { el, need, trapFocus, haptic } from '../utils/dom.js';
 let open = null;
 
 /**
+ * Whether a sheet is currently open.
+ *
+ * Used by the update path in main.js: a new app version must never reload the
+ * page out from under an open logging sheet, because nothing in that sheet is
+ * saved until Apply.
+ */
+export function isSheetOpen() {
+  return open != null;
+}
+
+/**
  * @param {Object} opts
  * @param {string} opts.title
  * @param {(Node|string|null|false)[]} opts.body
