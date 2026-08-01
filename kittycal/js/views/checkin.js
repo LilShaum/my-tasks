@@ -109,7 +109,7 @@ export function openCheckin(date = todayKey()) {
     single-select, so a pre-selected option also means the obvious tap does
     nothing visible.
   */
-  const flowAnswered = store.getState().logs[date] != null;
+  let flowAnswered = store.getState().logs[date] != null;
 
   const isToday = date === todayKey();
 
@@ -152,15 +152,42 @@ export function openCheckin(date = todayKey()) {
     token += 1;
     const mine = token;
     sheet.body.replaceChildren(
-      progress(step, steps.length),
+      progress(step, steps.length, step > 0 ? back : null),
       steps[step](() => token !== mine),
     );
     sheet.body.scrollTop = 0;
+
+    /*
+      Put focus on the new question.
+
+      Replacing the sheet's contents destroys whatever was focused, and the
+      browser drops focus to <body> — so a keyboard user was thrown to the top
+      of the document after every answer, and a screen reader said nothing at
+      all about the question that had just appeared. Three times a day, every
+      day. Moving focus to the heading reads the new question out and puts the
+      next Tab exactly where it should be.
+    */
+    const heading = sheet.body.querySelector('.checkin-title');
+    if (heading instanceof HTMLElement) heading.focus({ preventScroll: true });
   };
 
   const next = () => {
     step += 1;
     if (step >= steps.length) return void finish();
+    render();
+  };
+
+  /*
+    The first question is single-select and moves on the instant it is tapped,
+    which is what makes a quiet day three taps — and also means a mis-tap is
+    instantly a wrong answer. Flow is the field every prediction in the app is
+    built from, so "Heavy" when she meant "Light" mattering until she next
+    opens the diary is not acceptable. Back is the whole recovery path, and it
+    keeps every answer: the draft is untouched by moving between questions.
+  */
+  const back = () => {
+    if (step === 0) return;
+    step -= 1;
     render();
   };
 
@@ -219,6 +246,9 @@ export function openCheckin(date = todayKey()) {
         // to hunt for and no second tap to confirm what was already decided.
         onPick: () => {
           draft.flow = /** @type {DayLog['flow']} */ (id);
+          // Now it *is* answered, so coming back here shows her own choice
+          // rather than looking untouched again.
+          flowAnswered = true;
           next();
         },
       })),
@@ -357,7 +387,10 @@ function question({ title, hint, options, stale, multi, current, lastStep, onNex
   }
 
   return el('div', { class: 'checkin-step' }, [
-    el('h2', { class: 'checkin-title', text: title }),
+    // tabindex so the step change can move focus here; see render().
+    // tabindex so the step change can move focus here; data-autofocus so the
+    // sheet lands on the question rather than on its own close button.
+    el('h2', { class: 'checkin-title', tabindex: '-1', 'data-autofocus': '', text: title }),
     el('p', { class: 'hint', text: hint }),
     grid,
 
@@ -379,14 +412,34 @@ function question({ title, hint, options, stale, multi, current, lastStep, onNex
 }
 
 /**
- * Three dots, so the end is visible from the start.
+ * Three dots, so the end is visible from the start — and a way back.
+ *
+ * Back sits here rather than beside the answers so it never competes with them
+ * for the tap. It is absent on the first question, where there is nothing to go
+ * back to, and an empty spacer holds its place so the dots stay put.
+ *
  * @param {number} at
  * @param {number} total
+ * @param {(() => void)|null} onBack
  */
-function progress(at, total) {
-  return el('div', { class: 'checkin-progress', 'aria-label': `Step ${at + 1} of ${total}` },
+function progress(at, total, onBack) {
+  const dots = el('div', { class: 'checkin-dots', 'aria-hidden': 'true' },
     Array.from({ length: total }, (_, i) => el('span', {
       class: `checkin-dot${i === at ? ' is-active' : ''}${i < at ? ' is-done' : ''}`,
-      'aria-hidden': 'true',
     })));
+
+  return el('div', { class: 'checkin-progress' }, [
+    onBack
+      ? el('button', {
+          type: 'button',
+          class: 'btn-back',
+          'aria-label': 'Back to the previous question',
+          onclick: () => { haptic(); onBack(); },
+        }, ['← Back'])
+      : el('span', { class: 'btn-back-spacer', 'aria-hidden': 'true' }),
+    dots,
+    // The step count for anyone who cannot see the dots. The dots themselves
+    // are decorative and hidden from the accessibility tree.
+    el('span', { class: 'btn-back-spacer sr-only', text: `Step ${at + 1} of ${total}` }),
+  ]);
 }

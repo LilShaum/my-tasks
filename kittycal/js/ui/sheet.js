@@ -99,7 +99,16 @@ export function openSheet({ title, body, footer, onClose }) {
   requestAnimationFrame(() => {
     backdrop.dataset.open = 'true';
     root.dataset.open = 'true';
-    const first = root.querySelector('button, [href], input, select, textarea');
+    /*
+      A view can nominate where focus should land with `data-autofocus`.
+
+      Otherwise it is the first focusable thing, which in this layout is the
+      close button in the header — fine for a sheet you are reading, wrong for
+      one that opens by asking you a question, where it means a screen reader
+      announces "close" instead of the question.
+    */
+    const first = root.querySelector('[data-autofocus]')
+      ?? root.querySelector('button, [href], input, select, textarea');
     if (first instanceof HTMLElement) first.focus({ preventScroll: true });
   });
 

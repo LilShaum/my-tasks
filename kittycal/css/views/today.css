@@ -370,12 +370,57 @@
 
 /* ── Daily check-in ───────────────────────────────────────────────────── */
 
+/*
+  Back on the left, progress dots on the right. The dots must land in the same
+  place on every question or they read as a thing that moves rather than a
+  thing that fills, so the first question — which has nothing to go back to —
+  keeps an empty spacer of Back's width in its place.
+*/
 .checkin-progress {
   display: flex;
-  justify-content: center;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--sp-2);
   padding: var(--sp-2) 0 var(--sp-4);
 }
+
+.checkin-dots {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.btn-back,
+.btn-back-spacer {
+  flex: none;
+  min-width: 72px;
+}
+
+/*
+  Quiet on purpose. It is a recovery path, not part of the flow — competing
+  with the answers for attention would slow down the ordinary case to help the
+  rare one.
+*/
+.btn-back {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--sp-2);
+  border: 0;
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  border-radius: var(--r-md);
+}
+
+.btn-back:hover { color: var(--ink); }
+
+/*
+  Focused programmatically on each step so the question is read out; it is not
+  tabbable and not operable, so a focus ring on it would only look like a bug.
+*/
+.checkin-title:focus { outline: none; }
 
 .checkin-dot {
   width: 8px;
