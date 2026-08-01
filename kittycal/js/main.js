@@ -20,6 +20,7 @@ import { mountOnboarding } from './views/onboarding.js';
 import { openHelp } from './views/help.js';
 import { needsCheckin, openCheckin } from './views/checkin.js';
 import { isSheetOpen } from './ui/sheet.js';
+import { toast } from './ui/toast.js';
 import { mascot } from './ui/mascot.js';
 import { loadLock, showLockScreen } from './ui/lock.js';
 import { checkReminders } from './ui/reminders.js';
@@ -42,6 +43,20 @@ async function boot() {
   // before hydration finishes.
   const stored = readStoredTheme();
   applyTheme(stored.theme, stored.colorMode);
+
+  /*
+    A write that fails has to be visible.
+
+    Everything else in the app is built on the assumption that what she sees is
+    what is stored, and the failure mode without this is the worst one there
+    is: a tick, a celebration, and an empty database. Registered before hydrate
+    so even a failure during boot has somewhere to go.
+  */
+  store.onSaveError(() => {
+    toast('Could not save to this device. Your last change may be lost — ' +
+      'check you are not in a private window and have some space free.',
+      { ms: 8000 });
+  });
 
   try {
     await store.hydrate();
@@ -125,20 +140,30 @@ function startApp() {
  *
  * It is a sheet rather than a takeover, dismissible with the same tap as any
  * other sheet, and skipping it stops the app asking again until tomorrow. It
- * never appears twice in a session, never on a day already logged, and never
+ * appears at most once per day, never on a day already logged, and never
  * before onboarding is finished.
+ *
+ * The "once" is tracked per date rather than per page load. An app added to the
+ * Home Screen is not reloaded between uses — iOS keeps it resident for days —
+ * so a once-per-session flag would have asked on the day it was installed and
+ * then never again, which is the whole daily loop failing silently.
  */
-let askedThisSession = false;
+let askedFor = /** @type {string|null} */ (null);
 function maybeAskForCheckin() {
-  if (askedThisSession) return;
+  const today = todayKey();
+  if (askedFor === today) return;
+
   const { ui, ready } = store.getState();
   if (!ready || ui.locked) return;
-  if (!needsCheckin(todayKey())) return;
+  // Never over the top of something she is already doing. Midnight passing
+  // mid-sentence in the diary is not a reason to take the screen away.
+  if (isSheetOpen()) return;
+  if (!needsCheckin(today)) return;
 
-  askedThisSession = true;
+  askedFor = today;
   // After first paint, so the check-in slides over a drawn screen rather than
   // arriving before there is anything behind it.
-  requestAnimationFrame(() => openCheckin(todayKey()));
+  requestAnimationFrame(() => openCheckin(today));
 }
 
 /* ── Rendering ──────────────────────────────────────────────────────────── */
@@ -224,13 +249,23 @@ function watchDayRollover() {
     if (now !== current) {
       current = now;
       render();
+      // A new day is a new check-in. Without this the app would go quiet after
+      // the first day for anyone who never fully closes it.
+      maybeAskForCheckin();
     }
   };
 
   // Cheap poll, plus an immediate check whenever the app is brought forward.
   setInterval(check, 60_000);
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) { check(); void runReminderCheck(); }
+    if (!document.hidden) {
+      check();
+      // Also on every return to the foreground, not only on a date change: the
+      // usual way she reaches the app is bringing it forward, and the day may
+      // have turned over while it sat in the background with the poll frozen.
+      maybeAskForCheckin();
+      void runReminderCheck();
+    }
   });
 }
 

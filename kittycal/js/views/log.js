@@ -19,7 +19,7 @@ import {
   CATEGORIES, TESTS, MEASURES, WATER_GLASS_ML, WATER_GOAL_ML, labelFor,
   optionMatches, normalizeQuery, DEFAULT_CHIPS,
 } from '../data/taxonomy.js';
-import { isLogEmpty, isBleeding } from '../domain/model.js';
+import { nothingRecorded, isBleeding } from '../domain/model.js';
 import { openSheet, closeSheet } from '../ui/sheet.js';
 import { burst } from '../ui/particles.js';
 import { toast } from '../ui/toast.js';
@@ -134,7 +134,7 @@ function daySummary(date, log) {
   const phase = phaseFor({ date, cycles, prediction });
   const day = cycleDay(cycles, date);
 
-  const logged = !isLogEmpty(log);
+  const logged = !nothingRecorded(log);
 
   /** @type {string[]} */
   const entries = [];
@@ -959,8 +959,8 @@ function commit(date, draft, before) {
   store.putLog(draft);
   closeSheet();
 
-  const nowEmpty = isLogEmpty(draft);
-  const wasEmpty = isLogEmpty(before);
+  const nowEmpty = nothingRecorded(draft);
+  const wasEmpty = nothingRecorded(before);
 
   if (nowEmpty && !wasEmpty) {
     toast(`Cleared ${fmtLong(date)}`);
