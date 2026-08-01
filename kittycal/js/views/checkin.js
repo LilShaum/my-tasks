@@ -134,24 +134,56 @@ export function openCheckin(date = todayKey()) {
     },
   });
 
+  /*
+    Every rendered question carries a token, and its buttons refuse to act once
+    that token is stale.
+
+    The tapped button stays alive after the tap that replaced it — a phone
+    double-tap fires the same node twice, and the second firing advanced a
+    second time and skipped the mood question outright. Verified in the browser,
+    not theorised. A simple "busy" flag does not fix it, because the re-render
+    that clears the flag happens synchronously inside the first tap. Comparing
+    tokens is timing-independent: a button belonging to a question we have left
+    cannot move us on, however long the gap.
+  */
+  let token = 0;
+
   const render = () => {
+    token += 1;
+    const mine = token;
     sheet.body.replaceChildren(
       progress(step, steps.length),
-      steps[step](),
+      steps[step](() => token !== mine),
     );
     sheet.body.scrollTop = 0;
   };
 
   const next = () => {
     step += 1;
-    if (step >= steps.length) return finish();
+    if (step >= steps.length) return void finish();
     render();
   };
 
-  const finish = () => {
-    store.putLog(draft);
-    closeSheet();
+  const finish = async () => {
+    // Nothing is celebrated until it is actually on the disk. Saying "checked
+    // in" over a write that failed is worse than the failure: she would not
+    // know to do it again.
+    // The fact of having been asked and answered, recorded explicitly. Without
+    // it a day of "no bleeding, nothing bothering me" is indistinguishable from
+    // a day she never opened the app, and storage prunes it away.
+    draft.checkedIn = true;
 
+    const saved = await store.putLog(draft);
+    if (!saved) {
+      // The store has already put memory back and toasted. Return her to the
+      // last question with every answer still in the draft, so retrying is one
+      // tap rather than starting again.
+      step -= 1;
+      render();
+      return;
+    }
+
+    closeSheet();
     const theme = getTheme(store.getState().settings.theme);
     burst({ shape: theme.particle });
     announce(isToday ? 'Checked in for today' : `Checked in for ${whenLabel}`);
@@ -159,8 +191,10 @@ export function openCheckin(date = todayKey()) {
 
   /* ── 1. Flow ───────────────────────────────────────────────────────── */
 
-  function flowStep() {
+  /** @param {() => boolean} stale */
+  function flowStep(stale) {
     return question({
+      stale,
       title: isToday ? 'Any bleeding today?' : `Any bleeding ${whenPhrase}?`,
       hint: 'This is the one that matters most — it is what every prediction ' +
         'is built from.',
@@ -180,8 +214,10 @@ export function openCheckin(date = todayKey()) {
 
   /* ── 2. Mood ───────────────────────────────────────────────────────── */
 
-  function moodStep() {
+  /** @param {() => boolean} stale */
+  function moodStep(stale) {
     return question({
+      stale,
       title: isToday ? 'How are you feeling?' : 'How were you feeling?',
       hint: 'Pick as many as fit, or none.',
       multi: true,
@@ -198,7 +234,8 @@ export function openCheckin(date = todayKey()) {
 
   /* ── 3. Symptoms ───────────────────────────────────────────────────── */
 
-  function symptomStep() {
+  /** @param {() => boolean} stale */
+  function symptomStep(stale) {
     // Her own recent picks first, then the standard list behind them.
     const ids = [];
     for (const id of [...store.getState().settings.recentChips, ...DEFAULT_CHIPS,
@@ -211,6 +248,7 @@ export function openCheckin(date = todayKey()) {
     }
 
     return question({
+      stale,
       title: 'Anything bothering you?',
       hint: 'Whatever your body is doing today.',
       multi: true,
@@ -226,7 +264,10 @@ export function openCheckin(date = todayKey()) {
       onMore: () => {
         // Straight into the full diary, carrying everything answered so far so
         // nothing has to be re-entered.
-        store.putLog(draft);
+        draft.checkedIn = true;
+        // Not awaited: the diary is opening on the same draft, and she will
+        // Apply there. A failure surfaces as a toast either way.
+        void store.putLog(draft);
         step = steps.length;
         closeSheet();
         openLogSheet(date);
@@ -257,14 +298,25 @@ function toggle(list, id, set) {
  * @param {string} opts.title
  * @param {string} opts.hint
  * @param {{id: string, label: string, selected: boolean, onPick: () => void}[]} opts.options
+ * @param {() => boolean} opts.stale true once this question has been left
  * @param {boolean} [opts.multi]
  * @param {() => string[]} [opts.current]
  * @param {boolean} [opts.lastStep]
  * @param {() => void} [opts.onNext]
  * @param {() => void} [opts.onMore]
  */
-function question({ title, hint, options, multi, current, lastStep, onNext, onMore }) {
+function question({ title, hint, options, stale, multi, current, lastStep, onNext, onMore }) {
   const grid = el('div', { class: 'checkin-options' });
+
+  /*
+    Every control on this question goes through here. Once the question has
+    been left, its buttons are inert — they are still in the DOM long enough
+    for a double-tap to reach them, and acting twice on one answer is how a
+    question got skipped.
+
+    @param {() => void} fn
+  */
+  const guard = (fn) => () => { if (stale()) return; fn(); };
 
   /** @type {HTMLElement[]} */
   const buttons = [];
@@ -274,7 +326,7 @@ function question({ title, hint, options, multi, current, lastStep, onNext, onMo
       type: 'button',
       class: 'checkin-option',
       'aria-pressed': String(option.selected),
-      onclick: () => {
+      onclick: guard(() => {
         haptic(10);
         option.onPick();
         if (multi && current) {
@@ -283,7 +335,7 @@ function question({ title, hint, options, multi, current, lastStep, onNext, onMo
             b.setAttribute('aria-pressed', String(now.includes(b.dataset.opt ?? '')));
           }
         }
-      },
+      }),
       dataset: { opt: option.id },
     }, [el('span', { text: option.label })]);
 
@@ -299,7 +351,7 @@ function question({ title, hint, options, multi, current, lastStep, onNext, onMo
     multi && el('button', {
       type: 'button',
       class: 'btn btn-block btn-lg checkin-next',
-      onclick: () => { haptic(); onNext?.(); },
+      onclick: guard(() => { haptic(); onNext?.(); }),
     }, [lastStep ? 'Done' : 'Next']),
 
     // On the last step only: a way into the full diary for anyone who wants
@@ -308,7 +360,7 @@ function question({ title, hint, options, multi, current, lastStep, onNext, onMo
     lastStep && el('button', {
       type: 'button',
       class: 'btn btn-ghost btn-block',
-      onclick: () => { haptic(); onMore?.(); },
+      onclick: guard(() => { haptic(); onMore?.(); }),
     }, ['Add more detail']),
   ]);
 }

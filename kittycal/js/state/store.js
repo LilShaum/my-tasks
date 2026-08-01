@@ -94,33 +94,79 @@ function notify() {
 
 const dirty = { settings: false, periods: false, /** @type {Set<DateKey>} */ logs: new Set() };
 
-const flush = debounce(async () => {
-  const jobs = [];
+/**
+ * Told about a write that failed, so it can be shown rather than only logged.
+ *
+ * Registered by main.js. The store cannot reach for a toast itself without the
+ * data layer depending on the UI, and a storage failure is exactly the thing
+ * that must never be swallowed: the screen has already said "saved".
+ *
+ * @type {((err: unknown) => void)|null}
+ */
+let saveErrorHandler = null;
 
-  if (dirty.settings) {
-    dirty.settings = false;
-    jobs.push(repo.saveSettings(state.settings));
-  }
-  if (dirty.periods) {
-    dirty.periods = false;
-    jobs.push(repo.savePeriodDays(state.periodDays));
-  }
-  if (dirty.logs.size) {
-    const dates = [...dirty.logs];
-    dirty.logs.clear();
-    const logs = dates.map((d) => state.logs[d] ?? emptyLog(d));
-    jobs.push(repo.saveLogs(logs));
-  }
+/** @param {(err: unknown) => void} fn */
+export function onSaveError(fn) { saveErrorHandler = fn; }
+
+/**
+ * Write everything currently dirty, and put it all back if the write fails.
+ *
+ * The flags are cleared before the await so that changes made *during* the
+ * write are not lost — they re-dirty and go out on the next pass. The cost is
+ * that a failure has to restore them by hand, and getting that wrong is how a
+ * day disappears while the screen shows a tick. It restores the log dates too,
+ * which is the case an earlier version missed.
+ *
+ * @returns {Promise<boolean>} whether everything landed
+ */
+async function writeDirty() {
+  const settings = dirty.settings;
+  const periods = dirty.periods;
+  const dates = [...dirty.logs];
+
+  if (!settings && !periods && !dates.length) return true;
+
+  dirty.settings = false;
+  dirty.periods = false;
+  dirty.logs.clear();
+
+  const jobs = [];
+  if (settings) jobs.push(repo.saveSettings(state.settings));
+  if (periods) jobs.push(repo.savePeriodDays(state.periodDays));
+  if (dates.length) jobs.push(repo.saveLogs(dates.map((d) => state.logs[d] ?? emptyLog(d))));
 
   try {
     await Promise.all(jobs);
+    return true;
   } catch (err) {
+    if (settings) dirty.settings = true;
+    if (periods) dirty.periods = true;
+    for (const date of dates) dirty.logs.add(date);
+
     console.error('kittycal: failed to save', err);
-    // Re-flag so the next change retries rather than silently dropping data.
-    dirty.settings = true;
-    dirty.periods = true;
+    saveErrorHandler?.(err);
+    return false;
   }
-}, 300);
+}
+
+/*
+  Writes run one at a time, in order.
+
+  Without this a second save can start while the first is still in flight, find
+  the dirty set already emptied, and report success for work it never did — so
+  `await putLog(...)` would resolve before the data was anywhere near the disk.
+  Chaining means the second call waits, then writes whatever is genuinely left,
+  including anything the first put back after failing.
+*/
+let chain = /** @type {Promise<boolean>} */ (Promise.resolve(true));
+
+function runWrite() {
+  const next = chain.then(writeDirty, writeDirty);
+  chain = next;
+  return next;
+}
+
+const flush = debounce(() => { void runWrite(); }, 300);
 
 /**
  * Schedule a write.
@@ -132,21 +178,22 @@ const flush = debounce(async () => {
  * it would be the single worst bug this app could have.
  *
  * @param {boolean} [urgent]
+ * @returns {Promise<boolean>} whether the write landed, for urgent writes
  */
 function scheduleFlush(urgent = false) {
-  if (urgent) { void flushNow(); return; }
+  if (urgent) return runWrite();
   flush();
+  return Promise.resolve(true);
 }
 
-/** Force an immediate write — used before unload and after imports. */
-export async function flushNow() {
-  if (dirty.settings) { dirty.settings = false; await repo.saveSettings(state.settings); }
-  if (dirty.periods) { dirty.periods = false; await repo.savePeriodDays(state.periodDays); }
-  if (dirty.logs.size) {
-    const dates = [...dirty.logs];
-    dirty.logs.clear();
-    await repo.saveLogs(dates.map((d) => state.logs[d] ?? emptyLog(d)));
-  }
+/**
+ * Force an immediate write — used before unload, after imports, and by anything
+ * that needs to know the data is really down before it says so.
+ *
+ * @returns {Promise<boolean>} whether everything landed
+ */
+export function flushNow() {
+  return runWrite();
 }
 
 /* ── Boot ────────────────────────────────────────────────────────────────── */
@@ -186,9 +233,20 @@ export function getLog(date) {
  * Write a log. Flow changes are mirrored into `periodDays` so that marking
  * bleeding in the diary and marking a period on the calendar are the same
  * act — there's no way to get the two out of step.
+ *
+ * Returns whether the write reached storage, so a caller that is about to
+ * congratulate her can check first.
+ *
  * @param {DayLog} log
+ * @returns {Promise<boolean>}
  */
 export function putLog(log, { quiet = false } = {}) {
+  // Kept so a failed write can be undone. The screen renders from memory, so
+  // leaving the change in place after the disk refused it would show her a day
+  // that will not be there tomorrow.
+  const prevLog = state.logs[log.date];
+  const prevPeriods = state.periodDays;
+
   state.logs = { ...state.logs, [log.date]: log };
   dirty.logs.add(log.date);
 
@@ -205,7 +263,17 @@ export function putLog(log, { quiet = false } = {}) {
     dirty.periods = true;
   }
 
-  scheduleFlush(true);
+  const saved = scheduleFlush(true).then((ok) => {
+    if (!ok) {
+      if (prevLog) state.logs = { ...state.logs, [log.date]: prevLog };
+      else { const rest = { ...state.logs }; delete rest[log.date]; state.logs = rest; }
+      state.periodDays = prevPeriods;
+      // Nothing left to retry for this date — memory now matches the disk.
+      dirty.logs.delete(log.date);
+      notify();
+    }
+    return ok;
+  });
 
   /*
     `quiet` writes still persist and still update state — they just skip the
@@ -222,6 +290,7 @@ export function putLog(log, { quiet = false } = {}) {
     it, so that genuinely needs the repaint.
   */
   if (!quiet) notify();
+  return saved;
 }
 
 /* ── Period-day actions ─────────────────────────────────────────────────── */

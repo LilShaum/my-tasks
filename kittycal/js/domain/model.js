@@ -35,6 +35,7 @@
  * @property {string|null} testPregnancy  'positive'|'negative'
  * @property {string|null} testOvulation  'peak'|'high'|'negative'
  * @property {string} notes
+ * @property {boolean} checkedIn  she was asked the daily questions and answered
  * @property {number} updated      epoch ms, for import conflict resolution
  */
 
@@ -142,17 +143,21 @@ export function emptyLog(date) {
     testPregnancy: null,
     testOvulation: null,
     notes: '',
+    checkedIn: false,
     updated: Date.now(),
   };
 }
 
 /**
- * True when a log holds nothing worth keeping. Used to prune records back out
- * of storage when the last chip is deselected, so the calendar doesn't show
- * dots for days that were opened and then emptied.
+ * True when she recorded nothing on this day.
+ *
+ * Deliberately blind to `checkedIn`: answering "no bleeding, nothing bothering
+ * me" is a real answer, but it is still a day with nothing on it, and the
+ * screens that describe a day want to say so.
+ *
  * @param {DayLog} log
  */
-export function isLogEmpty(log) {
+export function nothingRecorded(log) {
   return (
     log.flow === 'none' &&
     !log.symptoms.length && !log.moods.length && !log.discharge.length &&
@@ -164,6 +169,24 @@ export function isLogEmpty(log) {
     log.testPregnancy == null && log.testOvulation == null &&
     !log.notes.trim()
   );
+}
+
+/**
+ * True when a log holds nothing worth keeping. Used to prune records back out
+ * of storage when the last chip is deselected, so the calendar doesn't show
+ * dots for days that were opened and then emptied.
+ *
+ * A day she checked in on is always worth keeping, even when the answer was
+ * "nothing". Storage used to delete those, which quietly broke the daily loop:
+ * the commonest day of all — no bleeding, nothing bothering her — vanished on
+ * write, so the app asked again the next day and the week strip showed it as
+ * never logged. It also threw away real information, since "no bleeding on the
+ * 3rd" is an observation the cycle maths wants and "never asked" is not.
+ *
+ * @param {DayLog} log
+ */
+export function isLogEmpty(log) {
+  return !log.checkedIn && nothingRecorded(log);
 }
 
 /**
@@ -211,6 +234,7 @@ export function normalizeLog(raw) {
     testPregnancy: typeof raw.testPregnancy === 'string' ? raw.testPregnancy : null,
     testOvulation: typeof raw.testOvulation === 'string' ? raw.testOvulation : null,
     notes: typeof raw.notes === 'string' ? raw.notes : '',
+    checkedIn: raw.checkedIn === true,
     updated: num(raw.updated) ?? Date.now(),
   };
 }

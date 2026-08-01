@@ -23,7 +23,7 @@ import { plural, listJoin } from '../utils/fmt.js';
 import { labelFor, labelOf, CATEGORIES, DEFAULT_CHIPS } from '../data/taxonomy.js';
 import { pick } from '../data/tips.js';
 import { loggedIds } from '../domain/stats.js';
-import { isLogEmpty } from '../domain/model.js';
+import { nothingRecorded } from '../domain/model.js';
 import { buildRecap, cluster } from '../domain/recap.js';
 import { backupNudge } from '../domain/backup-health.js';
 import { exportEverything } from '../storage/export-action.js';
@@ -49,8 +49,25 @@ export function renderToday(host) {
   const prediction = predict({ periodDays, settings, today });
   const phase = phaseFor({ date: today, cycles, prediction });
 
+  /*
+    No cycles yet — she skipped the last-period question during setup, or has
+    only ever logged days with no bleeding on them.
+
+    The ring and every prediction need a cycle to exist, so those are replaced
+    by a prompt to mark one. The daily loop is not: the check-in and the week
+    strip stay exactly where they always are. An earlier version returned here
+    with only the prompt, which meant someone in this state could be asked to
+    check in, answer, and still be told "Nothing logged yet" with no way to
+    check in again.
+  */
   if (!cycles.length) {
-    replace(host, [emptyState(settings.name)]);
+    replace(host, [
+      greeting(settings.name, today),
+      emptyState(settings.name),
+      logButton(logs[today], today),
+      weekStrip(logs, periodDays, today),
+      disclaimerNote(),
+    ]);
     return;
   }
 
@@ -346,7 +363,7 @@ function logButton(log, today) {
       // not an empty one — it records that she did not bleed, which the cycle
       // maths cares about. It just needs saying differently from a day with
       // three symptoms on it.
-      el('p', { text: isLogEmpty(log)
+      el('p', { text: nothingRecorded(log)
         ? 'Checked in for today — nothing to report.'
         : `Logged today — ${summariseLog(log)}` }),
     ]),
