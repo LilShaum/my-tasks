@@ -17,7 +17,7 @@ import { el, svg, haptic, announce } from '../utils/dom.js';
 import { fmtRelative, fmtLong, todayKey } from '../utils/date.js';
 import {
   CATEGORIES, TESTS, MEASURES, WATER_GLASS_ML, WATER_GOAL_ML, labelFor,
-  optionMatches, normalizeQuery,
+  optionMatches, normalizeQuery, DEFAULT_CHIPS,
 } from '../data/taxonomy.js';
 import { isLogEmpty, isBleeding } from '../domain/model.js';
 import { openSheet, closeSheet } from '../ui/sheet.js';
@@ -504,7 +504,8 @@ function quickRow(draft, settings, chips) {
   /** @type {{cat: import('../data/taxonomy.js').Category, option: import('../data/taxonomy.js').Option}[]} */
   const picks = [];
 
-  for (const id of settings.recentChips) {
+  // Same fallback as the Today row: her own first, defaults behind.
+  for (const id of new Set([...settings.recentChips, ...DEFAULT_CHIPS])) {
     if (picks.length >= QUICK_LIMIT) break;
     for (const cat of CATEGORIES) {
       // Flow lives in its own always-open section directly below, so

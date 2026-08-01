@@ -19,7 +19,7 @@
 import { el, svg, replace, haptic } from '../utils/dom.js';
 import { todayKey, fmtDayMonth, fmtRelative, daysBetween } from '../utils/date.js';
 import { plural, listJoin } from '../utils/fmt.js';
-import { labelFor, labelOf, CATEGORIES } from '../data/taxonomy.js';
+import { labelFor, labelOf, CATEGORIES, DEFAULT_CHIPS } from '../data/taxonomy.js';
 import { pick } from '../data/tips.js';
 import { loggedIds } from '../domain/stats.js';
 import { buildRecap, cluster } from '../domain/recap.js';
@@ -425,7 +425,11 @@ function inlineChips(log, today, settings) {
   /** @type {{cat: string, id: string, label: string}[]} */
   const picks = [];
 
-  for (const id of settings.recentChips) {
+  // Her own history first; the defaults only fill the gap behind it, so the
+  // row is never empty and never stays generic once she starts logging.
+  const source = [...settings.recentChips, ...DEFAULT_CHIPS];
+
+  for (const id of new Set(source)) {
     if (picks.length >= INLINE_CHIPS) break;
     for (const cat of CATEGORIES) {
       if (cat.id === 'flow' || cat.id === 'drive') continue;

@@ -268,6 +268,22 @@ export const MEASURES = [
 export const WATER_GLASS_ML = 250;
 export const WATER_GOAL_ML = 2000;
 
+/**
+ * What the quick rows show before she has any history of her own.
+ *
+ * `recentChips` only fills up when something is applied from the full diary
+ * sheet — so someone who marks her period and nothing else, which this app
+ * explicitly says is a perfectly good way to use it, had an empty list
+ * forever. The shortcut rows checked that list, found nothing, and fell back
+ * to the plain "Log today" button. The streamlining was invisible to exactly
+ * the person it was built for.
+ *
+ * These four are the ones a period tracker gets asked about most. They are a
+ * starting point, not a suggestion of what she should be feeling, and the
+ * moment she logs anything her own choices take over.
+ */
+export const DEFAULT_CHIPS = ['cramps', 'fatigue', 'headache', 'bloating'];
+
 /* ── Lookup helpers ─────────────────────────────────────────────────────── */
 
 /** @type {Map<string, {category: string, option: Option}>} */
