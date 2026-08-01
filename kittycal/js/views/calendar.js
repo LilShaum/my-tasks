@@ -29,6 +29,7 @@ import {
   month as monthOf, year as yearOf, dayOfMonth,
 } from '../utils/date.js';
 import { buildCycles, filledPeriodDays } from '../domain/cycles.js';
+import { nothingRecorded } from '../domain/model.js';
 import { predict, upcomingPeriods, upcomingFertile } from '../domain/predict.js';
 import { toastUndo } from '../ui/toast.js';
 import { spotArt } from '../ui/mascot.js';
@@ -413,7 +414,14 @@ function dayCell(opts) {
   const isOvulation = marks.ovulation.has(key) && !logged;
   const luteal = !logged && !predicted && !fertile && marks.luteal.has(key);
   const log = logs[key];
-  const hasOtherData = log != null && !marked;
+  /*
+    The dot means "something else was logged here", so it has to key off what
+    is recorded rather than whether a row exists. Days she checked in on are
+    stored even when the answer was "nothing" — without this the dot would
+    appear on every quiet day, which on a normal cycle is most of the month,
+    and a mark that is nearly always present marks nothing.
+  */
+  const hasOtherData = log != null && !nothingRecorded(log) && !marked;
   const selected = store.getState().ui.selectedDate === key;
 
   /** @type {string[]} */

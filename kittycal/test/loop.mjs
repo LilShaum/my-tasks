@@ -500,6 +500,67 @@ await withPage(async (p) => {
     'a day already answered goes to the diary instead');
 });
 
+/* ── 10. Checking in every day must not ruin the calendar ───────────────
+   Keeping checked-in days that hold nothing was the fix for the vanishing
+   quiet day, and it came within one boolean of wrecking the calendar: the "has
+   other data" dot keyed off whether a row existed, so every quiet day would
+   have sprouted one. On a normal cycle that is most of the month, and a mark
+   that is nearly always present marks nothing. */
+console.log('\nchecking in every day, for weeks');
+await withPage(async (p) => {
+  await p.goto(BASE, { waitUntil: 'networkidle' });
+  await p.evaluate(async () => {
+    const db = await new Promise((res, rej) => {
+      const r = indexedDB.open('kittycal', 1);
+      r.onupgradeneeded = () => {
+        const d = r.result;
+        d.createObjectStore('logs', { keyPath: 'date' });
+        d.createObjectStore('meta', { keyPath: 'key' });
+        d.createObjectStore('blobs', { keyPath: 'id' });
+      };
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+    const pad = (/** @type {number} */ n) => String(n).padStart(2, '0');
+    const shift = (/** @type {number} */ n) => {
+      const d = new Date(); d.setDate(d.getDate() + n);
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    };
+    const blank = (/** @type {string} */ date) => ({ date, flow: 'none', symptoms: [],
+      moods: [], discharge: [], activity: [], other: [], sex: [], drive: null, custom: [],
+      bbt: null, weight: null, water: 0, sleep: null, steps: null, pillTaken: false,
+      testPregnancy: null, testOvulation: null, notes: '', checkedIn: true, updated: Date.now() });
+    const days = [];
+    await new Promise((res) => {
+      const tx = db.transaction(['meta', 'logs'], 'readwrite');
+      // Sixty days of diligent check-ins; almost all of them say "nothing".
+      for (let back = 60; back >= 1; back -= 1) {
+        const key = shift(-back);
+        const l = blank(key);
+        if (back % 28 < 5) { l.flow = 'medium'; days.push(key); }
+        if (back % 17 === 0) l.symptoms = ['headache'];   // genuinely worth a dot
+        tx.objectStore('logs').put(l);
+      }
+      tx.objectStore('meta').put({ key: 'settings', value: {
+        theme: 'hellokitty', onboarded: true, disclaimerAck: true, avgCycleLength: 28,
+        avgPeriodLength: 5, name: 'Sam', lastBackup: shift(0), lastBackupAt: Date.now(),
+        checkinSkipped: shift(0) } });
+      tx.objectStore('meta').put({ key: 'periodDays', value: days });
+      tx.oncomplete = () => res(undefined);
+    });
+  });
+  await p.reload({ waitUntil: 'networkidle' });
+  await p.waitForTimeout(1500);
+  await p.locator('[data-tab="calendar"]').click();
+  await p.waitForTimeout(700);
+  await p.locator('[aria-label="Previous month"]').click();
+  await p.waitForTimeout(700);
+
+  const dots = await p.locator('.cal-dot').count();
+  check(dots <= 3, 'the dot still means something', `${dots} dots on a fully checked-in month`);
+  check(await p.locator('.cal-cell.is-period').count() > 0, 'period days are still drawn');
+});
+
 await browser.close();
 
 console.log(`\ndaily loop: ${checks - failures}/${checks} checks passed`);
