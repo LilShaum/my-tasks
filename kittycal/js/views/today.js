@@ -17,7 +17,8 @@
  */
 
 import { el, svg, replace, haptic } from '../utils/dom.js';
-import { todayKey, fmtDayMonth, fmtRelative, daysBetween } from '../utils/date.js';
+import { todayKey, fmtDayMonth, fmtRelative, daysBetween, addDays, dow, dayOfMonth, DOW_MIN }
+  from '../utils/date.js';
 import { plural, listJoin } from '../utils/fmt.js';
 import { labelFor, labelOf, CATEGORIES, DEFAULT_CHIPS } from '../data/taxonomy.js';
 import { pick } from '../data/tips.js';
@@ -90,6 +91,7 @@ export function renderToday(host) {
 
     phaseLine(phase),
     logButton(logs[today], today),
+    weekStrip(logs, periodDays, today),
 
     el('div', { class: 'section stagger' }, [
       prediction.stale ? staleCard(prediction)
@@ -353,6 +355,80 @@ function logButton(log, today) {
       class: 'btn btn-secondary btn-block',
       onclick: () => { haptic(); openLogSheet(today); },
     }, ['Add more']),
+  ]);
+}
+
+/**
+ * The last seven days, and whether each one got logged.
+ *
+ * A check-in you skipped used to be reachable only by going to the calendar,
+ * finding the day, and opening the full diary — a wall of categories to answer
+ * three questions with. So the missed days come to her instead: tap one and it
+ * runs the same three questions it would have asked on the day.
+ *
+ * It stays on screen when everything is logged, rather than appearing only when
+ * something is missing. A row of ticks is worth seeing, and a control that
+ * moves around depending on how well you have been doing is a control you have
+ * to re-find every time.
+ *
+ * Future days are not shown. Nothing about tomorrow can be answered yet, and a
+ * tappable tomorrow invites logging a period that has not happened.
+ *
+ * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
+ * @param {Set<DateKey>} periodDays
+ * @param {DateKey} today
+ */
+function weekStrip(logs, periodDays, today) {
+  const days = [];
+  let missed = 0;
+
+  for (let back = 6; back >= 0; back -= 1) {
+    const key = addDays(today, -back);
+    const log = logs[key];
+    const isToday = key === today;
+
+    /*
+      Logged and missed are the real distinction — "logged" means she answered,
+      "missed" means nobody knows, and a day with no log is not a day with
+      nothing on it. Today is marked on top of whichever of those it is, rather
+      than instead of them, so the current day stays findable once it is
+      logged.
+    */
+    const classes = ['week-day', log ? 'is-logged' : 'is-missed'];
+    if (isToday) classes.push('is-today');
+    if (periodDays.has(key)) classes.push('is-period');
+
+    // Today has not been missed, it just has not happened yet, so it is never
+    // part of the catch-up count.
+    if (!log && !isToday) missed += 1;
+
+    const label = `${fmtRelative(key)}${
+      log ? ', logged' : isToday ? ', not checked in yet' : ', not logged'}`;
+
+    days.push(el('button', {
+      type: 'button',
+      class: classes.join(' '),
+      'aria-label': label,
+      onclick: () => {
+        haptic();
+        // Already answered: straight to the diary, because the three questions
+        // have nothing left to ask. Not answered: the three questions.
+        if (log) openLogSheet(key); else openCheckin(key);
+      },
+    }, [
+      el('span', { class: 'week-day-dow', 'aria-hidden': 'true', text: DOW_MIN[dow(key)] }),
+      el('span', { class: 'week-day-num', 'aria-hidden': 'true', text: String(dayOfMonth(key)) }),
+      el('span', { class: 'week-day-mark', 'aria-hidden': 'true', text: log ? '✓' : '' }),
+    ]));
+  }
+
+  return el('section', { class: 'week-strip', 'aria-label': 'The last seven days' }, [
+    el('div', { class: 'week-strip-row' }, days),
+    el('p', { class: 'hint-sm week-strip-note', text: missed
+      ? `${plural(missed, 'day')} not logged — tap to catch up.`
+      // Not "every day this week is logged": today usually is not, and saying
+      // so would be wrong for most of the day, every day.
+      : 'Nothing to catch up on.' }),
   ]);
 }
 

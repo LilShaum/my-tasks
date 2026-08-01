@@ -40,6 +40,9 @@ const CHECKS = [
   // is the token used wherever a control's boundary has to meet WCAG 1.4.11.
   ['--primary-line', '--surface', 3.0, 'control boundary on surface'],
   ['--on-primary', '--primary', 4.5, 'label on a primary button'],
+  // The week strip's tick sits on a logged day, which is --surface-2. It is a
+  // glyph carrying meaning, so it is held to the text bar rather than 3:1.
+  ['--primary-line', '--surface-2', 4.5, 'logged tick on the week strip'],
 ];
 
 /** sRGB relative luminance, per WCAG 2.x. @param {number[]} rgb 0-255 */
