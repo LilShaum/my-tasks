@@ -164,7 +164,19 @@ export function openCheckin(date = todayKey()) {
     render();
   };
 
+  /*
+    Finishing is the one move the token guard does not cover, because it is the
+    one that does not re-render: the Done button stays live and tappable for as
+    long as the write takes. Double-tapping it ran the whole ending twice — two
+    writes, two bursts, two announcements — and on the failure path would have
+    wound `step` back twice.
+  */
+  let finishing = false;
+
   const finish = async () => {
+    if (finishing) return;
+    finishing = true;
+
     // Nothing is celebrated until it is actually on the disk. Saying "checked
     // in" over a write that failed is worse than the failure: she would not
     // know to do it again.
@@ -178,6 +190,7 @@ export function openCheckin(date = todayKey()) {
       // The store has already put memory back and toasted. Return her to the
       // last question with every answer still in the draft, so retrying is one
       // tap rather than starting again.
+      finishing = false;
       step -= 1;
       render();
       return;
