@@ -204,13 +204,14 @@ export function openCheckin(date = todayKey()) {
     if (finishing) return;
     finishing = true;
 
-    // Nothing is celebrated until it is actually on the disk. Saying "checked
-    // in" over a write that failed is worse than the failure: she would not
-    // know to do it again.
     // The fact of having been asked and answered, recorded explicitly. Without
     // it a day of "no bleeding, nothing bothering me" is indistinguishable from
     // a day she never opened the app, and storage prunes it away.
     draft.checkedIn = true;
+
+    // Nothing is celebrated until it is actually on the disk. Saying "checked
+    // in" over a write that failed is worse than the failure: she would not
+    // know to do it again.
 
     const saved = await store.putLog(draft);
     if (!saved) {
@@ -238,6 +239,27 @@ export function openCheckin(date = todayKey()) {
       title: isToday ? 'Any bleeding today?' : `Any bleeding ${whenPhrase}?`,
       hint: 'This is the one that matters most — it is what every prediction ' +
         'is built from.',
+      /*
+        The whole day in one tap.
+
+        "No bleeding, no moods, nothing bothering me" is the most common day
+        there is, and it cost three taps to say — the two after the first being
+        a pair of Next buttons over questions the answer to which is already
+        "none". Offering it as one control is the difference between a habit
+        and a chore on exactly the days she is least motivated to bother.
+
+        It is quiet and below the answers rather than among them: it is a
+        shortcut past the questions, not one of the answers to the first.
+      */
+      shortcut: !flowAnswered && draft.moods.length === 0 && draft.symptoms.length === 0
+        ? { label: 'Nothing to report today', onPick: () => {
+            draft.flow = 'none';
+            draft.moods = [];
+            draft.symptoms = [];
+            step = steps.length;
+            void finish();
+          } }
+        : null,
       options: FLOW_STEPS.map(([id, label]) => ({
         id,
         label,
@@ -342,13 +364,15 @@ function toggle(list, id, set) {
  * @param {string} opts.hint
  * @param {{id: string, label: string, selected: boolean, onPick: () => void}[]} opts.options
  * @param {() => boolean} opts.stale true once this question has been left
+ * @param {{label: string, onPick: () => void}|null} [opts.shortcut] a way past
+ *   the whole flow, offered only where answering everything at once is honest
  * @param {boolean} [opts.multi]
  * @param {() => string[]} [opts.current]
  * @param {boolean} [opts.lastStep]
  * @param {() => void} [opts.onNext]
  * @param {() => void} [opts.onMore]
  */
-function question({ title, hint, options, stale, multi, current, lastStep, onNext, onMore }) {
+function question({ title, hint, options, stale, shortcut, multi, current, lastStep, onNext, onMore }) {
   const grid = el('div', { class: 'checkin-options' });
 
   /*
@@ -399,6 +423,12 @@ function question({ title, hint, options, stale, multi, current, lastStep, onNex
       class: 'btn btn-block btn-lg checkin-next',
       onclick: guard(() => { haptic(); onNext?.(); }),
     }, [lastStep ? 'Done' : 'Next']),
+
+    shortcut && el('button', {
+      type: 'button',
+      class: 'btn btn-ghost btn-block checkin-shortcut',
+      onclick: guard(() => { haptic(); shortcut.onPick(); }),
+    }, [shortcut.label]),
 
     // On the last step only: a way into the full diary for anyone who wants
     // to record a temperature or write a note. Quiet, because most days it is

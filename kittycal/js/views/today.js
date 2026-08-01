@@ -25,6 +25,7 @@ import { pick } from '../data/tips.js';
 import { loggedIds } from '../domain/stats.js';
 import { nothingRecorded } from '../domain/model.js';
 import { buildRecap, cluster } from '../domain/recap.js';
+import { respondToCheckin } from '../domain/response.js';
 import { backupNudge } from '../domain/backup-health.js';
 import { exportEverything } from '../storage/export-action.js';
 import { openLogSheet } from './log.js';
@@ -64,7 +65,7 @@ export function renderToday(host) {
     replace(host, [
       greeting(settings.name, today),
       emptyState(settings.name),
-      logButton(logs[today], today),
+      logButton(logs[today], today, logs, cycles),
       weekStrip(logs, periodDays, today),
       disclaimerNote(),
     ]);
@@ -107,7 +108,7 @@ export function renderToday(host) {
     }),
 
     phaseLine(phase),
-    logButton(logs[today], today),
+    logButton(logs[today], today, logs, cycles),
     weekStrip(logs, periodDays, today),
 
     el('div', { class: 'section stagger' }, [
@@ -325,6 +326,8 @@ function phaseLine(phase) {
  * screen. Shows what's already recorded so tapping it isn't a leap of faith.
  * @param {import('../domain/model.js').DayLog|undefined} log
  * @param {DateKey} today
+ * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
+ * @param {import('../domain/cycles.js').Cycle[]} cycles
  */
 /**
  * The daily log area.
@@ -342,8 +345,10 @@ function phaseLine(phase) {
  *
  * @param {import('../domain/model.js').DayLog|undefined} log
  * @param {DateKey} today
+ * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
+ * @param {import('../domain/cycles.js').Cycle[]} cycles
  */
-function logButton(log, today) {
+function logButton(log, today, logs, cycles) {
   if (!log) {
     return el('div', { class: 'log-cta' }, [
       el('button', {
@@ -356,16 +361,29 @@ function logButton(log, today) {
     ]);
   }
 
+  /*
+    The one line she did not already know.
+
+    Everything above this is a receipt — she typed it fifteen seconds ago. This
+    is the only part of the exchange that gives her something back, so it is
+    what the check-in is actually for. Usually null, and on those days the app
+    says nothing rather than padding.
+  */
+  const said = respondToCheckin({ log, logs, cycles, today });
+
   return el('div', { class: 'log-cta' }, [
     el('div', { class: 'today-logged data-zone' }, [
       el('span', { class: 'today-logged-tick', 'aria-hidden': 'true', text: '\u2713' }),
-      // A day where she checked in and nothing was happening is a real answer,
-      // not an empty one — it records that she did not bleed, which the cycle
-      // maths cares about. It just needs saying differently from a day with
-      // three symptoms on it.
-      el('p', { text: nothingRecorded(log)
-        ? 'Checked in for today — nothing to report.'
-        : `Logged today — ${summariseLog(log)}` }),
+      el('div', { class: 'today-logged-text' }, [
+        // A day where she checked in and nothing was happening is a real
+        // answer, not an empty one — it records that she did not bleed, which
+        // the cycle maths cares about. It just needs saying differently from a
+        // day with three symptoms on it.
+        el('p', { text: nothingRecorded(log)
+          ? 'Checked in for today — nothing to report.'
+          : `Logged today — ${summariseLog(log)}` }),
+        said && el('p', { class: 'today-said', text: said }),
+      ]),
     ]),
     el('button', {
       type: 'button',
@@ -734,9 +752,18 @@ function summariseLog(log) {
   /** @type {string[]} */
   const bits = [];
   if (log.flow !== 'none') bits.push(labelFor('flow', log.flow).toLowerCase());
-  const chips = log.symptoms.length + log.moods.length + log.discharge.length
-    + log.activity.length + log.other.length + log.sex.length + log.custom.length;
-  if (chips) bits.push(`${chips} ${chips === 1 ? 'entry' : 'entries'}`);
+
+  /*
+    Named, not counted. This used to say "medium and 2 entries", which is the
+    app telling her it has two things and declining to say what — she has to
+    open the diary to find out something she recorded thirty seconds ago.
+    Three names fit comfortably on one line; past that it counts the remainder
+    rather than wrapping to a paragraph.
+  */
+  const named = loggedIds(log).map((id) => labelOf(id).toLowerCase());
+  if (named.length <= 3) bits.push(...named);
+  else bits.push(...named.slice(0, 2), `${named.length - 2} more`);
+
   if (log.bbt != null) bits.push('temperature');
   if (log.notes.trim()) bits.push('a note');
   return bits.length ? `${listJoin(bits)}.` : 'You can add to it any time.';
