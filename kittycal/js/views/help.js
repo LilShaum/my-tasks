@@ -33,15 +33,18 @@ export function openHelp() {
           'well by only marking your period each month.'),
       ]),
 
-      section('Logging without opening anything', [
-        p('Under the ring is a small set of chips: the things you log most, ' +
-          'plus Light, Medium and Heavy on the days a period could be running ' +
-          'or is about due.'),
-        p('One tap logs. Tap the same chip again to undo it — nothing to ' +
-          'confirm, nothing to regret. It saves the moment you tap.'),
-        p('The chips change as you go: whatever you have been logging recently ' +
-          'moves up here on its own, so the row is always the handful you ' +
-          'actually use. "Log something else" opens the full diary.'),
+      section('The daily check-in', [
+        p('Opening Kittycal on a new day asks three questions: whether you are ' +
+          'bleeding, how you feel, and whether anything is bothering you. Tap ' +
+          'the answers and it is done — about fifteen seconds, or three taps ' +
+          'on a day when nothing is going on.'),
+        p('Those three are not a random selection. They are exactly what every ' +
+          'other screen is built from: bleeding drives all the predictions, ' +
+          'mood is the whole of the mood-by-phase chart, and symptoms are the ' +
+          'whole of pattern detection.'),
+        p('Close it and it will not ask again until tomorrow — the button on ' +
+          'Today opens it whenever you want. "Add more detail" at the end ' +
+          'takes you into the full diary with your answers already filled in.'),
       ]),
 
       section('The Today screen', [
@@ -49,7 +52,7 @@ export function openHelp() {
           'the big number counts down to whatever comes next — your period, or ' +
           'ovulation if that is sooner.'),
         p('Under it is the phase you are in and what tends to happen during it, ' +
-          'then the quick chips. Below those are the next period, the fertile ' +
+          'then the check-in. Below those are the next period, the fertile ' +
           'window if it applies to you, and a few cards worth knowing.'),
       ]),
 
@@ -70,9 +73,9 @@ export function openHelp() {
       section('Logging a day', [
         p(`There are ${optionCount()} things you can record across ` +
           `${CATEGORIES.length} categories, plus anything you add yourself.`),
-        p('Once you have logged a few things, the ones you use most appear as ' +
-          'a row at the very top under "What you log most", so the usual day ' +
-          'is two taps and no scrolling.'),
+        p('The diary is where you go for anything the check-in does not ask ' +
+          'about. The things you log most appear as a row at the very top ' +
+          'under "What you log most", so they are one tap and no scrolling.'),
         p('Everything else sits in categories that start closed, so the screen ' +
           'is not a wall of buttons. Use the search box to find something ' +
           'instantly — it understands everyday wording, so "sore boobs" and ' +

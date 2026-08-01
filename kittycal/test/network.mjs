@@ -101,12 +101,21 @@ await page.evaluate(async () => {
 await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(800);
 
+// The daily check-in opens by itself on a day that has not been logged, and it
+// is modal — so it has to be dealt with before anything else can be driven.
+// Dismissing it here also exercises the skip path.
+if (await page.locator('.checkin-step').count()) {
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(500);
+}
+
 for (const tab of ['calendar', 'insights', 'settings', 'today']) {
   await page.click(`[data-tab="${tab}"]`);
   await page.waitForTimeout(500);
 }
 
-// Open the logging sheet, which is the most module-hungry path.
+// Open the check-in, then the full diary — between them the most
+// module-hungry paths in the app.
 await page.click('.log-cta .btn');
 await page.waitForTimeout(600);
 await page.keyboard.press('Escape');

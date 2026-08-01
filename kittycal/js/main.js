@@ -18,6 +18,7 @@ import { renderInsights } from './views/insights.js';
 import { renderSettings } from './views/settings.js';
 import { mountOnboarding } from './views/onboarding.js';
 import { openHelp } from './views/help.js';
+import { needsCheckin, openCheckin } from './views/checkin.js';
 import { isSheetOpen } from './ui/sheet.js';
 import { mascot } from './ui/mascot.js';
 import { loadLock, showLockScreen } from './ui/lock.js';
@@ -112,6 +113,32 @@ function startApp() {
   }
 
   render();
+  maybeAskForCheckin();
+}
+
+/**
+ * Open the daily check-in on the first launch of a day.
+ *
+ * The whole reason this exists is that a passive control collects thin data:
+ * a row of chips waits to be told something, and mostly is not. Asking is what
+ * turns "I might log later" into a logged day.
+ *
+ * It is a sheet rather than a takeover, dismissible with the same tap as any
+ * other sheet, and skipping it stops the app asking again until tomorrow. It
+ * never appears twice in a session, never on a day already logged, and never
+ * before onboarding is finished.
+ */
+let askedThisSession = false;
+function maybeAskForCheckin() {
+  if (askedThisSession) return;
+  const { ui, ready } = store.getState();
+  if (!ready || ui.locked) return;
+  if (!needsCheckin(todayKey())) return;
+
+  askedThisSession = true;
+  // After first paint, so the check-in slides over a drawn screen rather than
+  // arriving before there is anything behind it.
+  requestAnimationFrame(() => openCheckin(todayKey()));
 }
 
 /* ── Rendering ──────────────────────────────────────────────────────────── */
