@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -57,7 +57,19 @@ jobs:
         with:
           path: .
 
+      # Two deploys overlapping is rejected outright by the Pages API — "due to
+      # in progress deployment. Please cancel <sha> first" — and it takes only
+      # merging two pull requests a few minutes apart to cause it. The
+      # `concurrency` group above serialises the workflow *runs*, but the Pages
+      # deployment created by a finished run can still be settling when the
+      # next one asks, so the group is not enough on its own.
+      #
+      # The failure mode is the quiet one this workflow already guards against
+      # everywhere else: the site simply stays a version behind. So a collision
+      # gets a wait and one retry instead of a red X and a version of the app
+      # that never reaches the phone.
       - id: deployment
+        continue-on-error: true
         uses: actions/deploy-pages@v4
         with:
           # 600000ms (10 minutes) is the action's hard ceiling — it clamps
@@ -72,6 +84,16 @@ jobs:
           # so `check-deployed` below exists to make the failure loud.
           timeout: 600000
 
+      - name: Wait out an overlapping deployment
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 60
+
+      - id: deployment_retry
+        if: steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        with:
+          timeout: 600000
+
       # Confirm the site is actually serving this commit.
       #
       # `deploy-pages` reporting success means GitHub accepted the deployment,
@@ -82,7 +104,8 @@ jobs:
       # live.
       - name: Check the deploy actually landed
         run: |
-          url="${{ steps.deployment.outputs.page_url }}kittycal/sw.js"
+          # Whichever attempt actually landed.
+          url="${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url }}kittycal/sw.js"
           for attempt in 1 2 3 4 5 6 7 8 9 10; do
             if curl -fsS --max-time 30 "$url" | grep -q "kittycal-${GITHUB_SHA}"; then
               echo "Live and serving ${GITHUB_SHA}."
