@@ -355,6 +355,89 @@ await withPage(async (p) => {
     'the week strip still counts the day as logged');
 });
 
+/* ── 7. Correcting a mis-tap ────────────────────────────────────────────
+   The first question moves on the instant it is tapped, which is what makes a
+   quiet day three taps and also means a mis-tap is instantly a wrong answer —
+   on the one field every prediction is built from. */
+console.log('\ncorrecting a mis-tap');
+await withPage(async (p) => {
+  await p.goto(BASE, { waitUntil: 'networkidle' });
+  await seed(p, true);
+  await p.reload({ waitUntil: 'networkidle' });
+  await p.waitForTimeout(1500);
+
+  check(await p.locator('.btn-back').count() === 0,
+    'no way back from the first question, because there is nowhere to go');
+
+  await p.locator('.checkin-option', { hasText: 'Heavy' }).click();   // meant Light
+  await p.waitForTimeout(400);
+  await p.locator('.checkin-option', { hasText: 'Irritable' }).click();
+  await p.waitForTimeout(200);
+
+  check(await p.locator('.btn-back').count() === 1, 'Back is offered from then on');
+  await p.locator('.btn-back').click();
+  await p.waitForTimeout(400);
+
+  const shown = await p.locator('.checkin-option[aria-pressed="true"]')
+    .evaluateAll((ns) => ns.map((n) => n.innerText.trim()));
+  check(shown.length === 1 && shown[0] === 'Heavy',
+    'going back shows what she actually chose', shown.join(', '));
+
+  await p.locator('.checkin-option', { hasText: 'Light' }).click();
+  await p.waitForTimeout(400);
+  const moods = await p.locator('.checkin-option[aria-pressed="true"]')
+    .evaluateAll((ns) => ns.map((n) => n.innerText.trim()));
+  check(moods.includes('Irritable'), 'the mood survived the round trip', moods.join(', '));
+
+  await p.locator('.checkin-next').click();
+  await p.waitForTimeout(300);
+  await p.locator('.checkin-next').click();
+  await p.waitForTimeout(1200);
+
+  const stored = await p.evaluate(async () => {
+    const db = await new Promise((res) => {
+      const r = indexedDB.open('kittycal', 1); r.onsuccess = () => res(r.result);
+    });
+    return new Promise((res) => {
+      const tx = db.transaction(['logs'], 'readonly');
+      const g = tx.objectStore('logs').getAll();
+      g.onsuccess = () => res(g.result[0]);
+    });
+  });
+  check(stored.flow === 'light', 'the correction is what gets saved', `flow=${stored.flow}`);
+});
+
+/* ── 8. Reaching it without a touchscreen ───────────────────────────────
+   Replacing the sheet's contents destroys whatever was focused and the browser
+   drops focus to <body>, so a keyboard user was thrown to the top of the
+   document after every answer and a screen reader said nothing about the
+   question that had just appeared. Three times a day, every day. */
+console.log('\nkeyboard and screen reader');
+await withPage(async (p) => {
+  await p.goto(BASE, { waitUntil: 'networkidle' });
+  await seed(p, true);
+  await p.reload({ waitUntil: 'networkidle' });
+  await p.waitForTimeout(1500);
+
+  const focused = () => p.evaluate(() => {
+    const a = document.activeElement;
+    return a ? `${a.tagName.toLowerCase()}.${(a.className || '').split(' ')[0]}` : 'none';
+  });
+
+  check(await focused() === 'h2.checkin-title',
+    'opening lands on the question, not on the close button', await focused());
+
+  await p.locator('.checkin-option', { hasText: 'Light' }).click();
+  await p.waitForTimeout(500);
+  check(await focused() === 'h2.checkin-title',
+    'answering moves focus to the next question', await focused());
+
+  // And the whole thing is operable from the keyboard alone.
+  await p.keyboard.press('Tab');
+  const afterTab = await focused();
+  check(afterTab !== 'body', 'Tab from the question reaches a control', afterTab);
+});
+
 await browser.close();
 
 console.log(`\ndaily loop: ${checks - failures}/${checks} checks passed`);

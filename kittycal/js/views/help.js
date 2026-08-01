@@ -42,6 +42,9 @@ export function openHelp() {
           'other screen is built from: bleeding drives all the predictions, ' +
           'mood is the whole of the mood-by-phase chart, and symptoms are the ' +
           'whole of pattern detection.'),
+        p('The first question moves on the moment you tap, which is what makes ' +
+          'it quick. If you hit the wrong one, "← Back" at the top returns you ' +
+          'to it with nothing lost.'),
         p('Close it and it will not ask again until tomorrow — the button on ' +
           'Today opens it whenever you want. "Add more detail" at the end ' +
           'takes you into the full diary with your answers already filled in.'),
