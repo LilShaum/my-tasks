@@ -700,6 +700,65 @@ await withPage(async (p) => {
   check(/cramps/.test(receipt), 'the receipt names what she logged, not a count', receipt);
 });
 
+/* ── 14. Spotting must not start a period ───────────────────────────────
+   Marking light, medium or heavy also marks the day as a period day; spotting
+   deliberately does not, because it means bleeding outside a period and
+   counting it as day one throws every cycle length off. The check-in used to
+   offer only none/light/medium/heavy, so someone spotting mid-cycle could
+   either say "no bleeding" — false — or "light", which starts a phantom
+   period. Since the check-in is how most days get logged, that was a standing
+   invitation to corrupt the one field everything is derived from. */
+console.log('\nspotting mid-cycle');
+await withPage(async (p) => {
+  await p.goto(BASE, { waitUntil: 'networkidle' });
+  await seed(p, true);   // last period 14 days ago, so today is mid-cycle
+  await p.reload({ waitUntil: 'networkidle' });
+  await p.waitForTimeout(1500);
+
+  check(await p.locator('.checkin-option', { hasText: 'Spotting' }).count() === 1,
+    'spotting is offered at all');
+
+  const readPeriodDays = () => p.evaluate(async () => {
+    const db = await new Promise((res) => {
+      const r = indexedDB.open('kittycal', 1); r.onsuccess = () => res(r.result);
+    });
+    return new Promise((res) => {
+      const tx = db.transaction(['meta'], 'readonly');
+      const g = tx.objectStore('meta').get('periodDays');
+      g.onsuccess = () => res(g.result.value.length);
+    });
+  });
+
+  const before = await readPeriodDays();
+  const dayBefore = await p.locator('.ring-eyebrow').innerText().catch(() => '');
+
+  await p.locator('.checkin-option', { hasText: 'Spotting' }).click();
+  await p.waitForTimeout(300);
+  await p.locator('.checkin-next').click();
+  await p.waitForTimeout(300);
+  await p.locator('.checkin-next').click();
+  await p.waitForTimeout(1400);
+
+  const after = await readPeriodDays();
+  check(after === before, 'it does not become a period day', `${before} -> ${after}`);
+
+  const stored = await p.evaluate(async () => {
+    const db = await new Promise((res) => {
+      const r = indexedDB.open('kittycal', 1); r.onsuccess = () => res(r.result);
+    });
+    return new Promise((res) => {
+      const tx = db.transaction(['logs'], 'readonly');
+      const g = tx.objectStore('logs').getAll();
+      g.onsuccess = () => res(g.result[0]);
+    });
+  });
+  check(stored.flow === 'spotting', 'but the bleeding is still recorded', stored.flow);
+
+  const dayAfter = await p.locator('.ring-eyebrow').innerText().catch(() => '');
+  check(dayAfter === dayBefore, 'and the cycle day does not reset to 1',
+    `${dayBefore} -> ${dayAfter}`);
+});
+
 await browser.close();
 
 console.log(`\ndaily loop: ${checks - failures}/${checks} checks passed`);
