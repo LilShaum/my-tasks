@@ -165,6 +165,44 @@ await withPage(async (p) => {
   check(showing === 'How are you feeling?', 'advances exactly one question', showing);
 });
 
+/* ── 1b. …and neither must a double-tap on Done ─────────────────────────
+   The one move the token guard does not cover, because it is the one that does
+   not re-render: Done stays live for as long as the write takes. Tapping it
+   twice ran the whole ending twice — two writes, two bursts, two screen-reader
+   announcements. */
+console.log('\ndouble-tap on Done');
+await withPage(async (p) => {
+  await p.goto(BASE, { waitUntil: 'networkidle' });
+  await seed(p, true);
+  await p.reload({ waitUntil: 'networkidle' });
+  await p.waitForTimeout(1500);
+
+  await p.evaluate(() => {
+    // @ts-ignore - test shim
+    window.__announces = 0;
+    const live = document.querySelector('[aria-live]');
+    new MutationObserver(() => {
+      // @ts-ignore - test shim
+      if (live?.textContent?.trim()) window.__announces += 1;
+    }).observe(/** @type {Node} */ (live), { childList: true, characterData: true, subtree: true });
+  });
+
+  await p.locator('.checkin-option', { hasText: 'Light' }).click();
+  await p.waitForTimeout(250);
+  await p.locator('.checkin-next').click();
+  await p.waitForTimeout(250);
+  await p.evaluate(() => {
+    const done = /** @type {HTMLElement} */ (document.querySelector('.checkin-next'));
+    done.click(); done.click();
+  });
+  await p.waitForTimeout(1500);
+
+  // @ts-ignore - test shim
+  const announces = await p.evaluate(() => window.__announces);
+  check(announces === 1, 'the day is finished exactly once', `announced ${announces} times`);
+  check(await logsOnDisk(p) === 1, 'and stored once');
+});
+
 /* ── 2. A failed write must never look like a success ───────────────────
    The worst failure this app can have: a tick, a burst of confetti, and an
    empty database. What the screen shows must match what is stored. */
