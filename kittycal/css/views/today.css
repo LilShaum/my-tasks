@@ -624,3 +624,29 @@
   border-top: 1px solid var(--line-soft);
   border-radius: 0;
 }
+
+/*
+  "No bleeding" spans the row.
+
+  It is the answer on most days of most cycles, so it gets the largest target
+  and comes first; the four that describe actual bleeding then sit together
+  below it as a set, which is what they are.
+*/
+.checkin-option.is-wide { grid-column: 1 / -1; }
+
+/*
+  Spotting carries a caption, because it behaves differently from the levels
+  above it — it records bleeding without starting a period — and that is a
+  surprise worth heading off at the moment of tapping rather than explaining
+  afterwards.
+*/
+.checkin-option-note {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--ink-3);
+}
+
+.checkin-option[aria-pressed="true"] .checkin-option-note { color: inherit; }

@@ -57,12 +57,28 @@ const CHECKIN_SYMPTOMS = [
   'tender-breasts', 'backache', 'nausea', 'acne',
 ];
 
-/** Flow levels, in the order they are offered. */
+/**
+ * Flow levels, in the order they are offered.
+ *
+ * Spotting is here and it is not optional. Marking light, medium or heavy also
+ * marks the day as a period day; spotting deliberately does not, because it
+ * means bleeding outside a period and counting it as day one would throw every
+ * cycle length off. Leaving it out of the check-in did not remove that
+ * distinction, it just removed her ability to express it — someone spotting
+ * mid-cycle had the choice of saying "no bleeding", which is false, or "light",
+ * which starts a phantom period. Since the check-in is now the way most days
+ * get logged, that was a standing invitation to corrupt the one field
+ * everything else is derived from.
+ *
+ * `note` is what makes the difference visible at the moment of choosing, rather
+ * than in a Help page nobody reads before tapping.
+ */
 const FLOW_STEPS = /** @type {const} */ ([
-  ['none', 'No bleeding'],
-  ['light', 'Light'],
-  ['medium', 'Medium'],
-  ['heavy', 'Heavy'],
+  { id: 'none', label: 'No bleeding', wide: true },
+  { id: 'light', label: 'Light' },
+  { id: 'medium', label: 'Medium' },
+  { id: 'heavy', label: 'Heavy' },
+  { id: 'spotting', label: 'Spotting', note: 'does not start a period' },
 ]);
 
 /**
@@ -260,9 +276,11 @@ export function openCheckin(date = todayKey()) {
             void finish();
           } }
         : null,
-      options: FLOW_STEPS.map(([id, label]) => ({
+      options: FLOW_STEPS.map(({ id, label, note, wide }) => ({
         id,
         label,
+        note,
+        wide,
         selected: flowAnswered && draft.flow === id,
         // Single-select, so tapping an answer *is* moving on. No Next button
         // to hunt for and no second tap to confirm what was already decided.
@@ -362,7 +380,8 @@ function toggle(list, id, set) {
  * @param {Object} opts
  * @param {string} opts.title
  * @param {string} opts.hint
- * @param {{id: string, label: string, selected: boolean, onPick: () => void}[]} opts.options
+ * @param {{id: string, label: string, selected: boolean, onPick: () => void,
+ *   note?: string, wide?: boolean}[]} opts.options
  * @param {() => boolean} opts.stale true once this question has been left
  * @param {{label: string, onPick: () => void}|null} [opts.shortcut] a way past
  *   the whole flow, offered only where answering everything at once is honest
@@ -391,7 +410,7 @@ function question({ title, hint, options, stale, shortcut, multi, current, lastS
   for (const option of options) {
     const button = el('button', {
       type: 'button',
-      class: 'checkin-option',
+      class: `checkin-option${option.wide ? ' is-wide' : ''}`,
       'aria-pressed': String(option.selected),
       onclick: guard(() => {
         haptic(10);
@@ -404,7 +423,12 @@ function question({ title, hint, options, stale, shortcut, multi, current, lastS
         }
       }),
       dataset: { opt: option.id },
-    }, [el('span', { text: option.label })]);
+    }, [
+      el('span', { text: option.label }),
+      // Said here rather than in Help, because the difference only matters at
+      // the moment of choosing and nobody opens Help before tapping.
+      option.note && el('span', { class: 'checkin-option-note', text: option.note }),
+    ]);
 
     buttons.push(button);
     grid.append(button);

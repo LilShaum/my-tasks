@@ -36,8 +36,12 @@ export function openHelp() {
       section('The daily check-in', [
         p('Opening Kittycal on a new day asks three questions: whether you are ' +
           'bleeding, how you feel, and whether anything is bothering you. Tap ' +
-          'the answers and it is done — about fifteen seconds, or three taps ' +
-          'on a day when nothing is going on.'),
+          'the answers and it is done — about fifteen seconds, or one tap on a ' +
+          'day when nothing is going on.'),
+        p('"Spotting" is there deliberately. Light, medium and heavy all mark ' +
+          'the day as a period day; spotting does not, because it means ' +
+          'bleeding outside a period and treating it as day one would throw ' +
+          'your cycle lengths off.'),
         p('Those three are not a random selection. They are exactly what every ' +
           'other screen is built from: bleeding drives all the predictions, ' +
           'mood is the whole of the mood-by-phase chart, and symptoms are the ' +
