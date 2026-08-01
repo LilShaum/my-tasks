@@ -60,6 +60,8 @@ export function openHelp() {
           'questions have nothing left to ask.'),
         p('Backing out of a past day does not count as skipping today — you ' +
           'will still be asked about today.'),
+        p('For anything older than a week, tap the day on the calendar. It ' +
+          'asks exactly the same three questions.'),
       ]),
 
       section('The Today screen', [
@@ -72,7 +74,10 @@ export function openHelp() {
       ]),
 
       section('The calendar and its colours', [
-        p('Tap any day — past or future — to see what was logged and add to it.'),
+        p('Tap a day you have already logged to see what is on it and add to ' +
+          'it. Tap one you have not, and it asks the same three questions the ' +
+          'check-in would have — so catching up on something from weeks ago ' +
+          'costs the same fifteen seconds as doing it on the day.'),
         legendRow('is-period', 'Filled', 'A period day you logged.'),
         legendRow('is-predicted', 'Dashed outline', 'A period Kittycal expects. ' +
           'Never filled in, so a guess can never look like a record.'),
