@@ -18,6 +18,7 @@ import { renderInsights } from './views/insights.js';
 import { renderSettings } from './views/settings.js';
 import { mountOnboarding } from './views/onboarding.js';
 import { openHelp } from './views/help.js';
+import { isSheetOpen } from './ui/sheet.js';
 import { mascot } from './ui/mascot.js';
 import { loadLock, showLockScreen } from './ui/lock.js';
 import { checkReminders } from './ui/reminders.js';
@@ -256,6 +257,39 @@ function showFatal(message) {
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   if (!location.protocol.startsWith('http')) return;
+
+  /*
+    Take a new version on the first launch, not the second.
+
+    The worker is cache-first, so an update lands like this: launch one fetches
+    the new sw.js, installs it and precaches everything — but the page you are
+    looking at was already served from the old cache. Only launch two shows the
+    new app. Measured, not assumed: two full reloads before anything changed.
+
+    That is standard service-worker behaviour and a genuinely bad experience —
+    "I don't see the changes" is the correct reaction to it. So when the new
+    worker takes control, the page reloads itself once and the update is
+    invisible.
+
+    `hadController` is read before registering: on a first-ever install there is
+    no controller and nothing on screen is stale, so there is nothing to
+    refresh. Without that check this would reload every first run.
+  */
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return;
+
+    // Never yank the page out from under an open sheet — nothing typed into
+    // the logging sheet is saved until Apply. She gets the update next launch,
+    // which is no worse than the old behaviour.
+    if (isSheetOpen()) return;
+
+    reloading = true;
+    window.location.reload();
+  });
+
   navigator.serviceWorker.register('sw.js').catch((err) => {
     console.warn('kittycal: service worker registration failed', err);
   });
