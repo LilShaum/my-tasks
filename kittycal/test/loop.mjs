@@ -438,6 +438,68 @@ await withPage(async (p) => {
   check(afterTab !== 'body', 'Tab from the question reaches a control', afterTab);
 });
 
+/* ── 9. Catching up on something older than a week ──────────────────────
+   The week strip reaches back seven days. Beyond that the calendar is the only
+   way in, and it used to send every tap to the full diary — a wall of collapsed
+   categories to record what the check-in asks in three taps. Same rule as the
+   strip: unanswered gets the questions, answered gets the diary, and a future
+   date gets the diary because "any bleeding today?" cannot be asked about next
+   Tuesday. */
+console.log('\ncatching up from the calendar');
+await withPage(async (p) => {
+  await p.goto(BASE, { waitUntil: 'networkidle' });
+  await seed(p, true);
+  // Log one day a fortnight back, to prove the two paths diverge.
+  await p.evaluate(async () => {
+    const db = await new Promise((res) => {
+      const r = indexedDB.open('kittycal', 1); r.onsuccess = () => res(r.result);
+    });
+    const pad = (/** @type {number} */ n) => String(n).padStart(2, '0');
+    const d = new Date(); d.setDate(d.getDate() - 14);
+    const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    await new Promise((res) => {
+      const tx = db.transaction(['logs'], 'readwrite');
+      tx.objectStore('logs').put({ date, flow: 'medium', symptoms: ['cramps'], moods: [],
+        discharge: [], activity: [], other: [], sex: [], drive: null, custom: [], bbt: null,
+        weight: null, water: 0, sleep: null, steps: null, pillTaken: false,
+        testPregnancy: null, testOvulation: null, notes: '', checkedIn: true, updated: Date.now() });
+      tx.oncomplete = () => res(undefined);
+    });
+  });
+  await p.reload({ waitUntil: 'networkidle' });
+  await p.waitForTimeout(1500);
+  await p.locator('.sheet-close, [aria-label*="Close"]').first().click();
+  await p.waitForTimeout(500);
+
+  await p.locator('[data-tab="calendar"]').click();
+  await p.waitForTimeout(700);
+
+  // Last month, so these are days that have actually happened.
+  await p.locator('[aria-label="Previous month"]').click();
+  await p.waitForTimeout(600);
+  await p.locator('.cal-day, .cal-cell').filter({ hasText: /^10$/ }).first().click();
+  await p.waitForTimeout(700);
+  check(await p.locator('.checkin-step').count() > 0,
+    'an unanswered day from weeks ago gets the three questions');
+  const asked = await p.locator('.checkin-title').innerText();
+  check(/Jul|Jun|May|Apr|Mar|Feb|Jan|Aug|Sep|Oct|Nov|Dec/.test(asked),
+    'and names the day it is asking about', asked);
+
+  await p.locator('.sheet-close, [aria-label*="Close"]').first().click();
+  await p.waitForTimeout(600);
+  await p.locator('[aria-label="Next month"]').click();
+  await p.waitForTimeout(600);
+
+  const logged = await p.evaluate(() => {
+    const d = new Date(); d.setDate(d.getDate() - 14); return String(d.getDate());
+  });
+  await p.locator('.cal-day, .cal-cell')
+    .filter({ hasText: new RegExp(`^${logged}$`) }).first().click();
+  await p.waitForTimeout(700);
+  check(await p.locator('.checkin-step').count() === 0,
+    'a day already answered goes to the diary instead');
+});
+
 await browser.close();
 
 console.log(`\ndaily loop: ${checks - failures}/${checks} checks passed`);

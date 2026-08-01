@@ -33,6 +33,7 @@ import { predict, upcomingPeriods, upcomingFertile } from '../domain/predict.js'
 import { toastUndo } from '../ui/toast.js';
 import { spotArt } from '../ui/mascot.js';
 import { openLogSheet } from './log.js';
+import { openCheckin } from './checkin.js';
 import * as store from '../state/store.js';
 
 /** How many cycles ahead to draw. */
@@ -338,7 +339,19 @@ function grid({ year, month, today, firstDayOfWeek, periodDays, periodFill, logs
 
 /**
  * Tap behaviour. In edit mode a tap toggles a period day, with undo. Otherwise
- * it opens that day's logging sheet.
+ * it opens whichever of the two logging paths actually fits the day.
+ *
+ * The rule is the one the week strip on Today already uses: a day with nothing
+ * on it gets the three questions, a day that has already been answered gets the
+ * diary. Sending every tap to the diary meant catching up on anything older
+ * than the week strip's seven days cost a wall of collapsed categories to
+ * record what the check-in asks in three taps — which is the friction the
+ * check-in exists to remove, still sitting there one screen over.
+ *
+ * Future dates keep the diary. "Any bleeding today?" is not a question that can
+ * be asked about next Tuesday, and a check-in there would invite marking a
+ * period that has not happened.
+ *
  * @param {DateKey} key
  * @param {boolean} editMode
  */
@@ -355,7 +368,9 @@ function activate(key, editMode) {
   }
 
   store.setUi({ selectedDate: key });
-  openLogSheet(key);
+
+  const unanswered = !store.getState().logs[key] && key <= todayKey();
+  if (unanswered) openCheckin(key); else openLogSheet(key);
 }
 
 /**
