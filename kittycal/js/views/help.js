@@ -42,6 +42,9 @@ export function openHelp() {
           'the day as a period day; spotting does not, because it means ' +
           'bleeding outside a period and treating it as day one would throw ' +
           'your cycle lengths off.'),
+        p('The symptoms it offers are the ones you use most, including any you ' +
+          'added yourself, so the list stops being generic within a couple of ' +
+          'weeks of use.'),
         p('Those three are not a random selection. They are exactly what every ' +
           'other screen is built from: bleeding drives all the predictions, ' +
           'mood is the whole of the mood-by-phase chart, and symptoms are the ' +

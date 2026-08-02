@@ -946,16 +946,7 @@ function selectionCount(cat, draft) {
 function commit(date, draft, before) {
   const settings = store.getState().settings;
 
-  // Remember what she picked so those chips surface first next time.
-  const picked = [
-    ...draft.symptoms, ...draft.moods, ...draft.discharge,
-    ...draft.activity, ...draft.other, ...draft.sex,
-  ];
-  if (picked.length) {
-    const recent = [...new Set([...picked.reverse(), ...settings.recentChips])].slice(0, 24);
-    store.updateSettings({ recentChips: recent });
-  }
-
+  store.rememberPicks(draft);
   store.putLog(draft);
   closeSheet();
 

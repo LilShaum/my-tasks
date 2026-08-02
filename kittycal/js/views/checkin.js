@@ -225,6 +225,10 @@ export function openCheckin(date = todayKey()) {
     // a day she never opened the app, and storage prunes it away.
     draft.checkedIn = true;
 
+    // Same bookkeeping the diary does on Apply. Without it the check-in's own
+    // symptom list could never learn from the taps it collects.
+    store.rememberPicks(draft);
+
     // Nothing is celebrated until it is actually on the disk. Saying "checked
     // in" over a write that failed is worse than the failure: she would not
     // know to do it again.
@@ -319,15 +323,28 @@ export function openCheckin(date = todayKey()) {
 
   /** @param {() => boolean} stale */
   function symptomStep(stale) {
+    const { recentChips, customSymptoms } = store.getState().settings;
+
+    const builtIn = new Set(
+      CATEGORIES.find((c) => c.id === 'symptoms')?.options.map((o) => o.id) ?? [],
+    );
+    /*
+      Her own named symptoms count too.
+
+      Anything she went to the trouble of creating is, by definition, something
+      she cares about — and it was the one thing the fast path could never
+      offer, so logging it always meant opening the full diary. They live in a
+      different field on the log, which is the only reason this needs to know
+      the difference at all.
+    */
+    const custom = new Set(customSymptoms);
+
     // Her own recent picks first, then the standard list behind them.
     const ids = [];
-    for (const id of [...store.getState().settings.recentChips, ...DEFAULT_CHIPS,
-                      ...CHECKIN_SYMPTOMS]) {
+    for (const id of [...recentChips, ...DEFAULT_CHIPS, ...CHECKIN_SYMPTOMS]) {
       if (ids.length >= 8) break;
       if (ids.includes(id)) continue;
-      const inSymptoms = CATEGORIES
-        .find((c) => c.id === 'symptoms')?.options.some((o) => o.id === id);
-      if (inSymptoms) ids.push(id);
+      if (builtIn.has(id) || custom.has(id)) ids.push(id);
     }
 
     return question({
@@ -335,19 +352,28 @@ export function openCheckin(date = todayKey()) {
       title: 'Anything bothering you?',
       hint: 'Whatever your body is doing today.',
       multi: true,
-      current: () => draft.symptoms,
-      options: ids.map((id) => ({
-        id,
-        label: labelFor('symptoms', id),
-        selected: draft.symptoms.includes(id),
-        onPick: () => toggle(draft.symptoms, id, (l) => { draft.symptoms = l; }),
-      })),
+      current: () => [...draft.symptoms, ...draft.custom],
+      options: ids.map((id) => {
+        // Custom symptoms are stored as their own text, so the id is the label.
+        const isCustom = custom.has(id);
+        return {
+          id,
+          label: isCustom ? id : labelFor('symptoms', id),
+          selected: (isCustom ? draft.custom : draft.symptoms).includes(id),
+          onPick: () => (isCustom
+            ? toggle(draft.custom, id, (l) => { draft.custom = l; })
+            : toggle(draft.symptoms, id, (l) => { draft.symptoms = l; })),
+        };
+      }),
       lastStep: true,
       onNext: next,
       onMore: () => {
         // Straight into the full diary, carrying everything answered so far so
         // nothing has to be re-entered.
         draft.checkedIn = true;
+        // Learned from here too: the answers are already being stored, so not
+        // remembering them would depend on her going on to tap Apply.
+        store.rememberPicks(draft);
         // Not awaited: the diary is opening on the same draft, and she will
         // Apply there. A failure surfaces as a toast either way.
         void store.putLog(draft);
