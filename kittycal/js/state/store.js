@@ -230,6 +230,29 @@ export function getLog(date) {
 }
 
 /**
+ * Remember what she picked, so those chips surface first next time.
+ *
+ * A store action rather than something each view does for itself, because it
+ * was the latter and the two logging paths quietly disagreed: the diary
+ * recorded her picks and the check-in did not. Since the check-in is how most
+ * days get logged, the "what you log most" list it reads from stayed empty
+ * forever — the personalisation existed and never fired for the main journey.
+ * One implementation, called from both, cannot drift like that again.
+ *
+ * @param {DayLog} log
+ */
+export function rememberPicks(log) {
+  const picked = [
+    ...log.symptoms, ...log.moods, ...log.discharge,
+    ...log.activity, ...log.other, ...log.sex,
+  ];
+  if (!picked.length) return;
+  // Reversed so the most recently chosen ends up nearest the front.
+  const recent = [...new Set([...picked.reverse(), ...state.settings.recentChips])].slice(0, 24);
+  updateSettings({ recentChips: recent });
+}
+
+/**
  * Write a log. Flow changes are mirrored into `periodDays` so that marking
  * bleeding in the diary and marking a period on the calendar are the same
  * act — there's no way to get the two out of step.

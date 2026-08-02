@@ -759,6 +759,111 @@ await withPage(async (p) => {
     `${dayBefore} -> ${dayAfter}`);
 });
 
+/* ── 15. The check-in has to teach the app ──────────────────────────────
+   The diary remembers what she picked so those chips surface first next time.
+   The check-in read that list and never wrote to it — so for someone who only
+   ever uses the check-in, which is the entire design intent, the list stayed
+   empty forever and the personalisation never fired at all. */
+console.log('\nlearning from what she taps');
+await withPage(async (p) => {
+  await p.goto(BASE, { waitUntil: 'networkidle' });
+  await seed(p, true);   // no recentChips in the seeded settings
+  await p.reload({ waitUntil: 'networkidle' });
+  await p.waitForTimeout(1500);
+
+  const chips = () => p.evaluate(async () => {
+    const db = await new Promise((res) => {
+      const r = indexedDB.open('kittycal', 1); r.onsuccess = () => res(r.result);
+    });
+    return new Promise((res) => {
+      const tx = db.transaction(['meta'], 'readonly');
+      const g = tx.objectStore('meta').get('settings');
+      g.onsuccess = () => res(g.result.value.recentChips ?? []);
+    });
+  });
+
+  check((await chips()).length === 0, 'nothing remembered to start with');
+
+  await p.locator('.checkin-option', { hasText: 'No bleeding' }).click();
+  await p.waitForTimeout(300);
+  await p.locator('.checkin-option', { hasText: 'Anxious' }).click();
+  await p.waitForTimeout(200);
+  await p.locator('.checkin-next').click();
+  await p.waitForTimeout(300);
+  await p.locator('.checkin-option', { hasText: 'Backache' }).click();
+  await p.waitForTimeout(200);
+  await p.locator('.checkin-next').click();
+  await p.waitForTimeout(1400);
+
+  const after = await chips();
+  check(after.includes('anxious') && after.includes('backache'),
+    'the check-in records what she picked', JSON.stringify(after));
+
+  await p.locator('.log-cta button', { hasText: 'Add more' }).click();
+  await p.waitForTimeout(900);
+  const quick = await p.locator('.chip-row').first().innerText().catch(() => '');
+  check(/Anxious/.test(quick) && /Backache/.test(quick),
+    'and the diary surfaces them first', quick.replace(/\n/g, ' '));
+});
+
+/* ── 16. Her own named symptoms belong in the fast path ─────────────────
+   Anything she went to the trouble of creating is by definition something she
+   cares about, and it was the one thing the check-in could never offer — so
+   logging it always meant opening the full diary. They live in a different
+   field on the log, which is the only reason the check-in has to know the
+   difference at all. */
+console.log('\na symptom she named herself');
+await withPage(async (p) => {
+  await p.goto(BASE, { waitUntil: 'networkidle' });
+  await seed(p, true);
+  await p.evaluate(async () => {
+    const db = await new Promise((res) => {
+      const r = indexedDB.open('kittycal', 1); r.onsuccess = () => res(r.result);
+    });
+    const settings = await new Promise((res) => {
+      const tx = db.transaction(['meta'], 'readonly');
+      const g = tx.objectStore('meta').get('settings');
+      g.onsuccess = () => res(g.result.value);
+    });
+    settings.customSymptoms = ['PMS rage'];
+    settings.recentChips = ['PMS rage', 'cramps'];
+    await new Promise((res) => {
+      const tx = db.transaction(['meta'], 'readwrite');
+      tx.objectStore('meta').put({ key: 'settings', value: settings });
+      tx.oncomplete = () => res(undefined);
+    });
+  });
+  await p.reload({ waitUntil: 'networkidle' });
+  await p.waitForTimeout(1500);
+
+  await p.locator('.checkin-option', { hasText: 'No bleeding' }).click();
+  await p.waitForTimeout(300);
+  await p.locator('.checkin-next').click();
+  await p.waitForTimeout(400);
+
+  const first = await p.locator('.checkin-option').first().innerText();
+  check(first.trim() === 'PMS rage', 'it is offered, and first', first.trim());
+
+  await p.locator('.checkin-option', { hasText: 'PMS rage' }).click();
+  await p.waitForTimeout(200);
+  await p.locator('.checkin-next').click();
+  await p.waitForTimeout(1400);
+
+  const stored = await p.evaluate(async () => {
+    const db = await new Promise((res) => {
+      const r = indexedDB.open('kittycal', 1); r.onsuccess = () => res(r.result);
+    });
+    return new Promise((res) => {
+      const tx = db.transaction(['logs'], 'readonly');
+      const g = tx.objectStore('logs').getAll();
+      g.onsuccess = () => res(g.result[0]);
+    });
+  });
+  check(stored.custom.includes('PMS rage') && stored.symptoms.length === 0,
+    'and stored in the custom field, not mixed in with the built-in ones',
+    JSON.stringify({ custom: stored.custom, symptoms: stored.symptoms }));
+});
+
 await browser.close();
 
 console.log(`\ndaily loop: ${checks - failures}/${checks} checks passed`);
