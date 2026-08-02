@@ -512,3 +512,47 @@ test('the phase stops claiming luteal once badly overdue', () => {
   // someone with four cycles logged must not tell her to log a period first.
   assert.notEqual(build(28 + 30).summary, PHASES.unknown.summary);
 });
+
+/* ── Phases under hormonal contraception ─────────────────────────────────
+   The app refuses to predict ovulation on a hormonal method, because it is not
+   happening and a prediction would be worse than nothing. The phase copy has to
+   follow the same logic: naming a follicular or ovulatory phase states as fact
+   the very thing the fertility rule exists to avoid claiming. */
+
+test('hormonal contraception suppresses the phase narrative, not the bleeding', () => {
+  const today = '2026-07-20';
+  const days = [];
+  for (let c = 3; c >= 0; c--) {
+    const start = addDays(today, -14 - c * 28);
+    for (let i = 0; i < 5; i++) days.push(addDays(start, i));
+  }
+  const periodDays = new Set(days);
+  const cycles = buildCycles(periodDays);
+
+  const on = predict({ periodDays, settings: { ...defaultSettings(), birthControl: 'pill-combined' }, today });
+  const off = predict({ periodDays, settings: defaultSettings(), today });
+
+  assert.equal(on.onHormonal, true);
+  assert.equal(on.showFertility, false, 'fertility already hidden');
+
+  const phaseOn = phaseFor({ date: today, cycles, prediction: on });
+  const phaseOff = phaseFor({ date: today, cycles, prediction: off });
+
+  assert.equal(phaseOn.id, 'suppressed');
+  assert.doesNotMatch(phaseOn.summary, /egg/i, 'must not describe ovulation');
+  assert.match(phaseOff.summary, /egg/i, 'but it still does off the pill');
+
+  // A day she actually bled is still her bleeding, whatever the method.
+  const bleedDay = addDays(today, -14);
+  assert.equal(phaseFor({ date: bleedDay, cycles, prediction: on }).id, 'menstrual');
+});
+
+test('every phase heading reads as a heading on its own', () => {
+  // Two of these are not phases at all, and the view used to append the word:
+  // "Not enough data phase".
+  for (const phase of Object.values(PHASES)) {
+    assert.ok(phase.heading, `${phase.id} has a heading`);
+    assert.doesNotMatch(phase.heading, /data phase|date phase/,
+      `${phase.id} heading reads badly`);
+  }
+});

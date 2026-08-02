@@ -236,10 +236,17 @@ function recapCard(recap) {
       ]),
     ]),
     el('ul', { class: 'recap-lines' }, lines.map((line) => el('li', {}, [line]))),
-    // Outside the list: it counts how much was logged rather than reporting
-    // something that happened, so bulleting it alongside the findings gave it
-    // a weight it does not have.
-    el('p', { class: 'hint-sm recap-foot', text:
+    /*
+      Outside the list: it counts how much was logged rather than reporting
+      something that happened, so bulleting it alongside the findings gave it a
+      weight it does not have.
+
+      Silent at zero. "You logged something on 0 days of it" is the app opening
+      a summary of her cycle by telling her she did not use it — on precisely
+      the cycle where she was least inclined to, and where the recap has least
+      to offer anyway. There is no version of that sentence worth showing.
+    */
+    recap.daysLogged > 0 && el('p', { class: 'hint-sm recap-foot', text:
       `You logged something on ${plural(recap.daysLogged, 'day')} of it.` }),
   ]);
 }
@@ -315,7 +322,7 @@ function phaseLine(phase) {
         style: { background: `var(${phase.token})` },
         'aria-hidden': 'true',
       }),
-      el('h3', { text: `${phase.name} phase` }),
+      el('h3', { text: phase.heading }),
     ]),
     el('p', { class: 'hint', text: phase.summary }),
   ]);
