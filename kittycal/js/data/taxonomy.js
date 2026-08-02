@@ -340,6 +340,35 @@ const BY_ID = new Map(
 );
 
 /**
+ * Which category an option id belongs to, for the places that have to treat
+ * kinds of observation differently.
+ *
+ * The doctor report is the reason this exists: it was listing moods under
+ * "Recurring symptoms", so a clinician read "Happy — 3 of 3 cycles" as a
+ * presenting complaint. Both are worth reporting; they are not the same thing.
+ *
+ * @type {Map<string, string>}
+ */
+const CATEGORY_BY_ID = new Map(
+  CATEGORIES
+    .filter((c) => !SCALE_CATEGORIES.has(c.id))
+    .flatMap((c) => c.options
+      .filter((o) => o.id !== 'none')
+      .map((o) => /** @type {[string, string]} */ ([o.id, c.id]))),
+);
+
+/**
+ * @param {string} optionId
+ * @returns {string|null} category id, or null for anything she named herself
+ */
+export function categoryOf(optionId) {
+  return CATEGORY_BY_ID.get(optionId) ?? null;
+}
+
+/** Moods are reported separately from physical symptoms. @param {string} id */
+export const isMood = (id) => CATEGORY_BY_ID.get(id) === 'moods';
+
+/**
  * Display label for an option id, without knowing which category it came from.
  *
  * Anything derived from a `DayLog` — patterns, recaps, the doctor report —

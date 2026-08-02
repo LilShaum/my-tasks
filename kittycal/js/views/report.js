@@ -19,7 +19,7 @@ import { plural } from '../utils/fmt.js';
 import { buildCycles, cycleLengths, periodLengths, summarize } from '../domain/cycles.js';
 import { predict } from '../domain/predict.js';
 import { detectPatterns, symptomFrequency, daysLogged } from '../domain/stats.js';
-import { labelFor, labelOf } from '../data/taxonomy.js';
+import { labelFor, labelOf, isMood } from '../data/taxonomy.js';
 import * as acog from '../domain/acog.js';
 import * as store from '../state/store.js';
 
@@ -109,12 +109,22 @@ function buildReport() {
         : el('p', { text: 'No cycles recorded in this period.' }),
     ]),
 
-    section('Recurring symptoms', [
-      // `recent`, not `cycles`: the logs passed in are limited to the reported
-      // window, so counting them against all-time cycles would put a smaller
-      // numerator over a larger denominator and understate every pattern.
-      ...recurringSection(windowLogs, recent),
-    ]),
+    /*
+      Physical symptoms and mood, reported separately.
+
+      They were one table headed "Recurring symptoms", so a clinician read
+      "Happy — 3 of 3 cycles" as a presenting complaint sitting alongside
+      cramps. Both are worth putting in front of a doctor; they are not the
+      same kind of observation, and a report that muddles them reads as
+      unserious about the ones that matter.
+
+      `recent`, not `cycles`: the logs passed in are limited to the reported
+      window, so counting them against all-time cycles would put a smaller
+      numerator over a larger denominator and understate every pattern.
+    */
+    section('Recurring symptoms', recurringSection(windowLogs, recent, 'symptoms')),
+
+    section('Mood', recurringSection(windowLogs, recent, 'moods')),
 
     section('Outside typical ranges', [
       flags.length
@@ -140,13 +150,17 @@ function buildReport() {
 /**
  * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
  * @param {import('../domain/cycles.js').Cycle[]} cycles
+ * @param {'symptoms'|'moods'} kind  moods are reported in their own section
  */
-function recurringSection(logs, cycles) {
-  const patterns = detectPatterns(logs, cycles, 12);
-  const frequency = symptomFrequency(logs).slice(0, 12);
+function recurringSection(logs, cycles, kind) {
+  const wanted = (/** @type {string} */ id) => (kind === 'moods' ? isMood(id) : !isMood(id));
 
+  const patterns = detectPatterns(logs, cycles, 40).filter((p) => wanted(p.id)).slice(0, 12);
+  const frequency = symptomFrequency(logs).filter(({ id }) => wanted(id)).slice(0, 12);
+
+  const noun = kind === 'moods' ? 'moods' : 'symptoms';
   if (!frequency.length) {
-    return [el('p', { text: 'No symptoms logged in this period.' })];
+    return [el('p', { text: `No ${noun} logged in this period.` })];
   }
 
   /** @type {Node[]} */
@@ -160,7 +174,9 @@ function recurringSection(logs, cycles) {
       patterns.map((pattern) => [
         labelOf(pattern.id),
         `${pattern.cyclesWith} of ${pattern.cyclesTotal}`,
-        pattern.peakDays.length ? `day ${pattern.peakDays.slice(0, 3).join(', ')}` : '—',
+        // Blank rather than a guess: `peakDays` is empty unless the day
+        // genuinely recurs, so there is nothing honest to put here.
+        pattern.peakDays.length ? `day ${pattern.peakDays.join(', ')}` : 'no particular day',
       ]),
       ['What was logged', 'Cycles affected', 'Typical cycle day'],
     ));

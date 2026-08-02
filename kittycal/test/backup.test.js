@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { buildExport, toJSON, parseImport, exportFilename, EXPORT_VERSION } from '../js/storage/backup.js';
-import { emptyLog, defaultSettings, normalizeLog } from '../js/domain/model.js';
+import { emptyLog, defaultSettings, normalizeLog, normalizeSettings } from '../js/domain/model.js';
 
 /** A state object with a bit of everything in it. */
 function sampleState() {
@@ -191,4 +191,44 @@ test('an unknown flow value falls back to none', () => {
 
 test('the export filename carries the date', () => {
   assert.match(exportFilename(), /^kittycal-\d{4}-\d{2}-\d{2}\.json$/);
+});
+
+/* ── Settings survive the round trip ──────────────────────────────────────
+   `normalizeSettings` decides whether an incoming value is acceptable by
+   comparing its type against the default's. That silently destroys every
+   field whose default is null — `typeof null` is 'object', so no real value
+   ever matches — and it runs on every app start, not just on import.
+
+   `birthYear` was the casualty: asked for during setup, discarded seconds
+   later, and printed on the doctor report where it therefore never appeared.
+   This asserts the whole class rather than the one field, so the next
+   nullable setting cannot land the same way. */
+
+test('every setting survives normalisation', () => {
+  const populated = {
+    ...defaultSettings(),
+    mode: 'cycle', theme: 'kuromi', colorMode: 'dark',
+    avgCycleLength: 31, avgPeriodLength: 6, lutealLength: 13,
+    birthControl: 'iud-copper', birthYear: 1998, name: 'Sam',
+    firstDayOfWeek: 0, unitTemp: 'F', unitWeight: 'lb', unitWater: 'oz',
+    lastBackup: '2026-07-01', recapSeen: '2026-06-01', lastBackupAt: 1750000000000,
+    backupSnoozed: '2026-05-01', checkinSkipped: '2026-08-01',
+    onboarded: true, disclaimerAck: true,
+    customSymptoms: ['PMS rage'], recentChips: ['cramps'],
+    showFertility: false, schemaVersion: 1,
+  };
+
+  const out = normalizeSettings(structuredClone(populated));
+
+  for (const key of Object.keys(populated)) {
+    assert.deepEqual(out[key], populated[key], `"${key}" was not preserved`);
+  }
+});
+
+test('a nonsense birth year is refused rather than kept', () => {
+  assert.equal(normalizeSettings({ birthYear: 1200 }).birthYear, null);
+  assert.equal(normalizeSettings({ birthYear: 3000 }).birthYear, null);
+  assert.equal(normalizeSettings({ birthYear: 'nineteen' }).birthYear, null);
+  assert.equal(normalizeSettings({ birthYear: NaN }).birthYear, null);
+  assert.equal(normalizeSettings({}).birthYear, null, 'absent stays absent');
 });

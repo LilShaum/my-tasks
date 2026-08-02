@@ -337,3 +337,56 @@ test('consistency ignores anything older than the window', () => {
   for (let i = 0; i < 90; i += 1) logs[addDays('2026-06-30', -i)] = emptyLog('x');
   assert.equal(loggingConsistency(logs, '2026-06-30', addDays), CONSISTENCY_WINDOW);
 });
+
+/* ── Peak days ────────────────────────────────────────────────────────────
+   The doctor report prints these as "typical cycle day", so a peak that is
+   really a coincidence becomes a finding in a clinical document. */
+
+test('a symptom that lands on the same day every cycle reports that day', () => {
+  const periodDays = new Set();
+  /** @type {Record<string, any>} */
+  const logs = {};
+  for (let c = 0; c < 4; c += 1) {
+    const start = addDays('2026-01-01', c * 28);
+    for (let i = 0; i < 5; i += 1) periodDays.add(addDays(start, i));
+    // Cramps on day 2 of every single cycle.
+    const key = addDays(start, 1);
+    logs[key] = { ...emptyLog(key), symptoms: ['cramps'] };
+  }
+  const p = symptomPattern('cramps', logs, buildCycles(periodDays));
+  assert.deepEqual(p.peakDays, [2], 'a real peak still comes through');
+});
+
+test('scattered one-offs do not become a typical day', () => {
+  const periodDays = new Set();
+  /** @type {Record<string, any>} */
+  const logs = {};
+  for (let c = 0; c < 4; c += 1) {
+    const start = addDays('2026-01-01', c * 28);
+    for (let i = 0; i < 5; i += 1) periodDays.add(addDays(start, i));
+    // A different day each cycle: never twice on the same one.
+    const key = addDays(start, c * 3 + 1);
+    logs[key] = { ...emptyLog(key), symptoms: ['headache'] };
+  }
+  const p = symptomPattern('headache', logs, buildCycles(periodDays));
+  assert.equal(p.cyclesWith, p.cyclesTotal, 'it did happen in every complete cycle');
+  assert.deepEqual(p.peakDays, [], 'but on no particular day');
+});
+
+test('a peak spread across too many days is not a peak', () => {
+  const periodDays = new Set();
+  /** @type {Record<string, any>} */
+  const logs = {};
+  for (let c = 0; c < 4; c += 1) {
+    const start = addDays('2026-01-01', c * 28);
+    for (let i = 0; i < 5; i += 1) periodDays.add(addDays(start, i));
+    // Days 1-6 every cycle: all six tie at four occurrences, so naming them
+    // all as "typical" would be naming most of the first week.
+    for (let d = 0; d < 6; d += 1) {
+      const key = addDays(start, d);
+      logs[key] = { ...emptyLog(key), symptoms: ['bloating'] };
+    }
+  }
+  const p = symptomPattern('bloating', logs, buildCycles(periodDays));
+  assert.deepEqual(p.peakDays, [], 'six joint-first days is not a typical day');
+});
