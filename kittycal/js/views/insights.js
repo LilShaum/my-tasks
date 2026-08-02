@@ -21,7 +21,7 @@ import {
 import { predict, detectThermalShift } from '../domain/predict.js';
 import { phaseFor, PHASES } from '../domain/phases.js';
 import {
-  detectPatterns, symptomPattern, series, bbtForCycle, daysLogged, loggingStreak,
+  detectPatterns, symptomPattern, series, bbtForCycle, daysLogged, loggingConsistency,
   moodByPhase,
 } from '../domain/stats.js';
 import { labelOf } from '../data/taxonomy.js';
@@ -71,14 +71,22 @@ export function renderInsights(host) {
  */
 function overviewCard(logs, cycles, lengths, today) {
   const stats = summarize(lengths);
-  const streak = loggingStreak(logs, today, addDays);
+  /*
+    Consistency over a window, not a streak.
+
+    A streak resets to zero the first time she misses a day, and this card is
+    the last place that should be showing her a zero — its job is to make the
+    history feel worth adding to. A count over the last thirty days moves by
+    one when she misses a day and moves back when she catches up.
+  */
+  const recent = loggingConsistency(logs, today, addDays);
 
   return el('div', { class: 'card' }, [
     el('h2', { text: 'Your history' }),
     el('div', { class: 'stat-row' }, [
       stat('Cycles', String(cycles.length), cycles.length === 1 ? 'logged' : 'logged'),
       stat('Days', String(daysLogged(logs)), 'tracked'),
-      stat('Streak', String(streak), streak === 1 ? 'day' : 'days'),
+      stat('Last 30 days', String(recent), recent === 1 ? 'day logged' : 'days logged'),
     ]),
     stats.mean != null && el('p', { class: 'hint-sm', text:
       `Average cycle ${Math.round(stats.mean)} days, ` +

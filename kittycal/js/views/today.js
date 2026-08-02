@@ -677,6 +677,25 @@ function lateCard(prediction) {
       `Expected around ${prediction.nextStart ? fmtDayMonth(prediction.nextStart) : '—'}. ` +
       'Cycles shift for all sorts of ordinary reasons — stress, travel, illness, ' +
       'a change in sleep. Kittycal will update once you log your next period.' }),
+
+    /*
+      The card said "will update once you log your next period" and gave her no
+      way to do it — a dead end at the one moment the app is actively waiting
+      on the single most important thing it records.
+
+      It opens the check-in rather than marking the day outright. One tap would
+      be faster, but it would have to invent an intensity she has not given,
+      and this is exactly the field where putting words in her mouth is worst.
+      The check-in opens on "Any bleeding today?", so the answer is the very
+      next tap.
+    */
+    el('button', {
+      type: 'button',
+      class: 'btn',
+      style: { marginTop: 'var(--sp-3)' },
+      onclick: () => { haptic(); openCheckin(todayKey()); },
+    }, ['It started today']),
+
     confidenceLine(prediction),
   ]);
 }

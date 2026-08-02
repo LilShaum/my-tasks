@@ -253,8 +253,12 @@ export function moodByPhase(logs, cycles, lutealDays) {
  * Consecutive days logged, ending today or yesterday.
  *
  * Yesterday counts so the streak doesn't read as broken first thing in the
- * morning before she's opened the app. Streaks reward logging and never
- * penalise a gap — there is no "you lost your streak" anywhere in this app.
+ * morning before she's opened the app.
+ *
+ * Only ever used to mark a milestone that has been *reached* — never rendered
+ * as a running total, because a streak shown continuously is a number that
+ * spends most of its life telling her she failed. See `loggingConsistency`,
+ * which is what the screens display.
  *
  * @param {Record<DateKey, DayLog>} logs
  * @param {DateKey} today
@@ -271,6 +275,37 @@ export function loggingStreak(logs, today, addDaysFn) {
     cursor = addDaysFn(cursor, -1);
   }
   return streak;
+}
+
+/** How far back the consistency figure looks. */
+export const CONSISTENCY_WINDOW = 30;
+
+/**
+ * How many of the last thirty days have something logged.
+ *
+ * This is what the screens show, in place of a running streak, and the reason
+ * is not cosmetic. A streak resets to zero the first time she misses a day,
+ * and a prominent zero is the app telling her she failed — on a screen whose
+ * whole job is to make her want to keep going. It is a well-documented way to
+ * lose someone: one slip, and the app becomes a source of guilt rather than
+ * something worth opening, so it gets deleted rather than restarted.
+ *
+ * A count over a window degrades gently instead. Missing a day moves it by
+ * one, catching up moves it back, and it only reads as zero if she genuinely
+ * logged nothing for a month — which is a true statement rather than a
+ * punishment for one bad Tuesday.
+ *
+ * @param {Record<DateKey, DayLog>} logs
+ * @param {DateKey} today
+ * @param {(key: DateKey, days: number) => DateKey} addDaysFn
+ * @returns {number} 0..CONSISTENCY_WINDOW
+ */
+export function loggingConsistency(logs, today, addDaysFn) {
+  let count = 0;
+  for (let i = 0; i < CONSISTENCY_WINDOW; i += 1) {
+    if (logs[addDaysFn(today, -i)]) count += 1;
+  }
+  return count;
 }
 
 /**
