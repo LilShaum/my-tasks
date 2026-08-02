@@ -11,7 +11,8 @@ import assert from 'node:assert/strict';
 
 import {
   loggedIds, symptomFrequency, symptomPattern, detectPatterns, series,
-  loggingStreak, daysLogged, bbtForCycle, moodByPhase,
+  loggingStreak, loggingConsistency, CONSISTENCY_WINDOW, daysLogged, bbtForCycle,
+  moodByPhase,
 } from '../js/domain/stats.js';
 import { buildCycles } from '../js/domain/cycles.js';
 import { phaseInCycle } from '../js/domain/phases.js';
@@ -293,4 +294,46 @@ test('moodByPhase drops the "none" mood', () => {
   const cycle = cycles[1];
   const out = moodByPhase(moodLogs({ [cycle.start]: ['none'] }), cycles, 14);
   assert.equal(out.get('menstrual')?.moods.length, 0);
+});
+
+/* ── Consistency, not streaks ──────────────────────────────────────────────
+   A streak resets to zero the first time she misses a day, and a prominent
+   zero on the screen whose job is to make the history feel worth adding to is
+   how an app becomes a source of guilt. Consistency degrades by one instead. */
+
+test('consistency counts logged days in the window', () => {
+  /** @type {Record<string, any>} */
+  const logs = {};
+  for (let i = 0; i < 30; i += 1) logs[addDays('2026-06-30', -i)] = emptyLog('x');
+  assert.equal(loggingConsistency(logs, '2026-06-30', addDays), 30);
+});
+
+test('one missed day costs consistency exactly one', () => {
+  /** @type {Record<string, any>} */
+  const logs = {};
+  for (let i = 0; i < 30; i += 1) logs[addDays('2026-06-30', -i)] = emptyLog('x');
+  delete logs[addDays('2026-06-30', -5)];
+
+  assert.equal(loggingConsistency(logs, '2026-06-30', addDays), 29);
+  // The same gap takes a streak to zero, which is the behaviour being avoided.
+  assert.equal(loggingStreak(logs, '2026-06-30', addDays), 5);
+});
+
+test('a gap yesterday does not wipe the figure out', () => {
+  /** @type {Record<string, any>} */
+  const logs = {};
+  for (let i = 0; i < 30; i += 1) logs[addDays('2026-06-30', -i)] = emptyLog('x');
+  delete logs[addDays('2026-06-30', -1)];
+  delete logs['2026-06-30'];
+
+  // Two days off after a month of logging is 28, not nothing.
+  assert.equal(loggingConsistency(logs, '2026-06-30', addDays), 28);
+  assert.equal(loggingStreak(logs, '2026-06-30', addDays), 0);
+});
+
+test('consistency ignores anything older than the window', () => {
+  /** @type {Record<string, any>} */
+  const logs = {};
+  for (let i = 0; i < 90; i += 1) logs[addDays('2026-06-30', -i)] = emptyLog('x');
+  assert.equal(loggingConsistency(logs, '2026-06-30', addDays), CONSISTENCY_WINDOW);
 });

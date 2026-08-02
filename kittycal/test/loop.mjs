@@ -864,6 +864,77 @@ await withPage(async (p) => {
     JSON.stringify({ custom: stored.custom, symptoms: stored.symptoms }));
 });
 
+/* ── 17. The moment the app is waiting on ──────────────────────────────
+   The late card said "Kittycal will update once you log your next period" and
+   offered no way to do it — a dead end at the one moment the app is actively
+   waiting on the single most important thing it records. */
+console.log('\nlogging a late period from the card that mentions it');
+await withPage(async (p) => {
+  await p.goto(BASE, { waitUntil: 'networkidle' });
+  await p.evaluate(async () => {
+    const db = await new Promise((res, rej) => {
+      const r = indexedDB.open('kittycal', 1);
+      r.onupgradeneeded = () => {
+        const d = r.result;
+        d.createObjectStore('logs', { keyPath: 'date' });
+        d.createObjectStore('meta', { keyPath: 'key' });
+        d.createObjectStore('blobs', { keyPath: 'id' });
+      };
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+    const pad = (/** @type {number} */ n) => String(n).padStart(2, '0');
+    const shift = (/** @type {number} */ n) => {
+      const d = new Date(); d.setDate(d.getDate() + n);
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    };
+    // 28-day cycles with the last period 34 days ago: six days late.
+    const days = [];
+    for (let cy = 4; cy >= 1; cy -= 1) {
+      const s = -34 - ((cy - 1) * 28);
+      for (let i = 0; i < 5; i += 1) days.push(shift(s + i));
+    }
+    await new Promise((res) => {
+      const tx = db.transaction(['meta'], 'readwrite');
+      tx.objectStore('meta').put({ key: 'settings', value: {
+        theme: 'hellokitty', onboarded: true, disclaimerAck: true, avgCycleLength: 28,
+        avgPeriodLength: 5, name: 'Sam', lastBackup: shift(0), lastBackupAt: Date.now(),
+        checkinSkipped: shift(0) } });
+      tx.objectStore('meta').put({ key: 'periodDays', value: days });
+      tx.oncomplete = () => res(undefined);
+    });
+  });
+  await p.reload({ waitUntil: 'networkidle' });
+  await p.waitForTimeout(1500);
+
+  const card = p.locator('#view-today .card').filter({ hasText: 'Your period is late' }).first();
+  check(await card.count() === 1, 'the app says the period is late');
+  check(await card.locator('button', { hasText: 'It started today' }).count() === 1,
+    'and offers a way to say it arrived');
+
+  await card.locator('button', { hasText: 'It started today' }).click();
+  await p.waitForTimeout(800);
+  check(await p.locator('.checkin-title').innerText() === 'Any bleeding today?',
+    'which opens straight on the question that answers it');
+
+  // It must not invent an intensity she never gave.
+  check(await p.locator('.checkin-option[aria-pressed="true"]').count() === 0,
+    'without assuming how heavy it is');
+
+  await p.locator('.checkin-option', { hasText: 'Medium' }).click();
+  await p.waitForTimeout(300);
+  await p.locator('.checkin-next').click();
+  await p.waitForTimeout(300);
+  await p.locator('.checkin-next').click();
+  await p.waitForTimeout(1500);
+
+  check(await p.locator('.ring-eyebrow').innerText() === 'DAY 1',
+    'and the new cycle starts', await p.locator('.ring-eyebrow').innerText());
+  check(await p.locator('#view-today .card')
+    .filter({ hasText: 'Your period is late' }).count() === 0,
+    'the late card is gone');
+});
+
 await browser.close();
 
 console.log(`\ndaily loop: ${checks - failures}/${checks} checks passed`);

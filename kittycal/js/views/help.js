@@ -177,6 +177,13 @@ export function openHelp() {
           'be worse than nothing. Period tracking carries on as normal.'),
       ]),
 
+      section('If your period is late', [
+        p('Kittycal says so plainly and does not speculate about why — cycles ' +
+          'shift for stress, travel, illness, a change in sleep.'),
+        p('"It started today" on that card takes you straight to the bleeding ' +
+          'question, so logging it is two taps from the moment you notice.'),
+      ]),
+
       section('When it goes quiet', [
         p('If your period is later than about two weeks, Kittycal stops naming ' +
           'a phase. It cannot know where you are once its own prediction has ' +
