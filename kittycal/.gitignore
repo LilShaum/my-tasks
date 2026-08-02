@@ -2,6 +2,9 @@
 assets/mascots/*
 !assets/mascots/README.md
 !assets/mascots/.gitkeep
+# Shipped empty so the app's single probe succeeds instead of 404ing for
+# everyone who never adds their own art. Your images beside it stay ignored.
+!assets/mascots/manifest.json
 
 .DS_Store
 node_modules/

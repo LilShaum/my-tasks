@@ -23,6 +23,7 @@ import { nothingRecorded, isBleeding } from '../domain/model.js';
 import { openSheet, closeSheet } from '../ui/sheet.js';
 import { burst } from '../ui/particles.js';
 import { toast } from '../ui/toast.js';
+import { promptSheet } from '../ui/dialog.js';
 import { getTheme } from '../data/themes.js';
 import {
   cToF, fToC, kgToLb, lbToKg, mlToOz, fmtWater, fmtTemp, fmtWeight, round,
@@ -594,18 +595,28 @@ function customSection(draft, settings) {
       type: 'button',
       class: 'chip chip-add',
       text: '+ Add your own',
-      onclick: () => {
-        const name = window.prompt('What would you like to track?')?.trim();
+      onclick: async () => {
+        // Validated in the sheet rather than after it: a native prompt could
+        // only reject the name once it had already closed, which meant
+        // retyping it from scratch.
+        const name = await promptSheet({
+          title: 'Track something of your own',
+          label: 'What would you like to track?',
+          confirmLabel: 'Add it',
+          placeholder: 'Sore feet',
+          maxLength: 40,
+          validate: (v) => {
+            if (!v) return 'Give it a name first.';
+            const existing = store.getState().settings.customSymptoms;
+            if (existing.some((s) => s.toLowerCase() === v.toLowerCase())) {
+              return 'You already track that one.';
+            }
+            return null;
+          },
+        });
         if (!name) return;
-        if (name.length > 40) {
-          toast('That name is a bit long — 40 characters max');
-          return;
-        }
+
         const existing = store.getState().settings.customSymptoms;
-        if (existing.some((s) => s.toLowerCase() === name.toLowerCase())) {
-          toast('You already track that one');
-          return;
-        }
         store.updateSettings({ customSymptoms: [...existing, name] });
         draft.custom.push(name);
         paint();

@@ -152,6 +152,18 @@ async function withPage(fn, { clock = false } = {}) {
     failures += 1;
     console.error(`  FAIL  uncaught page error — ${e.message}`);
   });
+  /*
+    A native dialog anywhere is a regression. `window.confirm` and
+    `window.prompt` are stamped with the origin, truncate their text on a
+    phone, and cannot be themed — so the app asks in its own sheets instead.
+    Playwright blocks forever on an unhandled dialog, which is also how the
+    first audit of these flows appeared to hang.
+  */
+  page.on('dialog', async (d) => {
+    failures += 1;
+    console.error(`  FAIL  native dialog — ${d.message().slice(0, 60)}`);
+    await d.dismiss();
+  });
   try { await fn(page); } finally { await context.close(); }
 }
 

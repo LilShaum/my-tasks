@@ -20,6 +20,7 @@ import { themePicker, setPickerSelection } from '../ui/theme-picker.js';
 import { getTheme } from '../data/themes.js';
 import { applyTheme } from '../ui/theme.js';
 import { toast } from '../ui/toast.js';
+import { confirmSheet } from '../ui/dialog.js';
 import { releaseMascotUrls, mascot } from '../ui/mascot.js';
 import { openMascotPicker } from '../ui/image-picker.js';
 import { openHelp } from './help.js';
@@ -370,9 +371,11 @@ function lockRows() {
             type: 'button', class: 'row',
             onclick: async () => {
               if (lock.enabled) {
-                const ok = window.confirm(
-                  'Turn off the passcode? Kittycal will open straight away from now on.',
-                );
+                const ok = await confirmSheet({
+                  title: 'Turn off the passcode?',
+                  body: ['Kittycal will open straight away from now on.'],
+                  confirmLabel: 'Turn it off',
+                });
                 if (!ok) return;
                 await disableLock();
                 toast('Passcode turned off');
@@ -527,12 +530,17 @@ async function doImport(file) {
     return;
   }
 
-  const confirmed = window.confirm(
-    `This will replace everything currently in Kittycal with the backup:\n\n` +
-    `• ${result.logCount} logged days\n` +
-    `• ${result.periodCount} period days\n\n` +
-    `Your current data will be gone. Continue?`,
-  );
+  const confirmed = await confirmSheet({
+    title: 'Replace everything?',
+    body: [
+      `The backup holds ${plural(result.logCount ?? 0, 'logged day')} and ` +
+      `${plural(result.periodCount ?? 0, 'period day')}.`,
+      'Everything currently in Kittycal is replaced by it, and what is here ' +
+      'now is gone. Export first if you are not sure.',
+    ],
+    confirmLabel: 'Replace with the backup',
+    danger: true,
+  });
   if (!confirmed) return;
 
   await store.replaceAll({
@@ -547,17 +555,27 @@ async function doImport(file) {
 }
 
 async function doErase() {
-  const confirmed = window.confirm(
-    'Erase everything?\n\n' +
-    'Every logged day, every period, your settings and any pictures you added ' +
-    'will be permanently deleted from this device. There is no server copy and ' +
-    'no way to undo this.\n\n' +
-    'Export first if you want to keep a copy.',
-  );
-  if (!confirmed) return;
+  /*
+    One deliberate confirmation, not two.
 
-  const second = window.confirm('Last check — really erase all of it?');
-  if (!second) return;
+    This used to be two `window.confirm` calls back to back. That is not twice
+    the friction — it is the same dismissal reflex twice, and the second one
+    ("Last check — really erase all of it?") taught nothing the first had not
+    already said. A single sheet that states the cost plainly and puts the verb
+    on the button is harder to tap through on autopilot than two OKs.
+  */
+  const confirmed = await confirmSheet({
+    title: 'Erase everything?',
+    body: [
+      'Every logged day, every period, your settings and any pictures you ' +
+      'added are permanently deleted from this device.',
+      'There is no server copy and no undo. Export first if you want to keep ' +
+      'one.',
+    ],
+    confirmLabel: 'Erase everything',
+    danger: true,
+  });
+  if (!confirmed) return;
 
   releaseMascotUrls();
   await repo.eraseEverything();
@@ -568,8 +586,8 @@ async function doErase() {
 }
 
 function privacyNote() {
-  return el('div', { class: 'alert alert-ok', style: { marginTop: 'var(--sp-3)' } }, [
-    el('span', { class: 'alert-icon', text: '♥', 'aria-hidden': 'true' }),
+  return el('div', { class: 'note', style: { marginTop: 'var(--sp-3)' } }, [
+    el('span', { class: 'note-icon', text: '♥', 'aria-hidden': 'true' }),
     el('div', {}, [
       el('strong', { text: 'Nothing here is sent anywhere. ' }),
       'No account, no analytics, no server, and no internet requests at all. ' +
