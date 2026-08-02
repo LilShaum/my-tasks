@@ -935,6 +935,90 @@ await withPage(async (p) => {
     'the late card is gone');
 });
 
+/* ── 18. Someone on hormonal contraception ─────────────────────────────
+   A whole class of user the loop had never been driven as. The app already
+   refuses to predict ovulation on a hormonal method — it is not happening, so a
+   prediction would be worse than nothing — but the phase copy went on saying
+   oestrogen was climbing "as your body prepares an egg", which is the exact
+   claim the fertility rule exists to avoid, stated as fact. */
+console.log('\non hormonal contraception');
+await withPage(async (p) => {
+  await p.goto(BASE, { waitUntil: 'networkidle' });
+  await seed(p, true);
+  await p.evaluate(async () => {
+    const db = await new Promise((res) => {
+      const r = indexedDB.open('kittycal', 1); r.onsuccess = () => res(r.result);
+    });
+    const settings = await new Promise((res) => {
+      const tx = db.transaction(['meta'], 'readonly');
+      const g = tx.objectStore('meta').get('settings');
+      g.onsuccess = () => res(g.result.value);
+    });
+    settings.birthControl = 'pill-combined';
+    await new Promise((res) => {
+      const tx = db.transaction(['meta'], 'readwrite');
+      tx.objectStore('meta').put({ key: 'settings', value: settings });
+      tx.oncomplete = () => res(undefined);
+    });
+  });
+  await p.reload({ waitUntil: 'networkidle' });
+  await p.waitForTimeout(1500);
+  await p.locator('.sheet-close, [aria-label*="Close"]').first().click();
+  await p.waitForTimeout(600);
+
+  const today = await p.locator('#view-today').innerText();
+  check(!/prepares an egg|An egg is released/.test(today),
+    'nothing claims an egg is on its way');
+  check(!/Fertile window/.test(today), 'no fertile window, as before');
+  check(/Between periods/.test(today), 'the phase says what is actually true');
+  check(/Next period/.test(today), 'and period tracking carries on');
+});
+
+/* ── 19. Headings that are not phases ──────────────────────────────────
+   Two of the six phase states are not phases, and the view appended the word
+   regardless: "Not enough data phase". */
+console.log('\nheadings for the not-a-phase states');
+await withPage(async (p) => {
+  await p.goto(BASE, { waitUntil: 'networkidle' });
+  // No history at all beyond one very old period: stale, so no phase is known.
+  await p.evaluate(async () => {
+    const db = await new Promise((res, rej) => {
+      const r = indexedDB.open('kittycal', 1);
+      r.onupgradeneeded = () => {
+        const d = r.result;
+        d.createObjectStore('logs', { keyPath: 'date' });
+        d.createObjectStore('meta', { keyPath: 'key' });
+        d.createObjectStore('blobs', { keyPath: 'id' });
+      };
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+    const pad = (/** @type {number} */ n) => String(n).padStart(2, '0');
+    const shift = (/** @type {number} */ n) => {
+      const d = new Date(); d.setDate(d.getDate() + n);
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    };
+    const days = [];
+    for (const back of [100, 128, 156]) for (let i = 0; i < 5; i += 1) days.push(shift(-back + i));
+    await new Promise((res) => {
+      const tx = db.transaction(['meta'], 'readwrite');
+      tx.objectStore('meta').put({ key: 'settings', value: {
+        theme: 'hellokitty', onboarded: true, disclaimerAck: true, avgCycleLength: 28,
+        avgPeriodLength: 5, name: 'Sam', lastBackup: shift(0), lastBackupAt: Date.now(),
+        checkinSkipped: shift(0) } });
+      tx.objectStore('meta').put({ key: 'periodDays', value: days });
+      tx.oncomplete = () => res(undefined);
+    });
+  });
+  await p.reload({ waitUntil: 'networkidle' });
+  await p.waitForTimeout(1600);
+
+  const today = await p.locator('#view-today').innerText();
+  check(!/data phase|date phase/.test(today), 'no "Not enough data phase"');
+  check(/Worth mentioning to a doctor/.test(today),
+    'and three months without a period still reaches the doctor prompt');
+});
+
 await browser.close();
 
 console.log(`\ndaily loop: ${checks - failures}/${checks} checks passed`);

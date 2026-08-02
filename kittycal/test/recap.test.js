@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 
 import { buildRecap, cluster, RECAP_WINDOW_DAYS } from '../js/domain/recap.js';
 import { buildCycles } from '../js/domain/cycles.js';
-import { addDays } from '../js/utils/date.js';
+import { addDays, range } from '../js/utils/date.js';
 
 /**
  * Period days for cycles of the given lengths, ending with a period that
@@ -220,4 +220,19 @@ test('absences are not occurrences', () => {
   assert.ok(recap);
   assert.deepEqual(recap.notable, [],
     'reliably doing nothing is not a finding');
+});
+
+test('a cycle she logged nothing in still produces a recap', () => {
+  // The view drops the "you logged something on N days" line at zero — a
+  // summary that opens by telling her she did not use the app, on precisely
+  // the cycle where she was least inclined to.
+  const periodDays = new Set([
+    ...range('2026-05-01', '2026-05-05'),
+    ...range('2026-06-01', '2026-06-05'),
+  ]);
+  const recap = buildRecap({
+    cycles: buildCycles(periodDays), logs: {}, today: '2026-06-03',
+  });
+  assert.ok(recap, 'still worth showing the lengths');
+  assert.equal(recap.daysLogged, 0);
 });

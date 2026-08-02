@@ -19,12 +19,15 @@
 import { isPeriodDay } from './cycles.js';
 import { addDays } from '../utils/date.js';
 
-/** @typedef {'menstrual'|'follicular'|'ovulatory'|'luteal'|'unknown'|'overdue'} PhaseId */
+/** @typedef {'menstrual'|'follicular'|'ovulatory'|'luteal'|'unknown'|'overdue'|'suppressed'} PhaseId */
 
 /**
  * @typedef {Object} PhaseInfo
  * @property {PhaseId} id
  * @property {string} name
+ * @property {string} heading   the full headline, because two of these are not
+ *                             phases at all and "Not enough data phase" is what
+ *                             you get from appending the word in the view
  * @property {string} summary   what's happening, plainly
  * @property {string} token     the CSS custom property to colour it with
  */
@@ -34,6 +37,7 @@ export const PHASES = {
   menstrual: {
     id: 'menstrual',
     name: 'Period',
+    heading: 'Your period',
     summary:
       'The lining of your uterus is shedding. Cramps, tiredness and a lower ' +
       'mood are all common in these few days.',
@@ -42,6 +46,7 @@ export const PHASES = {
   follicular: {
     id: 'follicular',
     name: 'Follicular',
+    heading: 'Follicular phase',
     summary:
       'Oestrogen is climbing as your body prepares an egg. Energy and mood ' +
       'often pick up through this stretch.',
@@ -50,6 +55,7 @@ export const PHASES = {
   ovulatory: {
     id: 'ovulatory',
     name: 'Ovulatory',
+    heading: 'Ovulatory phase',
     summary:
       'An egg is released around now. You may notice clearer, stretchier ' +
       'discharge and a higher sex drive. This is the fertile part of the cycle.',
@@ -58,6 +64,7 @@ export const PHASES = {
   luteal: {
     id: 'luteal',
     name: 'Luteal',
+    heading: 'Luteal phase',
     summary:
       'Progesterone rises and then falls if there is no pregnancy. PMS ' +
       'symptoms — sore breasts, bloating, mood shifts — usually show up here.',
@@ -66,6 +73,7 @@ export const PHASES = {
   unknown: {
     id: 'unknown',
     name: 'Not enough data',
+    heading: 'Not enough data yet',
     summary:
       'Log a period and Kittycal can start working out where you are in your ' +
       'cycle.',
@@ -81,9 +89,30 @@ export const PHASES = {
     The copy deliberately does not speculate about why. Naming causes on a
     screen someone opens while waiting for a late period is not this app's job.
   */
+  /*
+    Hormonal contraception, between bleeds.
+
+    The app already refuses to predict ovulation on a hormonal method, on the
+    grounds that it is not happening and a prediction would be worse than
+    nothing. The phase copy did not follow that logic through: it went on
+    telling her that oestrogen was climbing "as your body prepares an egg" and
+    that "an egg is released around now", which is the exact claim the fertility
+    rule exists to avoid making — and it is the reading someone would take at
+    face value, because it is stated as fact rather than prediction.
+  */
+  suppressed: {
+    id: 'suppressed',
+    name: 'Between periods',
+    heading: 'Between periods',
+    summary:
+      'Hormonal contraception stops ovulation, so the usual follicular and ' +
+      'luteal phases do not apply. Bleeding is still tracked as normal.',
+    token: '--line-soft',
+  },
   overdue: {
     id: 'overdue',
     name: 'Past your expected date',
+    heading: 'Past your expected date',
     summary:
       'Your period was expected before now, so Kittycal cannot say which phase ' +
       'you are in. Logging it when it arrives puts everything back on track.',
@@ -172,6 +201,11 @@ export function phaseFor({ date, cycles, prediction }) {
   if (prediction.isLate && (prediction.daysLate ?? 0) > prediction.lutealDays) {
     return PHASES.overdue;
   }
+
+  // Naming follicular, ovulatory or luteal to someone whose ovulation is
+  // suppressed would state as fact the very thing the fertility rule refuses
+  // to predict. The bleeding above is still hers; the cycle around it is not.
+  if (prediction.onHormonal) return PHASES.suppressed;
 
   const { ovulation, fertileWindow, nextStart } = prediction;
 

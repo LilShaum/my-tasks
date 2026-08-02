@@ -86,6 +86,7 @@ export const CYCLE_MAX_CLAMP = 45;
  * @property {number|null} daysUntilPeriod  negative once late
  * @property {number|null} daysLate
  * @property {boolean} isLate
+ * @property {boolean} onHormonal   a method that suppresses ovulation
  * @property {boolean} stale        history too old to predict from
  * @property {number|null} daysSinceStart
  * @property {number|null} cycleDay
@@ -279,6 +280,7 @@ export function predict({ periodDays, settings, today }) {
     fertileWindow,
     fertileWidened,
     showFertility,
+    onHormonal,
     daysUntilPeriod: stale ? null : daysUntilPeriod,
     daysLate,
     isLate,
