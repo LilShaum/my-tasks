@@ -75,8 +75,6 @@ export const CYCLE_MAX_CLAMP = 45;
  * @property {number} avgCycleLength   the number actually used, rounded
  * @property {number} avgPeriodLength
  * @property {Confidence} confidence
- * @property {string} basis            plain-language account of where the
- *                                     number came from, shown in the UI
  * @property {boolean} recalibrated
  * @property {DateKey|null} lastStart
  * @property {DateKey|null} nextStart
@@ -182,7 +180,6 @@ export function predict({ periodDays, settings, today }) {
 
   /* ── Which cycle length do we use? ───────────────────────────────────── */
   let avg = settings.avgCycleLength;
-  let basis = `your stated average of ${settings.avgCycleLength} days`;
   let recalibrated = false;
 
   if (lengths.length >= MIN_CYCLES_FOR_MODEL) {
@@ -190,22 +187,15 @@ export function predict({ periodDays, settings, today }) {
     if (shift.recalibrated && shift.value != null) {
       avg = shift.value;
       recalibrated = true;
-      basis = `your last ${RECALIBRATE_AFTER} cycles — your cycle length has changed and stayed changed`;
     } else {
       const weighted = weightedAverage(lengths);
-      if (weighted != null) {
-        avg = weighted;
-        basis = `your last ${Math.min(WINDOW, lengths.length)} cycles, weighting recent ones more`;
-      }
+      if (weighted != null) avg = weighted;
     }
   } else if (lengths.length > 0) {
     // One or two cycles: blend what we've seen with her stated prior rather
     // than swinging fully onto a single observation.
     const observed = lengths.reduce((a, b) => a + b, 0) / lengths.length;
     avg = (observed + settings.avgCycleLength) / 2;
-    basis = lengths.length === 1
-      ? 'one logged cycle blended with your stated average'
-      : `${lengths.length} logged cycles blended with your stated average`;
   }
 
   avg = clamp(Math.round(avg), CYCLE_MIN_CLAMP, CYCLE_MAX_CLAMP);
@@ -281,7 +271,6 @@ export function predict({ periodDays, settings, today }) {
     // thing on the screen, so staleness overrides however many cycles are on
     // record.
     confidence: stale ? 'none' : confidence,
-    basis,
     recalibrated,
     lastStart,
     nextStart: stale ? null : nextStart,

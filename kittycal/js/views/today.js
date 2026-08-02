@@ -589,9 +589,10 @@ function nextPeriodCard(prediction) {
   return el('div', { class: 'card data-zone' }, [
     el('h3', { text: 'Next period' }),
     el('p', { class: 'big-value num', text: `${fmtDayMonth(start)} – ${fmtDayMonth(end)}` }),
+    // The basis for the estimate is the confidence line's whole job, so saying
+    // it here as well was the same fact twice, two lines apart.
     el('p', { class: 'hint-sm', text:
-      `Estimated ${prediction.avgPeriodLength}-day period, ` +
-      `based on ${prediction.basis}.` }),
+      `Estimated ${prediction.avgPeriodLength}-day period.` }),
     confidenceLine(prediction),
   ]);
 }
@@ -609,13 +610,10 @@ function confidenceLine(prediction) {
   /** @type {Record<string, string>} */
   const copy = {
     none: 'No cycles logged yet, so this is only your stated average.',
-    low: `Low confidence — based on ${plural(prediction.cyclesLogged, 'complete cycle')}. ` +
-      'This will tighten up over the next couple of months.',
+    low: `Low confidence — based on ${plural(prediction.cyclesLogged, 'complete cycle')}.`,
     medium: `Reasonable confidence — based on ${plural(prediction.cyclesLogged, 'complete cycle')}.`,
     high: `Good confidence — based on ${plural(prediction.cyclesLogged, 'complete cycle')}` +
-      (prediction.recalibrated
-        ? ', recently re-anchored because your cycle length changed and stayed changed.'
-        : '.'),
+      (prediction.recalibrated ? ', re-anchored to your new cycle length.' : '.'),
   };
 
   return el('p', {

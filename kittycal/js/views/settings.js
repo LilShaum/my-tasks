@@ -17,7 +17,7 @@ import {
 } from '../ui/reminders.js';
 import { BIRTH_CONTROL, HORMONAL_BIRTH_CONTROL } from '../domain/model.js';
 import { themePicker, setPickerSelection } from '../ui/theme-picker.js';
-import { getTheme, THEMES } from '../data/themes.js';
+import { getTheme } from '../data/themes.js';
 import { applyTheme } from '../ui/theme.js';
 import { toast } from '../ui/toast.js';
 import { releaseMascotUrls, mascot } from '../ui/mascot.js';
@@ -230,10 +230,8 @@ function cycleRows(settings) {
     ]),
 
     el('p', { class: 'hint-sm', style: { marginTop: 'var(--sp-2)' }, text:
-      'The luteal phase is the stretch between ovulation and your period. It is ' +
-      'the most consistent part of the cycle, which is why Kittycal counts ' +
-      'backwards from your next period to estimate ovulation. Fourteen days is ' +
-      'typical; leave it alone unless you have been told otherwise.' }),
+      'Fourteen days is typical. Leave it alone unless you have been told ' +
+      'otherwise.' }),
 
     onHormonal && el('div', { class: 'alert alert-info', style: { marginTop: 'var(--sp-3)' } }, [
       el('span', { class: 'alert-icon', text: 'i', 'aria-hidden': 'true' }),
@@ -272,8 +270,7 @@ function unitRows(settings) {
       }),
     ]),
     el('p', { class: 'hint-sm', style: { marginTop: 'var(--sp-2)' }, text:
-      'Changing a unit only changes how values are displayed. Nothing you have ' +
-      'already logged is converted or rounded.' }),
+      'Only changes how values are shown. Nothing already logged is altered.' }),
   ]);
 }
 
@@ -342,10 +339,8 @@ function reminderRows() {
         el('span', { class: 'alert-icon', text: '!', 'aria-hidden': 'true' }),
         el('div', {}, [
           el('strong', { text: 'These only arrive while you are using Kittycal. ' }),
-          'Apps that notify you out of the blue do it by running a server that ' +
-          'pushes to your phone, and that server would know your cycle. ' +
-          'Kittycal has neither, so a reminder fires when you next open the ' +
-          'app on the day it is due — not before.',
+          'A reminder fires when you next open the app on the day it is due, ' +
+          'not before — there is no server to push one.',
         ]),
       ]),
 
@@ -410,10 +405,8 @@ function lockRows() {
         ]),
 
         el('p', { class: 'hint-sm', style: { marginTop: 'var(--sp-2)' }, text:
-          'The passcode is never stored — only a slow hash of it, so the stored ' +
-          'value is useless on its own. It keeps the app shut to whoever picks ' +
-          'up your phone. It is not encryption: someone determined, with your ' +
-          'unlocked device, could still reach the data underneath.' }),
+          'The code itself is never stored. It keeps the app shut to whoever ' +
+          'picks up your phone, but it is not encryption.' }),
       ]);
     }).catch(() => {});
   };
@@ -579,10 +572,8 @@ function privacyNote() {
     el('span', { class: 'alert-icon', text: '♥', 'aria-hidden': 'true' }),
     el('div', {}, [
       el('strong', { text: 'Nothing here is sent anywhere. ' }),
-      'Kittycal has no account, no analytics and no server. It makes no ' +
-      'internet requests at all — the fonts and every image are part of the app ' +
-      'itself. Everything you log lives in this browser on this device, and the ' +
-      'only copies that exist are the ones you export yourself.',
+      'No account, no analytics, no server, and no internet requests at all. ' +
+      'The only copies of your data are the ones you export yourself.',
     ]),
   ]);
 }
@@ -591,12 +582,8 @@ function aboutCard() {
   return el('div', { class: 'card' }, [
     el('h3', { text: 'Kittycal' }),
     el('p', { class: 'hint-sm', text:
-      `${THEMES.length} themes. No subscription, no paywall, no adverts, ever.` }),
-    el('p', { class: 'hint-sm', style: { marginTop: 'var(--sp-2)' }, text:
-      'Predicted periods, fertile windows and ovulation days are estimates ' +
-      'calculated from your own logs. They are not a contraceptive method and ' +
-      'not medical advice. Please talk to a doctor about anything that concerns ' +
-      'you.' }),
+      'Predictions are estimates from your own logs. Not a contraceptive ' +
+      'method, and not medical advice.' }),
   ]);
 }
 

@@ -120,7 +120,6 @@ test('one logged period predicts from her stated average', () => {
   assert.equal(p.nextStart, '2026-07-31');
   assert.equal(p.cycleDay, 10);
   assert.equal(p.confidence, 'none', 'no completed cycles yet');
-  assert.match(p.basis, /stated average/);
 });
 
 test('a first completed cycle is blended with her stated average', () => {
@@ -133,7 +132,6 @@ test('a first completed cycle is blended with her stated average', () => {
   });
   assert.equal(p.cyclesLogged, 1);
   assert.equal(p.avgCycleLength, 28, '(26 + 30) / 2');
-  assert.match(p.basis, /blended/);
 });
 
 /* ── predict: the settled case ───────────────────────────────────────────── */
