@@ -141,10 +141,11 @@ async function completeCheckinWithSymptom(p) {
 const browser = await chromium.launch({ executablePath: CHROME });
 
 /** @param {(p: import('playwright').Page) => Promise<void>} fn */
-async function withPage(fn, { clock = false } = {}) {
+async function withPage(fn, { clock = false, reducedMotion = false } = {}) {
   const context = await browser.newContext({
     viewport: { width: 430, height: 932 }, deviceScaleFactor: 2,
     isMobile: true, hasTouch: true,
+    reducedMotion: reducedMotion ? 'reduce' : 'no-preference',
   });
   if (clock) await context.addInitScript(installClock);
   const page = await context.newPage();
@@ -1030,6 +1031,49 @@ await withPage(async (p) => {
   check(/Worth mentioning to a doctor/.test(today),
     'and three months without a period still reaches the doctor prompt');
 });
+
+/* ── 20. The celebration, with motion turned off ───────────────────────
+   The design rule is that reduced motion *removes* decorative motion rather
+   than speeding it up, and that confetti is never the only signal — someone
+   who cannot see the animation still has to know the day was recorded. Both
+   halves were true and neither was guarded. */
+for (const reduced of [false, true]) {
+  console.log(`\nfinishing a check-in with motion ${reduced ? 'off' : 'on'}`);
+  // eslint-disable-next-line no-await-in-loop
+  await withPage(async (p) => {
+    await p.goto(BASE, { waitUntil: 'networkidle' });
+    await seed(p, true);
+    await p.reload({ waitUntil: 'networkidle' });
+    await p.waitForTimeout(1500);
+    await completeCheckin(p, 'Medium');
+
+    /*
+      Particles are drawn to a canvas that is only created when something
+      bursts, so its presence is the signal — there are no DOM nodes to count.
+    */
+    const canvas = await p.locator('canvas').count();
+    check(reduced ? canvas === 0 : canvas > 0,
+      reduced ? 'no particle canvas is even created' : 'the particle canvas appears',
+      `${canvas} found`);
+
+    const announced = await p.locator('#live-region').innerText().catch(() => '');
+    check(/Checked in/.test(announced),
+      'the day is announced either way', announced.slice(0, 40));
+
+    if (reduced) {
+      const moving = await p.evaluate(() => {
+        const out = [];
+        for (const el of document.querySelectorAll('#view-today *')) {
+          const s = getComputedStyle(el);
+          if (s.animationName && s.animationName !== 'none'
+              && parseFloat(s.animationDuration) > 0.01) out.push(s.animationDuration);
+        }
+        return out;
+      });
+      check(moving.length === 0, 'motion is removed, not merely shortened', moving.join(', '));
+    }
+  }, { reducedMotion: reduced });
+}
 
 await browser.close();
 
