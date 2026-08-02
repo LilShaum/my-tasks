@@ -424,8 +424,8 @@ function stepDisclaimer() {
           'please talk to a doctor.',
         ]),
       ]),
-      el('div', { class: 'alert alert-ok' }, [
-        el('span', { class: 'alert-icon', text: '♥', 'aria-hidden': 'true' }),
+      el('div', { class: 'note' }, [
+        el('span', { class: 'note-icon', text: '♥', 'aria-hidden': 'true' }),
         el('div', {}, [
           el('strong', { text: 'Your data never leaves this device.' }),
           ' Kittycal has no account, no server and makes no internet requests ' +

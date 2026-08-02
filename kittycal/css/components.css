@@ -259,6 +259,38 @@
 .alert-danger { background: var(--danger-bg); border-color: var(--danger); color: var(--ink); }
 .alert-ok     { background: var(--ok-bg);     border-color: var(--ok);     color: var(--ink); }
 
+/*
+  A standing note, not an alert.
+
+  Same shape as `.alert` but in the theme's own colours, for text that is always
+  there and is not reporting a condition — the privacy statement, chiefly. Those
+  used to be `.alert-ok`, which was wrong twice: a permanent reassurance dressed
+  as a notification, and a green box in a pink app.
+
+  It matters beyond looks. Alerts here are deliberately theme-immune so a real
+  warning cannot be softened into decoration by a pastel palette — and that only
+  works while alert styling is reserved for alerts. Spending it on "your data
+  never leaves this device" is what makes the next genuine warning ordinary.
+*/
+.note {
+  display: flex;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-md);
+  border-left: 4px solid var(--primary-line);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+
+.note-icon {
+  flex: none;
+  font-size: var(--fs-md);
+  line-height: 1.3;
+  color: var(--primary-line);
+}
+
 /* ── Badges ───────────────────────────────────────────────────────────── */
 .badge {
   display: inline-flex;
@@ -505,3 +537,54 @@
 .empty h3 { font-size: var(--fs-md); }
 
 .empty p { font-size: var(--fs-sm); color: var(--ink-2); max-width: 30ch; }
+
+/* ── In-app dialogs ───────────────────────────────────────────────────── */
+
+/*
+  The stack of actions at the bottom of a confirm or prompt sheet. The
+  confirming action comes first and carries the verb, so the last thing read
+  before tapping says what is about to happen — "Erase everything", not "OK".
+*/
+/* Consecutive paragraphs in a dialog need air between them; without it the
+   cost and the warning read as one run-on block. */
+.dialog-body-p + .dialog-body-p { margin-top: var(--sp-3); }
+
+.dialog-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-top: var(--sp-4);
+}
+
+.dialog-label {
+  display: block;
+  margin: var(--sp-4) 0 var(--sp-2);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.dialog-input { width: 100%; }
+
+/*
+  Empty until something is wrong, and it keeps its slot so the buttons do not
+  jump down the screen the moment a message appears under the finger already
+  reaching for them.
+*/
+.dialog-error {
+  min-height: 1.25rem;
+  margin-top: var(--sp-2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--danger);
+}
+
+/*
+  Irreversible actions only. Fixed colour rather than the theme's, for the same
+  reason alerts are theme-immune: a pastel "erase everything" is one that gets
+  tapped by accident.
+*/
+.btn-danger {
+  background: var(--danger-solid);
+  border-color: var(--danger-solid);
+  color: var(--on-danger);
+}

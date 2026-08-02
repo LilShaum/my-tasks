@@ -17,8 +17,9 @@ This is the one to use. It works on the device where you actually use the app.
 
 ### 2. From a computer (this folder)
 
-Put your images in this folder, then add a `manifest.json` next to them listing
-which file belongs to which theme:
+Put your images in this folder, then list them in the `manifest.json` that is
+already here — it ships empty, so the app's single probe succeeds rather than
+404ing:
 
 ```json
 {
@@ -31,7 +32,8 @@ which file belongs to which theme:
 Only include the themes you have art for — anything missing falls back to the
 built-in emblem. The manifest exists so the app makes one request to find out
 what you have, instead of guessing at a dozen filenames per theme and filling
-your console with 404s.
+your console with 404s. It is the one file in this folder that *is* committed,
+for exactly that reason; your images beside it stay ignored.
 
 The valid theme ids are:
 

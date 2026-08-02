@@ -20,6 +20,7 @@
 import { el, need, haptic, announce } from '../utils/dom.js';
 import { spotArt } from './mascot.js';
 import * as db from '../storage/db.js';
+import { promptSheet } from './dialog.js';
 
 const META_LOCK = 'lock';
 const ITERATIONS = 210_000;
@@ -241,27 +242,45 @@ export function showLockScreen(themeId) {
  * @returns {Promise<boolean>}
  */
 export async function promptForNewPin() {
-  const first = window.prompt(
-    'Choose a 4-digit passcode.\n\n' +
-    'This keeps Kittycal shut to anyone who picks up your phone. It is not ' +
-    'encryption — someone determined, with your unlocked device, could still ' +
-    'reach the data underneath.',
-  );
+  /*
+    In the app's own sheet rather than `window.prompt`.
+
+    A native prompt is stamped with the origin, so this read as
+    "lilshaum.github.io wants a passcode" — the exact shape of a phishing
+    dialog, on the one screen where being trusted is the whole point. It also
+    truncated the explanation to roughly its first sentence, which meant the
+    part saying this is not encryption was the part nobody saw.
+  */
+  const first = await promptSheet({
+    title: 'Choose a passcode',
+    body: [
+      'Four digits, asked for whenever Kittycal opens.',
+      'It keeps the app shut to whoever picks up your phone. It is not ' +
+      'encryption — someone determined, with your unlocked device, could ' +
+      'still reach the data underneath.',
+    ],
+    label: 'New passcode',
+    confirmLabel: 'Continue',
+    mode: 'numeric',
+    maxLength: 4,
+    secret: true,
+    validate: (v) => (/^\d{4}$/.test(v) ? null : 'Four digits, please.'),
+  });
   if (first == null) return false;
 
-  if (!/^\d{4}$/.test(first.trim())) {
-    window.alert('A passcode needs to be exactly 4 digits.');
-    return false;
-  }
-
-  const second = window.prompt('Enter it once more to confirm.');
+  const second = await promptSheet({
+    title: 'Once more',
+    body: ['Enter the same four digits again, so a typo cannot lock you out.'],
+    label: 'Confirm passcode',
+    confirmLabel: 'Set passcode',
+    mode: 'numeric',
+    maxLength: 4,
+    secret: true,
+    validate: (v) => (v === first ? null : 'Those do not match.'),
+  });
   if (second == null) return false;
 
-  if (first.trim() !== second.trim()) {
-    window.alert('Those did not match. Nothing has been changed.');
-    return false;
-  }
-
-  await setPin(first.trim());
+  await setPin(first);
   return true;
 }
+

@@ -42,6 +42,7 @@ const PRECACHE = [
   'assets/fonts/nunito.woff2',
   'assets/fonts/fredoka.woff2',
   'assets/icons/icon.svg',
+  'assets/mascots/manifest.json',
 
   'js/main.js',
   'js/state/store.js',
@@ -73,6 +74,7 @@ const PRECACHE = [
   'js/data/taxonomy.js',
   'js/data/tips.js',
   'js/ui/sheet.js',
+  'js/ui/dialog.js',
   'js/ui/image-picker.js',
   'js/ui/chart.js',
   'js/ui/lock.js',

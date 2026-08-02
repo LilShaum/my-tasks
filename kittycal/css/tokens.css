@@ -137,6 +137,10 @@
         never softened below threshold by a pastel theme.             ── */
   --danger:      oklch(52% 0.20 25);
   --danger-bg:   oklch(95% 0.05 25);
+  /* A filled destructive button needs a darker face than the text/border
+     colour, so its label can clear 4.5:1 rather than merely large-text 3:1. */
+  --danger-solid: oklch(42% 0.19 25);
+  --on-danger:    oklch(99% 0.01 25);
   --warn:        oklch(52% 0.15 75);
   --warn-bg:     oklch(95% 0.06 85);
   --ok:          oklch(52% 0.14 150);
@@ -206,6 +210,9 @@
 
   --danger:    oklch(74% 0.17 25);
   --danger-bg: oklch(30% 0.07 25);
+  /* Inverted in dark: the face is light, so the label goes dark. */
+  --danger-solid: oklch(72% 0.17 25);
+  --on-danger:    oklch(18% 0.05 25);
   --warn:      oklch(80% 0.14 85);
   --warn-bg:   oklch(30% 0.06 85);
   --ok:        oklch(76% 0.14 150);

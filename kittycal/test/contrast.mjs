@@ -42,7 +42,11 @@ const CHECKS = [
   ['--on-primary', '--primary', 4.5, 'label on a primary button'],
   // The week strip's tick sits on a logged day, which is --surface-2. It is a
   // glyph carrying meaning, so it is held to the text bar rather than 3:1.
-  ['--primary-line', '--surface-2', 4.5, 'logged tick on the week strip'],
+  // The same pair carries the standing-note icon and its left edge.
+  ['--primary-line', '--surface-2', 4.5, 'logged tick and note icon on surface-2'],
+  ['--ink', '--surface-2', 4.5, 'note body text'],
+  // The one destructive button in the app. Held to the text bar, not 3:1.
+  ['--on-danger', '--danger-solid', 4.5, 'label on the erase button'],
 ];
 
 /** sRGB relative luminance, per WCAG 2.x. @param {number[]} rgb 0-255 */
