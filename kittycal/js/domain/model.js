@@ -269,6 +269,26 @@ export function normalizeSettings(raw) {
     }
   }
 
+  /*
+    Settings whose default is `null` have to be checked by hand.
+
+    The loop above decides whether a value is acceptable by comparing its type
+    against the default's — which works for every field with a real default and
+    silently destroys every field without one, because `typeof null` is
+    'object' and no number, string or boolean will ever match it.
+
+    `birthYear` was the casualty. This function runs on every app start and on
+    every settings change, so the year entered during setup was discarded
+    within seconds of being given, and the doctor report's "Year of birth" line
+    had never once appeared for anybody. It looked like an import bug and was
+    not: the export was fine, and so was the file.
+  */
+  const year = raw.birthYear;
+  out.birthYear = typeof year === 'number' && Number.isFinite(year)
+    && year > 1900 && year <= new Date().getFullYear()
+    ? Math.round(year)
+    : null;
+
   // Clamp the numeric priors into physiologically sane ranges so a corrupted
   // or hand-edited value can't produce nonsense predictions.
   out.avgCycleLength = clampInt(out.avgCycleLength, 15, 90, base.avgCycleLength);

@@ -32,6 +32,12 @@ function cycleEnd(cycle) {
   return cycle.nextStart ? addDays(cycle.nextStart, -1) : cycle.periodEnd;
 }
 
+/** A peak day has to recur in at least this many cycles to be called typical. */
+const PEAK_MIN_CYCLES = 2;
+
+/** And no more than this many days may share the top spot. */
+const PEAK_MAX_TIED = 3;
+
 /** A pattern needs this many cycles behind it before it's worth mentioning. */
 const MIN_CYCLES_FOR_PATTERN = 3;
 
@@ -104,11 +110,25 @@ export function symptomPattern(symptomId, logs, cycles) {
     if (seenInCycle) cyclesWith++;
   }
 
-  // The cycle days where this shows up most often.
+  /*
+    The cycle days where this shows up most often — but only when "most often"
+    means something.
+
+    Every day tied at the maximum used to be returned, so a symptom that
+    appeared once each on days 2, 7 and 12 came back as peaking on all three,
+    and the doctor report printed "typical cycle day: 2, 7, 12". That is noise
+    presented as a finding, in a clinical document.
+
+    Two conditions now. The peak has to have happened in at least two cycles,
+    or it is a coincidence rather than a tendency. And the tie has to be
+    narrow: if half the cycle is joint-first there is no typical day, and
+    saying so is better than naming four.
+  */
   const max = Math.max(0, ...byDay.values());
-  const peakDays = max === 0
+  const tied = max < PEAK_MIN_CYCLES
     ? []
     : [...byDay.entries()].filter(([, n]) => n === max).map(([day]) => day).sort((a, b) => a - b);
+  const peakDays = tied.length > PEAK_MAX_TIED ? [] : tied;
 
   return { cyclesWith, cyclesTotal: complete.length, byDay, peakDays };
 }
