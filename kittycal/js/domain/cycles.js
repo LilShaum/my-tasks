@@ -148,10 +148,26 @@ export function buildCycles(periodDays) {
  * @returns {number[]}
  */
 export function cycleLengths(cycles) {
+  return cycleLengthPoints(cycles).map((p) => p.length);
+}
+
+/**
+ * The same lengths, each keeping the date its cycle began.
+ *
+ * The chart needs this. Plotted from bare numbers it could only label the
+ * x-axis "1, 2, 3…", which is a position in an array rather than a point in
+ * her life — there is no way to look at it and find last March. This is the
+ * primitive and `cycleLengths` maps over it, so the two can never disagree
+ * about which cycles count.
+ *
+ * @param {Cycle[]} cycles
+ * @returns {{start: DateKey, length: number}[]}
+ */
+export function cycleLengthPoints(cycles) {
   return cycles
     .filter((c) => c.length != null)
-    .map((c) => /** @type {number} */ (c.length))
-    .filter((n) => n >= CYCLE_LENGTH_FLOOR && n <= CYCLE_LENGTH_CEIL);
+    .map((c) => ({ start: c.start, length: /** @type {number} */ (c.length) }))
+    .filter((p) => p.length >= CYCLE_LENGTH_FLOOR && p.length <= CYCLE_LENGTH_CEIL);
 }
 
 /**
@@ -163,12 +179,23 @@ export function cycleLengths(cycles) {
  * @returns {number[]}
  */
 export function periodLengths(cycles, today) {
+  return periodLengthPoints(cycles, today).map((p) => p.length);
+}
+
+/**
+ * The same period lengths, each keeping the date it started. See
+ * `cycleLengthPoints` for why the chart needs the date.
+ * @param {Cycle[]} cycles
+ * @param {DateKey} today
+ * @returns {{start: DateKey, length: number}[]}
+ */
+export function periodLengthPoints(cycles, today) {
   return cycles
     .filter((c) => {
       const stillRunning = daysBetween(c.periodEnd, today) <= 1;
       return !(stillRunning && !c.complete);
     })
-    .map((c) => c.periodLength);
+    .map((c) => ({ start: c.start, length: c.periodLength }));
 }
 
 /**
