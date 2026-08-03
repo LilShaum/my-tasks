@@ -650,3 +650,66 @@
 }
 
 .checkin-option[aria-pressed="true"] .checkin-option-note { color: inherit; }
+
+/* ── The mascot riding the ring ───────────────────────────────────────── */
+
+/*
+  Centred on today's point, which is given as a percentage of the ring box so
+  it stays put when the SVG scales. `pointer-events: none` because it sits over
+  the ring and there is nothing to tap here — the ring is a picture.
+*/
+.ring-rider {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+}
+
+/*
+  A disc behind her, in the card colour, so she reads as sitting on the ring
+  rather than floating over whichever phase colour happens to be underneath —
+  and so a dark uploaded photograph still has something to sit against.
+*/
+.ring-rider::before {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  background: var(--card);
+  border: var(--bw) solid var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+
+.ring-mascot {
+  position: relative;
+  /* Uploaded pictures are square and arbitrary; the circle is the frame. */
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.ring-mascot img { border-radius: 50%; }
+
+/*
+  The hop.
+
+  Transform only — nothing about her position on the ring changes, so the
+  countdown underneath does not move and the layout never reflows. Two beats
+  with a tilt, which reads as pleased rather than as a loading spinner.
+*/
+@keyframes ring-cheer {
+  0%   { transform: translateY(0) rotate(0deg) scale(1); }
+  25%  { transform: translateY(-14px) rotate(-8deg) scale(1.06); }
+  45%  { transform: translateY(0) rotate(0deg) scale(1); }
+  65%  { transform: translateY(-7px) rotate(5deg) scale(1.03); }
+  100% { transform: translateY(0) rotate(0deg) scale(1); }
+}
+
+/* The wrapper owns the centring transform, so the hop goes on the child. */
+.ring-rider.is-cheering > * {
+  animation: ring-cheer 760ms var(--ease-bounce);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ring-rider.is-cheering > * { animation: none; }
+}
