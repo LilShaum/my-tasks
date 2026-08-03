@@ -105,6 +105,7 @@
 
 /* ── Chips — the logging taxonomy's primary control ───────────────────── */
 .chip {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
@@ -119,6 +120,22 @@
   transition: transform var(--dur-tap) var(--ease-bounce),
               background var(--dur-hover) var(--ease-soft),
               border-color var(--dur-hover) var(--ease-soft);
+}
+
+/*
+  An invisible 44px hit area around a 38px chip.
+
+  Same trick the switch above uses, and for the same reason: the chip is the
+  most-tapped control in the app and 38px is under the target size the rest of
+  the app holds itself to, but a 44px-tall chip makes the diary's twelve
+  categories noticeably taller for no visual gain. Three pixels of reach top
+  and bottom fixes the target without moving anything on screen — the rows are
+  eight pixels apart, so neighbouring chips still do not overlap.
+*/
+.chip::before {
+  content: '';
+  position: absolute;
+  inset: -3px 0;
 }
 
 .chip:active { transform: scale(0.94) rotate(-1deg); }

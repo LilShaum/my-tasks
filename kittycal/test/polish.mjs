@@ -1,0 +1,261 @@
+/**
+ * polish.mjs — things found by using the app rather than by reading it.
+ *
+ * Each of these was a real defect that no unit test could have caught, because
+ * each is a property of the rendered page: a state drawn on the calendar with
+ * nothing in the legend naming it, a card whose heading is in the wrong tense
+ * for its own dates, a control smaller than the size the rest of the app holds
+ * itself to, and a caption sitting four rows below the field it describes.
+ *
+ * Run: node test/polish.mjs   (with a static server on 8099)
+ */
+
+import pw from '/opt/node22/lib/node_modules/playwright/index.js';
+
+const BASE = 'http://127.0.0.1:8099/';
+
+let pass = 0;
+let fail = 0;
+
+/** @param {string} label @param {boolean} cond @param {string} [extra] */
+const ok = (label, cond, extra = '') => {
+  if (cond) { pass += 1; console.log(`  ok    ${label}`); }
+  else { fail += 1; console.log(`  FAIL  ${label}${extra ? ` — ${extra}` : ''}`); }
+};
+
+const browser = await pw.chromium.launch({
+  executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+});
+const ctx = await browser.newContext({
+  viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true,
+});
+const page = await ctx.newPage();
+/** @type {string[]} */
+const errors = [];
+page.on('pageerror', (e) => errors.push(String(e)));
+
+await page.goto(BASE, { waitUntil: 'networkidle' });
+
+// Mid-luteal: the fertile window is behind her, the next period ahead.
+await page.evaluate(async () => {
+  const db = await new Promise((res, rej) => {
+    const r = indexedDB.open('kittycal', 1);
+    r.onupgradeneeded = () => {
+      const d = r.result;
+      d.createObjectStore('logs', { keyPath: 'date' });
+      d.createObjectStore('meta', { keyPath: 'key' });
+      d.createObjectStore('blobs', { keyPath: 'id' });
+    };
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+
+  const pad = (/** @type {number} */ n) => String(n).padStart(2, '0');
+  const shift = (/** @type {number} */ n) => {
+    const d = new Date(); d.setDate(d.getDate() + n);
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
+
+  const days = [];
+  for (let c = 0; c < 4; c += 1) {
+    const start = -23 - ((3 - c) * 29);
+    for (let i = 0; i < 5; i += 1) days.push(shift(start + i));
+  }
+
+  await new Promise((res) => {
+    const tx = db.transaction(['meta', 'logs'], 'readwrite');
+    tx.objectStore('meta').put({ key: 'settings', value: {
+      theme: 'hellokitty', onboarded: true, disclaimerAck: true, avgCycleLength: 29,
+      avgPeriodLength: 5, lutealLength: 14, name: 'Sam',
+      lastBackup: shift(0), lastBackupAt: Date.now(),
+    } });
+    tx.objectStore('meta').put({ key: 'periodDays', value: days });
+    tx.oncomplete = () => res(undefined);
+  });
+});
+
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForTimeout(500);
+await page.evaluate(() => {
+  /** @type {HTMLElement|null} */
+  (document.querySelector('.sheet-close, [aria-label*="Close"]'))?.click();
+});
+await page.waitForTimeout(300);
+
+console.log('\nthe fertile window, once it has been and gone');
+{
+  const text = await page.$eval('#view-today', (n) => n.textContent ?? '');
+  const dates = await page.evaluate(() => {
+    const cards = [...document.querySelectorAll('#view-today .card')];
+    const card = cards.find((c) => /Fertile window/.test(c.querySelector('h3')?.textContent ?? ''));
+    return card?.querySelector('.big-value')?.textContent ?? '';
+  });
+
+  ok('the card is still there, because when ovulation was is worth knowing',
+    /Fertile window/.test(text), text.slice(0, 60));
+  ok('but the heading no longer offers a past window as news',
+    /Fertile window has passed/.test(text), dates);
+  ok('and the estimate is in the past tense too',
+    /Ovulation was estimated/.test(text));
+}
+
+console.log('\nthe calendar legend covers what the calendar draws');
+{
+  await page.evaluate(async () => (await import('/js/state/store.js')).setView('calendar'));
+  await page.waitForSelector('.cal-cell');
+  await page.waitForTimeout(400);
+
+  /*
+    Collected from the grid rather than hard-coded, so a state added later
+    without a legend entry fails here rather than shipping unexplained. This is
+    how the luteal shading went unlabelled: it was drawn on every day between
+    ovulation and the next expected period, and grey on a future date reads as
+    "unavailable" until something names it.
+  */
+  const drawn = await page.$$eval('.cal-cell', (cells) => {
+    const seen = new Set();
+    for (const c of cells) {
+      for (const cls of c.classList) {
+        if (cls.startsWith('is-') && cls !== 'is-today' && cls !== 'is-outside'
+          && cls !== 'is-selected' && cls !== 'is-future' && cls !== 'is-logged') seen.add(cls);
+      }
+    }
+    return [...seen];
+  });
+
+  const explained = await page.$$eval('.cal-legend-swatch', (n) =>
+    n.map((s) => [...s.classList].find((c) => c.startsWith('is-'))));
+
+  const missing = drawn.filter((d) => !explained.includes(d));
+  ok('every state on the grid has a legend entry', missing.length === 0,
+    `drawn ${JSON.stringify(drawn)}, explained ${JSON.stringify(explained)}`);
+  ok('the luteal shading in particular is named', explained.includes('is-luteal'),
+    JSON.stringify(explained));
+}
+
+console.log('\nchips are as big to tap as the app claims');
+{
+  await page.evaluate(async () => {
+    const { openLogSheet } = await import('/js/views/log.js');
+    const { todayKey } = await import('/js/utils/date.js');
+    openLogSheet(todayKey());
+  });
+  await page.waitForSelector('.chip');
+  await page.waitForTimeout(400);
+
+  /*
+    Tested by tapping rather than by measuring. The chip is 38px of visible
+    pill with three more of invisible reach top and bottom, so a measurement of
+    the box says 38 and is not what a thumb experiences.
+  */
+  const result = await page.evaluate(() => {
+    const chip = [...document.querySelectorAll('.chip')]
+      .find((c) => /Cramps/.test(c.textContent ?? ''));
+    if (!chip) return null;
+
+    /** @param {number} offset px outside the visible pill, negative is above */
+    const tapAt = (offset) => {
+      const before = chip.getAttribute('aria-pressed');
+      const r = chip.getBoundingClientRect();
+      const y = offset < 0 ? r.top + offset + 0.5 : r.bottom + offset - 0.5;
+      document.elementFromPoint(r.left + r.width / 2, y)
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      return chip.getAttribute('aria-pressed') !== before;
+    };
+
+    return { above: tapAt(-2), below: tapAt(2), wayOff: tapAt(9) };
+  });
+
+  ok('a chip exists to tap', result !== null);
+  ok('two pixels above the pill still hits it', result?.above === true);
+  ok('two pixels below the pill still hits it', result?.below === true);
+  ok('nine pixels away does not, so neighbours stay separable',
+    result?.wayOff === false);
+
+  await page.evaluate(() => {
+    /** @type {HTMLElement|null} */
+    (document.querySelector('.sheet-close, [aria-label*="Close"]'))?.click();
+  });
+  await page.waitForTimeout(300);
+}
+
+console.log('\na field’s caption sits with the field');
+{
+  await page.evaluate(async () => (await import('/js/state/store.js')).setView('settings'));
+  await page.waitForTimeout(500);
+
+  const attached = await page.evaluate(() => {
+    const group = [...document.querySelectorAll('.row-label-group')]
+      .find((g) => /Luteal phase length/.test(g.textContent ?? ''));
+    return group?.querySelector('.row-hint')?.textContent ?? null;
+  });
+
+  ok('the luteal note is inside the luteal row', /Fourteen is typical/.test(attached ?? ''),
+    String(attached));
+
+  // It used to be the last thing in the card, directly under an unrelated switch.
+  const strayed = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('.row')];
+    const toggleRow = rows.find((r) => /Show fertility estimates/.test(r.textContent ?? ''));
+    return /Fourteen/.test(toggleRow?.parentElement?.textContent?.split('Show fertility')[1] ?? '');
+  });
+  ok('and not underneath the fertility switch', strayed === false);
+}
+
+console.log('\nthe question every prediction is built on');
+{
+  // A fresh context, because this one is past onboarding.
+  const fresh = await browser.newContext({
+    viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true,
+  });
+  const onb = await fresh.newPage();
+  onb.on('pageerror', (e) => errors.push(String(e)));
+  await onb.goto(BASE, { waitUntil: 'networkidle' });
+  await onb.waitForTimeout(400);
+
+  // Theme, name, year, then the date.
+  for (let i = 0; i < 3; i += 1) {
+    await onb.evaluate(() => {
+      const b = [...document.querySelectorAll('#onb-foot button')];
+      (b.find((x) => /next|continue/i.test(x.textContent ?? '')) ?? b[0]).click();
+    });
+    await onb.waitForTimeout(300);
+  }
+
+  const heading = await onb.$eval('#onb-body h2', (n) => n.textContent ?? '');
+  ok('we are on the last-period question', /When did your last period start/.test(heading),
+    heading);
+
+  const labels = await onb.$$eval('.chip-row .chip', (n) => n.map((c) => c.textContent));
+  ok('the shortcuts are words, not abbreviations',
+    labels.includes('14 days ago') && !labels.includes('14d ago'), JSON.stringify(labels));
+
+  ok('and they wrap rather than scrolling off the phone',
+    await onb.evaluate(() => {
+      const row = document.querySelector('.chip-row');
+      return row ? row.scrollWidth <= row.clientWidth + 1 : false;
+    }));
+
+  await onb.evaluate(() => {
+    /** @type {HTMLElement|undefined} */
+    ([...document.querySelectorAll('.chip-row .chip')]
+      .find((c) => /14 days/.test(c.textContent ?? '')))?.click();
+  });
+  await onb.waitForTimeout(200);
+
+  const pressed = await onb.$$eval('.chip-row .chip',
+    (n) => n.filter((c) => c.getAttribute('aria-pressed') === 'true').map((c) => c.textContent));
+  ok('the tapped shortcut looks tapped', pressed.length === 1 && /14 days/.test(pressed[0] ?? ''),
+    JSON.stringify(pressed));
+
+  const filled = await onb.$eval('#onb-lastperiod', (n) => n.value);
+  ok('and it fills the date field', /^\d{4}-\d{2}-\d{2}$/.test(filled), filled);
+
+  await fresh.close();
+}
+
+ok('no page errors throughout', errors.length === 0, errors.join(' | '));
+
+console.log(`\npolish: ${pass}/${pass + fail} checks passed`);
+await browser.close();
+if (fail) process.exit(1);

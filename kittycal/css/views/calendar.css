@@ -164,6 +164,7 @@
 .cal-legend-swatch.is-predicted { border: 2px dashed var(--period-pred); }
 .cal-legend-swatch.is-fertile { background: var(--fertile-soft); border-color: var(--fertile-soft); }
 .cal-legend-swatch.is-ovulation { border: 2px dotted var(--ovulation); background: var(--fertile-soft); }
+.cal-legend-swatch.is-luteal { background: var(--luteal-soft); border-color: var(--luteal-soft); }
 
 /* The month header carries five controls once the Year button is there. */
 .cal-head-5 { grid-template-columns: auto 1fr auto auto auto; }

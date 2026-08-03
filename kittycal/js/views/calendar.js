@@ -533,6 +533,19 @@ function legend(prediction, opts = {}) {
     items.push({ class: 'is-ovulation', label: 'Ovulation estimated' });
   }
 
+  /*
+    The luteal shading was on the calendar and not in the legend.
+
+    This function already refuses to list a state the view does not draw, on
+    the grounds that a legend for something absent is worse than no legend —
+    the opposite case was the one that got missed. A block of muted days runs
+    from ovulation to the next expected period, and with nothing naming it the
+    obvious reading of grey is "unavailable", on days that are in the future.
+  */
+  if (prediction.nextStart) {
+    items.push({ class: 'is-luteal', label: 'After ovulation' });
+  }
+
   return el('ul', { class: 'cal-legend' }, items.map((item) =>
     el('li', {}, [
       el('span', { class: `cal-legend-swatch ${item.class}`, 'aria-hidden': 'true' }),

@@ -308,9 +308,18 @@
 /* Only present once the row holds a value, so an empty list is a column of
    inputs rather than a column of inputs and dead buttons. */
 .measure-clear {
+  position: relative;
   width: 32px;
   height: 32px;
   flex: none;
+}
+
+/* Reaches 44px without growing: it sits beside a 44px input, and a button that
+   matched it would read as a second field rather than as a way to empty one. */
+.measure-clear::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
 }
 
 .measure-clear svg { width: 16px; height: 16px; }
