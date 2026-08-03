@@ -284,6 +284,33 @@ export const WATER_GOAL_ML = 2000;
  */
 export const DEFAULT_CHIPS = ['cramps', 'fatigue', 'headache', 'bloating'];
 
+/**
+ * How bad a symptom was, when she says.
+ *
+ * Three levels, not five and not a slider. The most common request under
+ * every period tracker's reviews is some way to say that this month's cramps
+ * were not like last month's — but the moment the scale gets finer than three
+ * the answer stops being obvious, and a question you have to think about is
+ * one that gets skipped. Three is also what a clinician actually uses.
+ *
+ * Stored as 1..3 rather than as words so the doctor report can rank them and
+ * the wording can change without a migration.
+ */
+export const SEVERITY = /** @type {const} */ ([
+  { value: 1, label: 'Mild' },
+  { value: 2, label: 'Moderate' },
+  { value: 3, label: 'Severe' },
+]);
+
+/**
+ * The word for a stored severity, or null for anything else.
+ * @param {unknown} value
+ * @returns {string|null}
+ */
+export function severityLabel(value) {
+  return SEVERITY.find((s) => s.value === value)?.label ?? null;
+}
+
 /* ── Lookup helpers ─────────────────────────────────────────────────────── */
 
 /** @type {Map<string, {category: string, option: Option}>} */

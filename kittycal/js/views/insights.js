@@ -22,9 +22,9 @@ import { predict, detectThermalShift } from '../domain/predict.js';
 import { phaseFor, PHASES } from '../domain/phases.js';
 import {
   detectPatterns, symptomPattern, series, bbtForCycle, daysLogged, loggingConsistency,
-  moodByPhase,
+  moodByPhase, severitySummary,
 } from '../domain/stats.js';
-import { labelOf } from '../data/taxonomy.js';
+import { labelOf, severityLabel } from '../data/taxonomy.js';
 import * as acog from '../domain/acog.js';
 import { barChart, lineChart, dayHeatmap } from '../ui/chart.js';
 import { spotArt } from '../ui/mascot.js';
@@ -57,7 +57,7 @@ export function renderInsights(host) {
       bbtCard(logs, cycles, settings),
       trendCard(logs, settings),
       notesCard(),
-    reportCard(),
+      reportCard(),
       footnote(),
     ]),
   ]);
@@ -307,9 +307,35 @@ function patternsCard(logs, cycles, prediction) {
             `${pattern.cyclesTotal} cycles, ${where || 'spread across the cycle'}.`,
         }),
         where && el('span', { class: 'hint-sm', text: `${where[0].toUpperCase()}${where.slice(1)}.` }),
+        severityLine(pattern.id, logs),
       ]);
     })),
   ]);
+}
+
+/**
+ * "Usually mild, severe 3 times" — but only where she has said.
+ *
+ * Silent unless the symptom was graded, and silent about the days it was not,
+ * because severity is optional by design and a line reading "graded on 2 of 14
+ * days" would turn an optional field into a chore she is behind on.
+ *
+ * @param {string} id
+ * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
+ */
+function severityLine(id, logs) {
+  const summary = severitySummary(id, logs);
+  if (!summary.rated) return null;
+
+  const typical = severityLabel(summary.typical)?.toLowerCase();
+  const severe = summary.counts[2];
+
+  // "Usually severe, severe 4 times" says one thing twice.
+  const text = severe && summary.typical !== 3
+    ? `Usually ${typical}, but severe ${plural(severe, 'time')}.`
+    : `Usually ${typical}.`;
+
+  return el('span', { class: 'hint-sm', text });
 }
 
 /* ── BBT ────────────────────────────────────────────────────────────────── */

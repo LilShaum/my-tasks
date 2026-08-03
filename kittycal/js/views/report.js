@@ -18,8 +18,8 @@ import { todayKey, addDays, fmtLong, fmtDayMonth, daysBetween } from '../utils/d
 import { plural } from '../utils/fmt.js';
 import { buildCycles, cycleLengths, periodLengths, summarize } from '../domain/cycles.js';
 import { predict } from '../domain/predict.js';
-import { detectPatterns, symptomFrequency, daysLogged } from '../domain/stats.js';
-import { labelFor, labelOf, isMood } from '../data/taxonomy.js';
+import { detectPatterns, symptomFrequency, daysLogged, severitySummary } from '../domain/stats.js';
+import { labelFor, labelOf, isMood, severityLabel } from '../data/taxonomy.js';
 import * as acog from '../domain/acog.js';
 import * as store from '../state/store.js';
 
@@ -166,6 +166,16 @@ function recurringSection(logs, cycles, kind) {
   /** @type {Node[]} */
   const out = [];
 
+  /*
+    Severity is optional and moods do not have one, so the column only exists
+    when there is something in it. An empty column in a clinical table reads as
+    "measured and found to be nothing" rather than "not asked".
+  */
+  const graded = kind === 'symptoms'
+    ? new Map(patterns.map((p) => [p.id, severitySummary(p.id, logs)]))
+    : new Map();
+  const anyGraded = [...graded.values()].some((s) => s.rated > 0);
+
   if (patterns.length) {
     out.push(el('p', { text:
       'Logged in the majority of complete cycles, with the cycle days on which ' +
@@ -177,8 +187,10 @@ function recurringSection(logs, cycles, kind) {
         // Blank rather than a guess: `peakDays` is empty unless the day
         // genuinely recurs, so there is nothing honest to put here.
         pattern.peakDays.length ? `day ${pattern.peakDays.join(', ')}` : 'no particular day',
+        ...(anyGraded ? [severityCell(graded.get(pattern.id))] : []),
       ]),
-      ['What was logged', 'Cycles affected', 'Typical cycle day'],
+      ['What was logged', 'Cycles affected', 'Typical cycle day',
+        ...(anyGraded ? ['Severity, when graded'] : [])],
     ));
   }
 
@@ -192,6 +204,30 @@ function recurringSection(logs, cycles, kind) {
   ));
 
   return out;
+}
+
+/**
+ * One severity cell: the usual level, and how often it was the worst one.
+ *
+ * Always says how many days were graded, because the denominator is the whole
+ * point — "severe" on its own invites a reader to assume every occurrence was
+ * severe, when it may have been graded twice out of nine.
+ *
+ * @param {import('../domain/stats.js').SeveritySummary|undefined} summary
+ */
+function severityCell(summary) {
+  if (!summary?.rated) return 'not graded';
+
+  const typical = severityLabel(summary.typical) ?? '';
+  const atTypical = summary.counts[summary.typical - 1];
+  const severe = summary.counts[2];
+
+  const base = `${typical} (${atTypical} of ${summary.rated} graded)`;
+
+  // The worst level is worth naming even when it is not the usual one — a
+  // symptom that is mild six times and severe twice is a different history
+  // from one that is mild eight times, and only the second row would say so.
+  return severe && summary.typical !== 3 ? `${base}, severe on ${severe}` : base;
 }
 
 /**

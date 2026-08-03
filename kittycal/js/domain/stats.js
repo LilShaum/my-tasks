@@ -179,6 +179,54 @@ export function detectPatterns(logs, cycles, limit = 8) {
 }
 
 /**
+ * @typedef {Object} SeveritySummary
+ * @property {number} rated    days where she said how bad it was
+ * @property {number} worst    the highest severity given, 0 if never rated
+ * @property {number} typical  the most common severity, 0 if never rated
+ * @property {number[]} counts index 0..2 → how many days at severity 1..3
+ */
+
+/**
+ * How bad one symptom usually is.
+ *
+ * Severity is optional, so this counts only the days she rated — averaging an
+ * unrated day in as "mild" would understate every symptom she could not be
+ * bothered to grade, which is exactly the ones that did not bother her.
+ * `rated` is returned alongside so callers can say "severe in 5 of the 8 times
+ * you graded it" rather than implying it was measured every time.
+ *
+ * `typical` is the mode rather than the mean. A symptom rated mild six times
+ * and severe twice averages to 1.5, which is not a thing she ever reported;
+ * the mode is always a level she actually chose. Ties go to the worse of the
+ * two, because under-reporting a symptom to a doctor is the costlier error.
+ *
+ * @param {string} symptomId
+ * @param {Record<DateKey, DayLog>} logs
+ * @returns {SeveritySummary}
+ */
+export function severitySummary(symptomId, logs) {
+  const counts = [0, 0, 0];
+
+  for (const log of Object.values(logs)) {
+    const value = log.severity?.[symptomId];
+    if (value === 1 || value === 2 || value === 3) counts[value - 1] += 1;
+  }
+
+  const rated = counts[0] + counts[1] + counts[2];
+  if (!rated) return { rated: 0, worst: 0, typical: 0, counts };
+
+  let typical = 1;
+  for (let i = 1; i < counts.length; i += 1) {
+    if (counts[i] >= counts[typical - 1]) typical = i + 1;
+  }
+
+  let worst = 0;
+  for (let i = 0; i < counts.length; i += 1) if (counts[i]) worst = i + 1;
+
+  return { rated, worst, typical, counts };
+}
+
+/**
  * A numeric series for charting, oldest first, skipping days with no reading.
  * @param {Record<DateKey, DayLog>} logs
  * @param {'bbt'|'weight'|'sleep'|'water'|'steps'} field
