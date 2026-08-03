@@ -30,6 +30,8 @@ import { el, haptic, announce } from '../utils/dom.js';
 import { todayKey, fmtRelative } from '../utils/date.js';
 import { CATEGORIES, DEFAULT_CHIPS, labelFor } from '../data/taxonomy.js';
 import { openSheet, closeSheet } from '../ui/sheet.js';
+import { severityBlock } from '../ui/severity.js';
+import { pruneSeverity } from '../domain/model.js';
 import { openLogSheet } from './log.js';
 import { burst } from '../ui/particles.js';
 import { getTheme } from '../data/themes.js';
@@ -347,12 +349,39 @@ export function openCheckin(date = todayKey()) {
       if (builtIn.has(id) || custom.has(id)) ids.push(id);
     }
 
+    /*
+      The rating strip, under the chips rather than inside them.
+
+      Putting it on the chip itself was the obvious shape and the wrong one:
+      three targets inside a 64px tile leaves each of them too small to hit
+      one-handed, and the words have to be abbreviated past the point of
+      meaning anything. Below the grid, each row gets the full width, and —
+      more importantly — it does not exist until she has picked something, so
+      the days she has nothing to report look exactly as they always did.
+    */
+    const severity = severityBlock({
+      label: (id) => (custom.has(id) ? id : labelFor('symptoms', id)),
+      get: (id) => draft.severity[id],
+      set: (id, value) => {
+        if (value == null) delete draft.severity[id];
+        else draft.severity[id] = value;
+      },
+    });
+
+    const rated = () => [...draft.symptoms, ...draft.custom];
+
+    // Coming back to this question must show the ratings she already gave,
+    // not an empty block over a grid of ticked chips.
+    severity.update(rated());
+
     return question({
       stale,
       title: 'Anything bothering you?',
       hint: 'Whatever your body is doing today.',
       multi: true,
       current: () => [...draft.symptoms, ...draft.custom],
+      extra: severity.node,
+      onChange: () => severity.update(rated()),
       options: ids.map((id) => {
         // Custom symptoms are stored as their own text, so the id is the label.
         const isCustom = custom.has(id);
@@ -413,11 +442,14 @@ function toggle(list, id, set) {
  *   the whole flow, offered only where answering everything at once is honest
  * @param {boolean} [opts.multi]
  * @param {() => string[]} [opts.current]
+ * @param {HTMLElement} [opts.extra] sits between the answers and the way onward
+ * @param {() => void} [opts.onChange] after any answer is toggled
  * @param {boolean} [opts.lastStep]
  * @param {() => void} [opts.onNext]
  * @param {() => void} [opts.onMore]
  */
-function question({ title, hint, options, stale, shortcut, multi, current, lastStep, onNext, onMore }) {
+function question({ title, hint, options, stale, shortcut, multi, current, extra, onChange,
+  lastStep, onNext, onMore }) {
   const grid = el('div', { class: 'checkin-options' });
 
   /*
@@ -447,6 +479,7 @@ function question({ title, hint, options, stale, shortcut, multi, current, lastS
             b.setAttribute('aria-pressed', String(now.includes(b.dataset.opt ?? '')));
           }
         }
+        onChange?.();
       }),
       dataset: { opt: option.id },
     }, [
@@ -467,6 +500,7 @@ function question({ title, hint, options, stale, shortcut, multi, current, lastS
     el('h2', { class: 'checkin-title', tabindex: '-1', 'data-autofocus': '', text: title }),
     el('p', { class: 'hint', text: hint }),
     grid,
+    extra,
 
     multi && el('button', {
       type: 'button',

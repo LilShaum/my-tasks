@@ -26,6 +26,7 @@
  * @property {string[]} sex        protected, unprotected, masturbation…
  * @property {string|null} drive   'low'|'neutral'|'high'
  * @property {string[]} custom     user-defined symptom ids
+ * @property {Record<string, 1|2|3>} severity  how bad, per symptom id; sparse
  * @property {number|null} bbt     °C
  * @property {number|null} weight  kg
  * @property {number} water        ml
@@ -134,6 +135,7 @@ export function emptyLog(date) {
     sex: [],
     drive: null,
     custom: [],
+    severity: {},
     bbt: null,
     weight: null,
     water: 0,
@@ -224,6 +226,7 @@ export function normalizeLog(raw) {
     other: arr(raw.other),
     sex: arr(raw.sex),
     custom: arr(raw.custom),
+    severity: severities(raw.severity),
     drive: typeof raw.drive === 'string' ? raw.drive : null,
     bbt: num(raw.bbt),
     weight: num(raw.weight),
@@ -237,6 +240,49 @@ export function normalizeLog(raw) {
     checkedIn: raw.checkedIn === true,
     updated: num(raw.updated) ?? Date.now(),
   };
+}
+
+/**
+ * The severity map, cleaned.
+ *
+ * Only 1, 2 and 3 survive. Everything downstream — the report, the pattern
+ * rows — indexes `SEVERITY[value - 1]` to get a word, so a stray 0 or 4 from a
+ * hand-edited export would print `undefined` inside a clinical document.
+ *
+ * @param {unknown} raw
+ * @returns {Record<string, 1|2|3>}
+ */
+function severities(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+
+  /** @type {Record<string, 1|2|3>} */
+  const out = {};
+  for (const [id, value] of Object.entries(raw)) {
+    if (value === 1 || value === 2 || value === 3) out[id] = value;
+  }
+  return out;
+}
+
+/**
+ * Drop severities for symptoms that are no longer logged.
+ *
+ * Severity is stored beside the symptom list rather than inside it, which is
+ * what lets it stay optional and sparse — but it also means deselecting a
+ * symptom would otherwise leave its rating behind, to be silently re-attached
+ * the next time that symptom was picked. Applied on write so no caller has to
+ * remember.
+ *
+ * @param {DayLog} log
+ * @returns {DayLog}
+ */
+export function pruneSeverity(log) {
+  const kept = new Set([...log.symptoms, ...log.custom]);
+  /** @type {Record<string, 1|2|3>} */
+  const severity = {};
+  for (const [id, value] of Object.entries(log.severity)) {
+    if (kept.has(id)) severity[id] = value;
+  }
+  return { ...log, severity };
 }
 
 /**

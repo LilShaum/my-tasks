@@ -39,6 +39,8 @@ export function openHelp() {
           'would throw your cycle lengths off.'),
         p('The first question moves on as soon as you tap. "← Back" returns to ' +
           'it with nothing lost.'),
+        p('Pick a symptom and you can say how bad it was. Skipping that is fine ' +
+          '— it only ever adds to what a symptom means, never subtracts.'),
       ]),
 
       section('Days you missed', [

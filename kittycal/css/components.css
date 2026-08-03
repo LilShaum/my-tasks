@@ -588,3 +588,81 @@
   border-color: var(--danger-solid);
   color: var(--on-danger);
 }
+
+/* ── Severity — how bad a symptom was ─────────────────────────────────── */
+
+/*
+  Sits under whichever set of symptom chips it rates, and is `hidden` until
+  something is selected. That is what keeps it free: a day with nothing to
+  report never renders it, so the check-in is exactly as short as it was.
+
+  This is a data zone, not chrome — a severity ends up in a doctor's hands.
+  Hence the thin data border and the small radius, matching the chips and the
+  charts rather than the mascot.
+*/
+.severity-block {
+  display: grid;
+  /* Wider than the gap inside a row, so a block of three symptoms reads as
+     three pairs rather than six loose lines. */
+  gap: var(--sp-3);
+  margin-top: var(--sp-3);
+}
+
+.severity-block[hidden] { display: none; }
+
+.severity-hint { margin: 0; }
+
+/*
+  Name over scale, rather than name beside it.
+
+  Side by side left each level about 52px, which is only enough for "Mod" —
+  and an abbreviation is the wrong thing to put on a control whose answer ends
+  up in a doctor's hands. Stacking costs about 20px a row and buys the real
+  words, targets half again as wide, and a layout that cannot be broken by a
+  long custom symptom name.
+*/
+.severity-row {
+  display: grid;
+  gap: var(--sp-1);
+}
+
+.severity-name {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.severity-scale {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-1);
+}
+
+.severity-level {
+  min-height: 44px;
+  padding-inline: var(--sp-1);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--card);
+  border: var(--bw-data) solid var(--line-soft);
+  border-radius: var(--r-md);
+  transition: transform var(--dur-tap) var(--ease-bounce),
+              background var(--dur-hover) var(--ease-soft),
+              border-color var(--dur-hover) var(--ease-soft);
+}
+
+.severity-level:active { transform: scale(0.94); }
+
+/*
+  The selected level is filled rather than merely outlined, and carries a
+  weight change as well as the colour, so the answer survives being looked at
+  in greyscale or by someone who cannot separate the theme's two pinks.
+*/
+.severity-level[aria-pressed='true'] {
+  background: var(--primary);
+  border-color: var(--primary-line);
+  color: var(--on-primary);
+  font-weight: 800;
+}

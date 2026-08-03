@@ -15,7 +15,7 @@
  */
 
 import * as repo from '../storage/repo.js';
-import { emptyLog, normalizeSettings } from '../domain/model.js';
+import { emptyLog, normalizeSettings, pruneSeverity } from '../domain/model.js';
 import { defaultSettings } from '../domain/model.js';
 import { debounce } from '../utils/dom.js';
 import { todayKey } from '../utils/date.js';
@@ -264,6 +264,15 @@ export function rememberPicks(log) {
  * @returns {Promise<boolean>}
  */
 export function putLog(log, { quiet = false } = {}) {
+  /*
+    Severity belongs to a symptom, so it cannot outlive one. Done here rather
+    than in each view because there are four ways a symptom gets deselected —
+    the check-in, the diary's own chips, the diary's quick row, and "none"
+    clearing a whole category — and a rating left behind by any of them would
+    silently reattach itself the next time that symptom was picked.
+  */
+  log = pruneSeverity(log);
+
   // Kept so a failed write can be undone. The screen renders from memory, so
   // leaving the change in place after the disk refused it would show her a day
   // that will not be there tomorrow.

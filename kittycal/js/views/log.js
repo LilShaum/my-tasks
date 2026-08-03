@@ -17,10 +17,11 @@ import { el, svg, haptic, announce } from '../utils/dom.js';
 import { fmtRelative, fmtLong, todayKey } from '../utils/date.js';
 import {
   CATEGORIES, TESTS, MEASURES, WATER_GLASS_ML, WATER_GOAL_ML, labelFor,
-  optionMatches, normalizeQuery, DEFAULT_CHIPS,
+  optionMatches, normalizeQuery, DEFAULT_CHIPS, severityLabel,
 } from '../data/taxonomy.js';
 import { nothingRecorded, isBleeding } from '../domain/model.js';
 import { openSheet, closeSheet } from '../ui/sheet.js';
+import { severityBlock } from '../ui/severity.js';
 import { burst } from '../ui/particles.js';
 import { toast } from '../ui/toast.js';
 import { promptSheet } from '../ui/dialog.js';
@@ -70,7 +71,7 @@ export function openLogSheet(date) {
 
   const sections = [
     ...CATEGORIES.map((cat) => categorySection(cat, draft, settings, chips)),
-    customSection(draft, settings),
+    customSection(draft, settings, chips),
     testsSection(draft, chips),
     measurementsSection(draft, settings, chips),
     pillSection(draft),
@@ -146,10 +147,10 @@ function daySummary(date, log) {
   ])) {
     for (const id of ids) {
       if (id === 'none') continue;
-      entries.push(labelFor(category, id));
+      entries.push(withSeverity(labelFor(category, id), log.severity[id]));
     }
   }
-  for (const name of log.custom) entries.push(name);
+  for (const name of log.custom) entries.push(withSeverity(name, log.severity[name]));
   if (log.drive) entries.push(`${labelFor('drive', log.drive)} sex drive`);
   if (log.bbt != null) entries.push(fmtTemp(log.bbt, settings.unitTemp));
   if (log.weight != null) entries.push(fmtWeight(log.weight, settings.unitWeight));
@@ -325,6 +326,21 @@ function searchBar() {
   return el('div', { class: 'search-wrap' }, [input, clear, count]);
 }
 
+/**
+ * "Cramps (severe)", or just "Cramps" when she did not say.
+ *
+ * Parenthesised rather than prefixed so the list still scans by the thing that
+ * happened — a summary whose lines half begin with "Severe" is harder to read
+ * down than one whose lines begin with what it was.
+ *
+ * @param {string} label
+ * @param {number|undefined} value
+ */
+function withSeverity(label, value) {
+  const word = severityLabel(value);
+  return word ? `${label} (${word.toLowerCase()})` : label;
+}
+
 /* ── Chip categories ────────────────────────────────────────────────────── */
 
 /**
@@ -358,8 +374,15 @@ function categorySection(cat, draft, settings, chips) {
     row.append(chips.make(cat, option, draft));
   }
 
+  /*
+    Symptoms are the only category where "how bad" is a real question. A mood
+    does not have an intensity in any sense she could answer consistently, and
+    flow already has one built into its levels.
+  */
+  const rating = cat.id === 'symptoms' ? symptomSeverity(draft, chips) : null;
+
   // Flow leads and stays open — it's the reason most people open this sheet.
-  const node = section(cat.name, cat.hint, [row], {
+  const node = section(cat.name, cat.hint, [row, rating], {
     open: cat.id === 'flow',
     count: selectionCount(cat, draft),
   });
@@ -368,6 +391,33 @@ function categorySection(cat, draft, settings, chips) {
   if (badge) chips.watchBadge(cat, badge);
 
   return node;
+}
+
+/**
+ * The severity strip for a set of symptoms.
+ *
+ * Two of these exist — one under the built-in symptom chips and one under her
+ * own — because the two live in different fields on the log and in different
+ * sections on the sheet, and a single combined block would list a symptom from
+ * a section that is not on screen.
+ *
+ * @param {DayLog} draft
+ * @param {ReturnType<typeof sheetState>} chips
+ * @param {'symptoms'|'custom'} [field]
+ */
+function symptomSeverity(draft, chips, field = 'symptoms') {
+  const block = severityBlock({
+    // Custom symptoms are stored as the text she typed, so the id is the label.
+    label: (id) => (field === 'custom' ? id : labelFor('symptoms', id)),
+    get: (id) => draft.severity[id],
+    set: (id, value) => {
+      if (value == null) delete draft.severity[id];
+      else draft.severity[id] = value;
+    },
+  });
+
+  chips.watchSeverity(block, () => draft[field]);
+  return block.node;
 }
 
 /**
@@ -413,6 +463,9 @@ function sheetState(draft) {
   /** @type {{node: HTMLElement, count: () => number}[]} */
   const badges = [];
 
+  /** @type {{block: import('../ui/severity.js').SeverityBlock, ids: () => string[]}[]} */
+  const severities = [];
+
   const sync = () => {
     for (const { cat, id, node } of all) {
       const selected = cat.id === 'flow' && !flowAnswered
@@ -426,11 +479,26 @@ function sheetState(draft) {
       node.textContent = String(n);
       node.hidden = n === 0;
     }
+
+    for (const { block, ids } of severities) block.update(ids());
   };
 
   return {
     setFlowAnswered,
     sync,
+
+    /**
+     * A rating block, repainted whenever the selection changes.
+     *
+     * Registered here rather than updated from the chip that changed, because
+     * a symptom can be deselected from three places — its own chip, the quick
+     * row at the top, and "none" clearing the category — and only the first
+     * of those knows which symptom it was.
+     *
+     * @param {import('../ui/severity.js').SeverityBlock} block
+     * @param {() => string[]} ids  the symptoms this block rates
+     */
+    watchSeverity(block, ids) { severities.push({ block, ids }); },
 
     /**
      * @param {import('../data/taxonomy.js').Category} cat
@@ -569,8 +637,9 @@ function toggle(cat, draft, id, single) {
 /**
  * @param {DayLog} draft
  * @param {import('../domain/model.js').Settings} settings
+ * @param {ReturnType<typeof sheetState>} chips
  */
-function customSection(draft, settings) {
+function customSection(draft, settings, chips) {
   const row = el('div', { class: 'chip-row' });
 
   const paint = () => {
@@ -585,6 +654,10 @@ function customSection(draft, settings) {
           if (at >= 0) draft.custom.splice(at, 1);
           else draft.custom.push(name);
           chip.setAttribute('aria-pressed', String(draft.custom.includes(name)));
+          // These chips are built here rather than by `chips.make`, so they
+          // repaint themselves — but the rating block below still has to be
+          // told that the list it is rating just changed.
+          chips.sync();
           haptic(8);
         },
       }, [el('span', { text: name })]);
@@ -620,6 +693,9 @@ function customSection(draft, settings) {
         store.updateSettings({ customSymptoms: [...existing, name] });
         draft.custom.push(name);
         paint();
+        // A symptom she has just created is selected, so it wants a rating row
+        // straight away rather than after the next unrelated tap.
+        chips.sync();
         announce(`Added ${name}`);
       },
     }));
@@ -630,7 +706,7 @@ function customSection(draft, settings) {
   return section(
     'Anything else',
     'Track whatever you like — it shows up in your patterns alongside everything else.',
-    [row],
+    [row, symptomSeverity(draft, chips, 'custom')],
     { count: draft.custom.length },
   );
 }
