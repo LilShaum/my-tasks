@@ -39,7 +39,7 @@ const PEAK_MIN_CYCLES = 2;
 const PEAK_MAX_TIED = 3;
 
 /** A pattern needs this many cycles behind it before it's worth mentioning. */
-const MIN_CYCLES_FOR_PATTERN = 3;
+export const MIN_CYCLES_FOR_PATTERN = 3;
 
 /** And it has to show up in at least this share of them. */
 const PATTERN_THRESHOLD = 0.6;
@@ -176,6 +176,62 @@ export function detectPatterns(logs, cycles, limit = 8) {
   }
 
   return found.sort((a, b) => b.share - a.share || b.cyclesWith - a.cyclesWith).slice(0, limit);
+}
+
+/**
+ * @typedef {Object} CycleSummary
+ * @property {number} day            which day of the cycle `today` is
+ * @property {number} daysLogged     days in this cycle with any record
+ * @property {number} bleedingDays   days marked as bleeding
+ * @property {{id: string, count: number}[]} logged  what came up, most first
+ */
+
+/**
+ * What has happened in one cycle so far.
+ *
+ * This exists because everything else in stats.js needs a history to say
+ * anything, and a history takes months. Pattern detection wants three complete
+ * cycles; mood-by-phase wants complete cycles too. Someone in her second week
+ * of using the app has none of that and is not going to wait — she has logged
+ * real things and the analysis screen was telling her it had nothing to show.
+ *
+ * Everything here is a count of what she actually recorded inside one cycle.
+ * No comparison, no typical, no pattern — those words would be dishonest with
+ * a single cycle behind them, and the point is to be useful without pretending.
+ *
+ * @param {Record<DateKey, DayLog>} logs
+ * @param {Cycle} cycle
+ * @param {DateKey} today
+ * @returns {CycleSummary}
+ */
+export function cycleSummary(logs, cycle, today) {
+  // The cycle may be finished (looking back at an old one) or still running,
+  // in which case it ends today rather than at some future date.
+  const end = cycle.nextStart ? addDays(cycle.nextStart, -1) : today;
+
+  /** @type {Map<string, number>} */
+  const counts = new Map();
+  let daysLogged = 0;
+  let bleedingDays = 0;
+
+  for (const date of range(cycle.start, end < cycle.start ? cycle.start : end)) {
+    const log = logs[date];
+    if (!log) continue;
+    daysLogged += 1;
+    if (log.flow === 'light' || log.flow === 'medium'
+      || log.flow === 'heavy' || log.flow === 'clots') bleedingDays += 1;
+    for (const id of loggedIds(log)) counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+
+  return {
+    day: daysBetween(cycle.start, today) + 1,
+    daysLogged,
+    bleedingDays,
+    logged: [...counts.entries()]
+      .map(([id, count]) => ({ id, count }))
+      // Ties broken by id so the order does not shuffle between renders.
+      .sort((a, b) => b.count - a.count || a.id.localeCompare(b.id)),
+  };
 }
 
 /**
