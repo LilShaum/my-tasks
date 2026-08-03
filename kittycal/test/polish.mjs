@@ -202,6 +202,37 @@ console.log('\na field’s caption sits with the field');
   ok('and not underneath the fertility switch', strayed === false);
 }
 
+console.log('\nthe mascot is in the daily loop, not only in Settings');
+{
+  await page.evaluate(async () => (await import('/js/state/store.js')).setView('today'));
+  await page.waitForTimeout(500);
+
+  const rider = await page.evaluate(() => {
+    const r = document.querySelector('.ring-rider');
+    if (!r) return null;
+    const box = r.getBoundingClientRect();
+    const wrap = document.querySelector('.ring-wrap')?.getBoundingClientRect();
+    return {
+      art: !!r.querySelector('svg, img'),
+      size: Math.round(box.width),
+      onTheRing: !!wrap && box.left >= wrap.left - 10 && box.right <= wrap.right + 10
+        && box.top >= wrap.top - 10 && box.bottom <= wrap.bottom + 10,
+    };
+  });
+
+  /*
+    The plan said "mascot parked on today's marker" on day one and it was a
+    black dot for the entire build, so the character she chose during setup —
+    or the photograph she uploaded — appeared in onboarding, in Settings, and
+    as a 30px header glyph, and never once on the screen she opens daily.
+  */
+  ok('she is on the ring at all', rider !== null);
+  ok('as real art rather than a placeholder', rider?.art === true);
+  ok('big enough to be a character, not a token', (rider?.size ?? 0) >= 40, String(rider?.size));
+  ok('and parked on the ring rather than floating beside it',
+    rider?.onTheRing === true);
+}
+
 console.log('\nthe question every prediction is built on');
 {
   // A fresh context, because this one is past onboarding.
