@@ -29,6 +29,7 @@ import * as acog from '../domain/acog.js';
 import { barChart, lineChart, dayHeatmap } from '../ui/chart.js';
 import { spotArt } from '../ui/mascot.js';
 import { openReport } from './report.js';
+import { openNotes, noteCount } from './notes.js';
 import * as store from '../state/store.js';
 
 /** @param {HTMLElement} host */
@@ -55,7 +56,8 @@ export function renderInsights(host) {
       moodCard(logs, cycles, settings),
       bbtCard(logs, cycles, settings),
       trendCard(logs, settings),
-      reportCard(),
+      notesCard(),
+    reportCard(),
       footnote(),
     ]),
   ]);
@@ -413,6 +415,30 @@ function trendCard(logs, settings) {
 }
 
 /* ── Report ─────────────────────────────────────────────────────────────── */
+
+/*
+  Only appears once she has written something. An empty "Your notes" card on a
+  screen she visits to see her data would be one more thing to scroll past for
+  everyone who never uses the notes box.
+*/
+function notesCard() {
+  const n = noteCount();
+  if (!n) return null;
+
+  return el('div', { class: 'card' }, [
+    el('h2', { text: 'Your notes' }),
+    el('p', { class: 'hint-sm', text:
+      `${plural(n, 'thing')} you have written in the diary. Searchable, newest ` +
+      'first, and tapping one opens that day.' }),
+    el('button', {
+      type: 'button',
+      class: 'btn',
+      style: { marginTop: 'var(--sp-3)' },
+      text: 'Read them back',
+      onclick: () => { haptic(); openNotes(); },
+    }),
+  ]);
+}
 
 function reportCard() {
   return el('div', { class: 'card' }, [

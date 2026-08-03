@@ -138,3 +138,72 @@
 }
 
 .mood-bar-pct { text-align: right; color: var(--ink-2); }
+
+/* ── Notes, read back ─────────────────────────────────────────────────── */
+
+.notes-count { margin: var(--sp-2) 0 var(--sp-3); }
+
+.notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+/*
+  Each note is a button, because tapping one opens that day — but it has to
+  read as a written entry rather than a control, so it keeps the left-aligned
+  text and the quiet surface of a card instead of a button's fill.
+*/
+.note-entry {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--sp-3);
+  border: 1.5px solid var(--line-soft);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.note-entry-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-1);
+}
+
+.note-entry-date {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+/* Where in the cycle it fell, which is usually why the note exists. */
+.note-entry-day {
+  flex: none;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--primary-line);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+  Her own words, so they get room to breathe and are never truncated — a note
+  cut off at two lines is a note you have to open to read, which is the problem
+  this screen exists to solve.
+*/
+.note-entry-text {
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.note-entry-when {
+  display: block;
+  margin-top: var(--sp-1);
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+}
