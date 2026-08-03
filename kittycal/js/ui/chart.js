@@ -17,28 +17,39 @@ import { svg, el } from '../utils/dom.js';
 const PAD = { top: 12, right: 10, bottom: 22, left: 30 };
 
 /**
- * Vertical bars with an average line. Used for cycle and period length.
+ * A measurement per cycle, plotted as dots on a scale.
+ *
+ * This was a bar chart, and a bar chart was the wrong form for it. Cycle
+ * lengths sit between about 21 and 45 days, so a bar starting at zero is
+ * eight-ninths empty and every bar looks the same height — which is why the
+ * baseline had been quietly moved up to just below the smallest value. That
+ * makes the picture a lie: with a baseline at 22, a 25-day cycle drew at a
+ * third the height of a 36-day one, so the chart said "less than half as long"
+ * about two cycles that differ by eleven days.
+ *
+ * A dot has no baseline to be honest or dishonest about. Its *position*
+ * carries the value, which is exactly the claim we can support, and the
+ * connecting line answers the question this card actually exists for — is this
+ * steady, or is it wandering?
  *
  * @param {Object} opts
  * @param {{label: string, value: number, flagged?: boolean}[]} opts.data
  * @param {number} [opts.width]
  * @param {number} [opts.height]
- * @param {number} [opts.average]   draws a dashed reference line
- * @param {[number, number]} [opts.normalBand]  shaded typical range
+ * @param {number} [opts.average]   a reference line
+ * @param {[number, number]} [opts.normalBand]  the typical range, shaded
  * @param {string} opts.summary     the accessible description
  * @param {string} [opts.unit]
+ * @param {number} [opts.decimals]  for values that are not whole, like weight
  */
-export function barChart({
-  data, width = 320, height = 150, average, normalBand, summary, unit = '',
+export function trendChart({
+  data, width = 320, height = 168, average, normalBand, summary, unit = '', decimals = 0,
 }) {
   const chart = svg('svg', {
     viewBox: `0 0 ${width} ${height}`,
-    width: '100%',
-    height: String(height),
     class: 'chart',
     role: 'img',
     'aria-label': summary,
-    preserveAspectRatio: 'none',
   });
 
   if (!data.length) return chart;
@@ -47,62 +58,155 @@ export function barChart({
   const plotH = height - PAD.top - PAD.bottom;
 
   const values = data.map((d) => d.value);
-  const lo = Math.max(0, Math.min(...values, normalBand?.[0] ?? Infinity) - 3);
-  const hi = Math.max(...values, normalBand?.[1] ?? 0) + 3;
-  const span = Math.max(1, hi - lo);
+  const rawLo = Math.min(...values, normalBand?.[0] ?? Infinity);
+  const rawHi = Math.max(...values, normalBand?.[1] ?? -Infinity);
+  // A little air above and below, so a dot sitting exactly on the band edge
+  // is not drawn half outside the plot.
+  const margin = Math.max(1, (rawHi - rawLo) * 0.15);
+  const lo = rawLo - margin;
+  const span = Math.max(1, (rawHi + margin) - lo);
 
   const y = (/** @type {number} */ v) => PAD.top + plotH - ((v - lo) / span) * plotH;
+  const slot = plotW / data.length;
+  const x = (/** @type {number} */ i) => PAD.left + slot * i + slot / 2;
 
-  // Typical-range band behind everything, so out-of-range bars read at a glance.
+  const show = (/** @type {number} */ v) => v.toFixed(decimals);
+
+  /** Left-gutter numbers, so any dot can be read off the scale. */
+  const tick = (/** @type {number} */ value) => {
+    chart.append(svg('text', {
+      x: PAD.left - 5, y: y(value) + 3,
+      'text-anchor': 'end', class: 'chart-label',
+      text: show(value),
+    }));
+  };
+
+  /*
+    Without a typical range there is nothing else numbering the scale, so the
+    extremes do it. Weight and sleep have no published normal band — and a
+    chart whose only number is the average is one you cannot read a single dot
+    off.
+  */
+  if (!normalBand) {
+    tick(rawLo);
+    if (rawHi - rawLo > 0.01) tick(rawHi);
+  }
+
+  /*
+    The typical range, with hairline edges.
+
+    It used to be a 10%-opacity wash with no boundary, so "the green band is
+    21-35 days" was a sentence you had to take on trust — there was nothing on
+    the chart at 21 or at 35 to look at. Drawing and numbering the edges is
+    what turns it from a tint into a scale.
+  */
   if (normalBand) {
     const [bandLo, bandHi] = normalBand;
     chart.append(svg('rect', {
       x: PAD.left, y: y(bandHi),
       width: plotW, height: Math.max(1, y(bandLo) - y(bandHi)),
-      fill: 'var(--ok)', opacity: '0.10',
-    }));
-  }
-
-  const slot = plotW / data.length;
-  const barW = Math.max(4, Math.min(26, slot * 0.62));
-
-  data.forEach((point, i) => {
-    const cx = PAD.left + slot * i + slot / 2;
-    const top = y(point.value);
-    chart.append(svg('rect', {
-      x: cx - barW / 2,
-      y: top,
-      width: barW,
-      height: Math.max(2, PAD.top + plotH - top),
-      rx: Math.min(5, barW / 2),
-      fill: point.flagged ? 'var(--warn)' : 'var(--primary)',
-      stroke: point.flagged ? 'var(--warn)' : 'var(--primary-line)',
-      'stroke-width': '1',
+      fill: 'var(--ok)', opacity: '0.14',
     }));
 
-    // Only label every other bar once they get tight, so they don't collide.
-    if (data.length <= 8 || i % 2 === 0) {
-      chart.append(svg('text', {
-        x: cx, y: height - 7,
-        'text-anchor': 'middle',
-        class: 'chart-label',
-        text: point.label,
+    for (const edge of [bandLo, bandHi]) {
+      chart.append(svg('line', {
+        x1: PAD.left, x2: width - PAD.right,
+        y1: y(edge), y2: y(edge),
+        stroke: 'var(--ok)', 'stroke-width': '1', opacity: '0.55',
       }));
+      tick(edge);
     }
-  });
+  }
 
   if (average != null) {
     chart.append(svg('line', {
       x1: PAD.left, x2: width - PAD.right,
       y1: y(average), y2: y(average),
-      stroke: 'var(--ink-2)', 'stroke-width': '1.5', 'stroke-dasharray': '4 3',
+      stroke: 'var(--ink-3)', 'stroke-width': '1.5', 'stroke-dasharray': '4 3',
     }));
-    chart.append(svg('text', {
-      x: PAD.left - 4, y: y(average) + 3.5,
-      'text-anchor': 'end', class: 'chart-label',
-      text: `${Math.round(average)}${unit}`,
+
+    /*
+      Numbered in the gutter with the band edges, not spelled out on the plot.
+
+      "average 29d" set inside the plot area is a label with nowhere safe to
+      go: put it at either end and it lands on whichever dot happens to be
+      there. The gutter is the one column guaranteed to be empty, the dashed
+      rule already reads as a reference rather than data, and the stat tile
+      directly beneath the chart says AVERAGE 29 DAYS in type four times the
+      size — so nothing is lost by letting the gutter carry just the number.
+    */
+    const clashes = normalBand?.some((edge) => Math.abs(y(edge) - y(average)) < 9);
+    if (!clashes) tick(average);
+  }
+
+  if (data.length > 1) {
+    chart.append(svg('path', {
+      d: data.map((d, i) => `${i === 0 ? 'M' : 'L'}${x(i)},${y(d.value)}`).join(' '),
+      fill: 'none',
+      stroke: 'var(--primary-line)', 'stroke-width': '2',
+      'stroke-linejoin': 'round', 'stroke-linecap': 'round',
+      opacity: '0.55',
     }));
   }
+
+  /** At most six x labels, however many points there are. */
+  const stride = Math.max(1, Math.ceil(data.length / 5));
+  let lastLabel = '';
+
+  data.forEach((point, i) => {
+    const cx = x(i);
+    const cy = y(point.value);
+
+    /*
+      Out-of-range points get a ring as well as the warning colour, and are
+      always labelled. Colour alone would be the whole signal otherwise, which
+      fails anyone who cannot separate these two hues — and this is the one
+      mark on the chart that is actually trying to tell her something.
+    */
+    if (point.flagged) {
+      chart.append(svg('circle', {
+        cx: String(cx), cy: String(cy), r: '7',
+        fill: 'none', stroke: 'var(--warn)', 'stroke-width': '1.5',
+      }));
+    }
+
+    chart.append(svg('circle', {
+      cx: String(cx), cy: String(cy), r: '4',
+      fill: point.flagged ? 'var(--warn)' : 'var(--primary)',
+      stroke: 'var(--card)', 'stroke-width': '1.5',
+    }));
+
+    // Selectively labelled: the newest reading and anything unusual. A number
+    // over every dot is unreadable at this size and goes unread anyway.
+    if (point.flagged || i === data.length - 1) {
+      const above = cy > PAD.top + 18;
+      chart.append(svg('text', {
+        x: String(cx), y: String(above ? cy - 12 : cy + 19),
+        'text-anchor': 'middle', class: 'chart-label chart-value',
+        text: `${show(point.value)}${unit}`,
+      }));
+    }
+
+    /*
+      A handful of x labels, evenly spread, never the same word twice running.
+
+      Both rules earn their place. Labelling every point overlapped at eight
+      cycles; labelling every other one was fine for a series of cycles and
+      absurd for a series of nights, where sixteen readings from one month
+      printed "Jul" eight times in a row. The stride keeps the count sane and
+      the dedupe keeps a repeated month from being said at all.
+    */
+    if (i % stride === 0 || i === data.length - 1) {
+      if (point.label !== lastLabel) {
+        lastLabel = point.label;
+        chart.append(svg('text', {
+          x: String(cx), y: String(height - 6),
+          'text-anchor': 'middle', class: 'chart-label',
+          text: point.label,
+        }));
+      }
+    }
+  });
 
   return chart;
 }
@@ -124,9 +228,7 @@ export function lineChart({
 }) {
   const chart = svg('svg', {
     viewBox: `0 0 ${width} ${height}`,
-    width: '100%', height: String(height),
     class: 'chart', role: 'img', 'aria-label': summary,
-    preserveAspectRatio: 'none',
   });
 
   if (data.length < 2) return chart;

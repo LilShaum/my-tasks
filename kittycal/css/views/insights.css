@@ -14,11 +14,34 @@
 }
 
 /* ── Charts ───────────────────────────────────────────────────────────── */
+/*
+  Scales uniformly.
+
+  These used to carry `preserveAspectRatio="none"` with a fixed pixel height,
+  which stretched the viewBox horizontally to fill the card — and stretched
+  every number and axis label with it. `height: auto` lets the aspect ratio
+  come from the viewBox, so the type stays the shape it was drawn.
+*/
 .chart {
   display: block;
   width: 100%;
+  height: auto;
   margin: var(--sp-3) 0 var(--sp-2);
   overflow: visible;
+}
+
+/*
+  The one or two numbers called out on the plot itself. Darker than the axis
+  labels, because they are data rather than scale — and carrying a stroke in
+  the card colour, drawn behind the glyphs, so a value that lands on the band
+  edge or the average rule stays legible instead of tangling with it.
+*/
+.chart-value {
+  font-size: 10px;
+  fill: var(--ink-2);
+  stroke: var(--card);
+  stroke-width: 3px;
+  paint-order: stroke fill;
 }
 
 .chart-label {

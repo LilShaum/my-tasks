@@ -13,10 +13,10 @@
  */
 
 import { el, replace, haptic } from '../utils/dom.js';
-import { todayKey, fmtDayMonth, addDays } from '../utils/date.js';
+import { todayKey, fmtDayMonth, fmtMonth, addDays } from '../utils/date.js';
 import { plural, fmtTemp, fmtWeight } from '../utils/fmt.js';
 import {
-  buildCycles, cycleLengths, periodLengths, summarize, currentCycle,
+  buildCycles, cycleLengths, cycleLengthPoints, periodLengthPoints, summarize, currentCycle,
 } from '../domain/cycles.js';
 import { predict, detectThermalShift } from '../domain/predict.js';
 import { phaseFor, PHASES } from '../domain/phases.js';
@@ -26,7 +26,7 @@ import {
 } from '../domain/stats.js';
 import { labelOf, severityLabel } from '../data/taxonomy.js';
 import * as acog from '../domain/acog.js';
-import { barChart, lineChart, dayHeatmap } from '../ui/chart.js';
+import { trendChart, lineChart, dayHeatmap } from '../ui/chart.js';
 import { spotArt } from '../ui/mascot.js';
 import { openReport } from './report.js';
 import { openNotes, noteCount } from './notes.js';
@@ -40,7 +40,8 @@ export function renderInsights(host) {
   const cycles = buildCycles(periodDays);
   const prediction = predict({ periodDays, settings, today });
   const lengths = cycleLengths(cycles);
-  const periods = periodLengths(cycles, today);
+  const lengthPoints = cycleLengthPoints(cycles);
+  const periodPoints = periodLengthPoints(cycles, today);
 
   if (cycles.length < 2) {
     replace(host, [notEnoughYet(cycles.length)]);
@@ -50,8 +51,8 @@ export function renderInsights(host) {
   replace(host, [
     el('div', { class: 'data-zone' }, [
       overviewCard(logs, cycles, lengths, today),
-      cycleLengthCard(lengths, prediction),
-      periodLengthCard(periods),
+      cycleLengthCard(lengthPoints, prediction),
+      periodLengthCard(periodPoints),
       patternsCard(logs, cycles, prediction),
       moodCard(logs, cycles, settings),
       bbtCard(logs, cycles, settings),
@@ -99,21 +100,32 @@ function overviewCard(logs, cycles, lengths, today) {
 /* ── Cycle length ───────────────────────────────────────────────────────── */
 
 /**
- * @param {number[]} lengths
+ * How many points before the x-axis has to start skipping labels.
+ *
+ * Twelve fits, and a year of cycles is the span worth looking at: further back
+ * than that and a change of pattern is history rather than news.
+ */
+const CHART_POINTS = 12;
+
+/**
+ * @param {{start: DateKey, length: number}[]} points
  * @param {import('../domain/predict.js').Prediction} prediction
  */
-function cycleLengthCard(lengths, prediction) {
-  if (!lengths.length) return null;
+function cycleLengthCard(points, prediction) {
+  if (!points.length) return null;
 
-  const stats = summarize(lengths);
-  const recent = lengths.slice(-12);
-  const offset = lengths.length - recent.length;
+  const stats = summarize(points.map((p) => p.length));
+  const recent = points.slice(-CHART_POINTS);
 
-  const data = recent.map((value, i) => ({
-    label: String(offset + i + 1),
-    value,
-    flagged: !acog.isCycleTypical(value),
+  const data = recent.map((point) => ({
+    // The month it started, rather than its position in a list. "4" is a row
+    // number; "Mar" is a thing she can remember.
+    label: fmtMonth(point.start),
+    value: point.length,
+    flagged: !acog.isCycleTypical(point.length),
   }));
+
+  const outside = data.filter((d) => d.flagged).length;
 
   const regularity = prediction.regularity ?? 'regular';
   /** @type {Record<string, string>} */
@@ -126,18 +138,22 @@ function cycleLengthCard(lengths, prediction) {
   return el('div', { class: 'card' }, [
     el('h2', { text: 'Cycle length' }),
     el('p', { class: 'hint-sm', text:
-      `Last ${plural(recent.length, 'cycle')}. The green band is the typical ` +
-      `range, ${acog.CYCLE_MIN}–${acog.CYCLE_MAX} days.` }),
-    barChart({
+      `One dot per cycle, oldest first. Inside the green band is the typical ` +
+      `${acog.CYCLE_MIN}–${acog.CYCLE_MAX} days.` }),
+    trendChart({
       data,
       average: stats.mean ?? undefined,
       normalBand: [acog.CYCLE_MIN, acog.CYCLE_MAX],
       unit: 'd',
-      summary: `Bar chart of your last ${recent.length} cycle lengths, ` +
-        `from ${stats.min} to ${stats.max} days, averaging ` +
-        `${Math.round(stats.mean ?? 0)}. ` +
-        `${data.filter((d) => d.flagged).length} fall outside the typical range.`,
+      summary: `Your last ${recent.length} cycle lengths, from ${stats.min} to ` +
+        `${stats.max} days, averaging ${Math.round(stats.mean ?? 0)}. ` +
+        (outside
+          ? `${plural(outside, 'cycle')} outside the typical range.`
+          : 'All within the typical range.'),
     }),
+    outside > 0 && el('p', { class: 'hint-sm', text:
+      `The ringed ${outside === 1 ? 'dot is a cycle' : 'dots are cycles'} outside ` +
+      'that range.' }),
     el('div', { class: 'stat-row' }, [
       stat('Average', String(prediction.avgCycleLength), 'days'),
       stat('Variation', String(stats.spread ?? 0), 'days'),
@@ -148,28 +164,29 @@ function cycleLengthCard(lengths, prediction) {
   ]);
 }
 
-/** @param {number[]} periods */
-function periodLengthCard(periods) {
-  if (periods.length < 2) return null;
-  const stats = summarize(periods);
-  const recent = periods.slice(-12);
+/** @param {{start: DateKey, length: number}[]} points */
+function periodLengthCard(points) {
+  if (points.length < 2) return null;
+  const stats = summarize(points.map((p) => p.length));
+  const recent = points.slice(-CHART_POINTS);
 
   return el('div', { class: 'card' }, [
     el('h2', { text: 'Period length' }),
     el('p', { class: 'hint-sm', text:
-      `Typical is ${acog.PERIOD_MIN}–${acog.PERIOD_MAX} days of bleeding.` }),
-    barChart({
-      data: recent.map((value, i) => ({
-        label: String(periods.length - recent.length + i + 1),
-        value,
-        flagged: !acog.isPeriodTypical(value),
+      `Days of bleeding per period. Typical is ${acog.PERIOD_MIN}–` +
+      `${acog.PERIOD_MAX}.` }),
+    trendChart({
+      data: recent.map((point) => ({
+        label: fmtMonth(point.start),
+        value: point.length,
+        flagged: !acog.isPeriodTypical(point.length),
       })),
       average: stats.mean ?? undefined,
       normalBand: [acog.PERIOD_MIN, acog.PERIOD_MAX],
       unit: 'd',
-      height: 120,
-      summary: `Bar chart of your last ${recent.length} period lengths, ` +
-        `from ${stats.min} to ${stats.max} days.`,
+      height: 150,
+      summary: `Your last ${recent.length} period lengths, from ${stats.min} ` +
+        `to ${stats.max} days.`,
     }),
   ]);
 }
@@ -279,8 +296,11 @@ function patternsCard(logs, cycles, prediction) {
   return el('div', { class: 'card' }, [
     el('h2', { text: 'Patterns' }),
     el('p', { class: 'hint-sm', text:
+      // The strips are a darkness ramp and nothing said so, which left the
+      // one thing they encode to be guessed at.
       `Things that show up in most of your cycles, and where in the cycle they ` +
-      `land. Based on ${plural(complete, 'complete cycle')}.` }),
+      `land — darker means more cycles. Based on ` +
+      `${plural(complete, 'complete cycle')}.` }),
 
     el('ul', { class: 'pattern-list' }, patterns.map((pattern) => {
       const detail = symptomPattern(pattern.id, logs, cycles);
@@ -414,13 +434,23 @@ function trendCard(logs, settings) {
       el('p', { class: 'hint-sm', text:
         `Weight, last ${plural(weights.length, 'reading')}. ` +
         `Now ${fmtWeight(weights[weights.length - 1].value, settings.unitWeight)}.` }),
-      lineChart({
-        data: weights.map((point, i) => ({
-          x: i,
-          y: settings.unitWeight === 'lb' ? point.value * 2.2046226 : point.value,
+      /*
+        The same chart as sleep below it, not a different one.
+
+        Weight used the BBT line chart, which draws hollow markers and numbers
+        only its own extremes — so two series doing the identical job, one
+        above the other in one card, were drawn in two visual languages. The
+        BBT chart keeps its own shape because it genuinely differs: it plots
+        against day-of-cycle and carries a coverline.
+      */
+      trendChart({
+        data: weights.map((point) => ({
+          label: fmtDayMonth(point.date),
+          value: settings.unitWeight === 'lb' ? point.value * 2.2046226 : point.value,
         })),
-        height: 110,
+        height: 140,
         decimals: 1,
+        unit: settings.unitWeight,
         summary: `Weight trend over the last ${weights.length} readings.`,
       }),
     ]),
@@ -429,10 +459,11 @@ function trendCard(logs, settings) {
       el('p', { class: 'hint-sm', text:
         `Sleep, last ${plural(sleeps.length, 'night')}. Average ` +
         `${(sleeps.reduce((a, s) => a + s.value, 0) / sleeps.length).toFixed(1)} hours.` }),
-      barChart({
-        data: sleeps.map((point, i) => ({ label: String(i + 1), value: point.value })),
-        height: 110,
+      trendChart({
+        data: sleeps.map((point) => ({ label: fmtDayMonth(point.date), value: point.value })),
+        height: 140,
         unit: 'h',
+        decimals: 1,
         average: sleeps.reduce((a, s) => a + s.value, 0) / sleeps.length,
         summary: `Sleep hours over the last ${sleeps.length} nights.`,
       }),

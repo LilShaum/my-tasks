@@ -144,6 +144,19 @@ export function fmtDayMonth(key) {
   return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`;
 }
 
+/**
+ * 'Jul' — the month alone, for a chart axis.
+ *
+ * No year: a year of cycles is at most thirteen points, so the months never
+ * repeat, and the extra two digits under every dot would cost more room than
+ * they buy.
+ *
+ * @param {DateKey} key
+ */
+export function fmtMonth(key) {
+  return MONTHS_SHORT[fromKey(key).getMonth()];
+}
+
 /** 'July 2026' @param {number} y @param {number} m 0-indexed */
 export const fmtMonthYear = (y, m) => `${MONTHS[m]} ${y}`;
 
