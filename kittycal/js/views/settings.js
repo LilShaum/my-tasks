@@ -206,6 +206,7 @@ function cycleRows(settings) {
         label: 'Luteal phase length',
         value: settings.lutealLength,
         min: 8, max: 20, unit: 'days',
+        hint: 'Fourteen is typical. Leave it unless you have been told otherwise.',
         onChange: (v) => store.updateSettings({ lutealLength: v }),
       }),
       selectRow({
@@ -229,10 +230,6 @@ function cycleRows(settings) {
         }),
       ]),
     ]),
-
-    el('p', { class: 'hint-sm', style: { marginTop: 'var(--sp-2)' }, text:
-      'Fourteen days is typical. Leave it alone unless you have been told ' +
-      'otherwise.' }),
 
     onHormonal && el('div', { class: 'alert alert-info', style: { marginTop: 'var(--sp-3)' } }, [
       el('span', { class: 'alert-icon', text: 'i', 'aria-hidden': 'true' }),
@@ -643,12 +640,23 @@ function selectRow({ label, value, options, onChange }) {
  * @param {number} opts.min
  * @param {number} opts.max
  * @param {string} opts.unit
+ * @param {string} [opts.hint]  a caption tied to this field, not to the card
  * @param {(value: number) => void} opts.onChange
  */
-function numberRow({ label, value, min, max, unit, onChange }) {
+function numberRow({ label, value, min, max, unit, hint, onChange }) {
   const id = `set-${label.toLowerCase().replace(/[^a-z]+/g, '-')}`;
   return el('div', { class: 'row' }, [
-    el('label', { class: 'row-label', for: id, text: label }),
+    /*
+      The label and its caption travel together.
+
+      The luteal note used to sit at the foot of the whole card, four rows
+      below the field it describes and directly under the fertility toggle —
+      so "fourteen days is typical" read as a statement about a switch.
+    */
+    el('div', { class: 'row-label-group' }, [
+      el('label', { class: 'row-label', for: id, text: label }),
+      hint && el('span', { class: 'row-hint', text: hint }),
+    ]),
     el('div', { style: { display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' } }, [
       el('input', {
         class: 'input num',

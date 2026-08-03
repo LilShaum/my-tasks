@@ -271,21 +271,48 @@ function stepLastPeriod() {
     },
   });
 
-  /** Quick picks, because most people know it in relative terms. */
-  const quick = el('div', { class: 'chip-row' }, [0, 3, 7, 14, 21, 28].map((ago) =>
-    el('button', {
+  /*
+    Quick picks, because most people know this in relative terms rather than as
+    a date — and because typing one into a date field on a phone is the worst
+    way to answer the question every prediction in the app is built on.
+
+    Two things they were missing. They said "3d ago", which is an abbreviation
+    on a screen with room for the words. And tapping one changed the sentence
+    underneath but left the chip itself looking untouched, so the only feedback
+    for the primary control on the screen was somewhere else.
+  */
+  /** @type {HTMLElement[]} */
+  const quickChips = [];
+
+  const quick = el('div', { class: 'chip-row' }, [0, 3, 7, 14, 21, 28].map((ago) => {
+    const chip = el('button', {
       type: 'button',
       class: 'chip',
-      text: ago === 0 ? 'Today' : `${ago}d ago`,
+      'aria-pressed': 'false',
+      dataset: { ago: String(ago) },
+      text: ago === 0 ? 'Today' : `${ago} days ago`,
       onclick: () => {
         draft.lastPeriodStart = addDays(today, -ago);
         /** @type {HTMLInputElement} */ (input).value = draft.lastPeriodStart;
         chosen.textContent =
           `${fmtLong(draft.lastPeriodStart)} — ${describeAgo(draft.lastPeriodStart)}`;
+        for (const c of quickChips) {
+          c.setAttribute('aria-pressed', String(c.dataset.ago === String(ago)));
+        }
         haptic(8);
       },
-    }),
-  ));
+    });
+    quickChips.push(chip);
+    return chip;
+  }));
+
+  /*
+    Typing or picking a date directly clears the chips, so the screen never
+    shows a highlighted "7 days ago" above a field reading something else.
+  */
+  input.addEventListener('change', () => {
+    for (const c of quickChips) c.setAttribute('aria-pressed', 'false');
+  });
 
   return {
     content: [

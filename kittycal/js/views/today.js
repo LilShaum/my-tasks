@@ -713,12 +713,25 @@ function fertileCard(prediction, today) {
   if (!prediction.fertileWindow || !prediction.ovulation) return null;
   const chance = conceptionChance(prediction, today);
 
+  /*
+    Past the window, the same card was a lie of tense.
+
+    The heading said "Fertile window" over a date range that had already been
+    and gone — on the third of August it read "Fertile window / 22 Jul - 28
+    Jul", which scans as something upcoming. The information is still worth
+    keeping: knowing roughly when ovulation was is what makes the rest of the
+    luteal phase legible. Only the framing was wrong.
+  */
+  const passed = prediction.fertileWindow.end < today;
+
   return el('div', { class: 'card data-zone' }, [
-    el('h3', { text: 'Fertile window' }),
+    el('h3', { text: passed ? 'Fertile window has passed' : 'Fertile window' }),
     el('p', { class: 'big-value num', text:
       `${fmtDayMonth(prediction.fertileWindow.start)} – ${fmtDayMonth(prediction.fertileWindow.end)}` }),
-    el('p', { class: 'hint-sm', text:
-      `Ovulation estimated ${fmtDayMonth(prediction.ovulation)}. Today: ${chance.label.toLowerCase()}.` }),
+    el('p', { class: 'hint-sm', text: passed
+      ? `Ovulation was estimated at ${fmtDayMonth(prediction.ovulation)}. `
+        + `Today: ${chance.label.toLowerCase()}.`
+      : `Ovulation estimated ${fmtDayMonth(prediction.ovulation)}. Today: ${chance.label.toLowerCase()}.` }),
     prediction.fertileWidened && el('div', { class: 'alert alert-warn', style: { marginTop: 'var(--sp-3)' } }, [
       el('span', { class: 'alert-icon', text: '!', 'aria-hidden': 'true' }),
       el('div', { text:

@@ -274,6 +274,30 @@
 
 .row-label { flex: 1; font-weight: 600; }
 
+/*
+  A field's caption belongs to the field.
+
+  `.row` is a two-column flex, so a label with a caption under it needs its own
+  block — otherwise the caption becomes a third column and squeezes the input.
+  The luteal note used to sit at the foot of the whole card, four rows below
+  the field it describes and directly under the fertility switch, so "fourteen
+  is typical" read as a statement about a toggle.
+*/
+.row-label-group {
+  flex: 1;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.row-label-group .row-label { flex: none; }
+
+.row-hint {
+  font-size: var(--fs-xs);
+  line-height: 1.35;
+  color: var(--ink-3);
+}
+
 .row-value { color: var(--ink-2); font-size: var(--fs-sm); }
 
 button.row, a.row { transition: background var(--dur-hover) var(--ease-soft); }
