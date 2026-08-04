@@ -53,36 +53,6 @@
   max-width: 15ch;
 }
 
-.ring-legend {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--sp-2) var(--sp-4);
-  margin-bottom: var(--sp-5);
-  font-size: var(--fs-xs);
-  color: var(--ink-2);
-  font-weight: 600;
-}
-
-.ring-legend li { display: flex; align-items: center; gap: 5px; }
-
-.legend-dot {
-  width: 9px; height: 9px;
-  border-radius: 50%;
-  border: 1px solid oklch(50% 0 0 / 0.2);
-  flex: none;
-}
-
-/* ── Cards ────────────────────────────────────────────────────────────── */
-.card-head {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  margin-bottom: var(--sp-2);
-}
-
-.card-head h3 { font-size: var(--fs-md); }
-
 .phase-dot {
   width: 11px; height: 11px;
   border-radius: 50%;
@@ -138,17 +108,6 @@
 .flag-list li { display: flex; flex-direction: column; gap: 2px; }
 
 .flag-list strong { font-size: var(--fs-sm); }
-
-/* ── Log nudge ────────────────────────────────────────────────────────── */
-.log-nudge {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-}
-
-.log-nudge h3 { font-size: var(--fs-md); }
-
-.log-nudge .mascot-host { animation: float-y 5s var(--ease-soft) infinite; }
 
 /* ── Daily insight cards ──────────────────────────────────────────────── */
 .tips { margin-bottom: var(--sp-5); }
@@ -246,11 +205,6 @@
   color: var(--ink-2);
 }
 
-.confidence-high { border-left-color: var(--ok); }
-.confidence-medium { border-left-color: var(--info); }
-.confidence-low,
-.confidence-none { border-left-color: var(--warn); }
-
 /* ── End-of-cycle recap ───────────────────────────────────────────────── */
 
 /*
@@ -335,39 +289,8 @@
    than shrinking below that. */
 .backup-nudge-actions .btn { flex: 1 1 auto; }
 
-/* ── Inline quick logging ─────────────────────────────────────────────── */
-
-/*
-  Sits where the single big "Log today" button used to. It is doing more work,
-  so it gets a surface of its own rather than floating on the page — but a
-  quiet one, because it must not compete with the ring above it.
-*/
-.quick-log {
-  display: grid;
-  gap: var(--sp-3);
-  padding: var(--sp-3);
-  background: var(--surface-2);
-  border-radius: var(--r-lg);
-}
-
-.quick-block { display: grid; gap: var(--sp-2); }
-
-.quick-block .hint-sm { font-weight: 600; }
-
-/* The route to the full diary. Secondary, because the chips above it handle
-   the common case and this is the "something unusual today" path. */
-.quick-log-more { margin-top: var(--sp-1); }
-
-.quick-log .chip-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-}
-
 /* Chips here are the primary control, so they keep the full 44px target and
    grow to fill the row rather than huddling at the left. */
-.quick-log .chip { flex: 1 1 auto; justify-content: center; }
-
 /* ── Daily check-in ───────────────────────────────────────────────────── */
 
 /*

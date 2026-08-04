@@ -384,13 +384,6 @@ const CATEGORY_BY_ID = new Map(
       .map((o) => /** @type {[string, string]} */ ([o.id, c.id]))),
 );
 
-/**
- * @param {string} optionId
- * @returns {string|null} category id, or null for anything she named herself
- */
-export function categoryOf(optionId) {
-  return CATEGORY_BY_ID.get(optionId) ?? null;
-}
 
 /** Moods are reported separately from physical symptoms. @param {string} id */
 export const isMood = (id) => CATEGORY_BY_ID.get(id) === 'moods';

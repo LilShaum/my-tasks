@@ -127,7 +127,7 @@ export const dayOfMonth = (key) => Number(key.slice(8, 10));
 /* ── Display formatting ─────────────────────────────────────────────────── */
 
 /** 'Mon 27 Jul' @param {DateKey} key */
-export function fmtShort(key) {
+function fmtShort(key) {
   const d = fromKey(key);
   return `${DOW_SHORT[d.getDay()]} ${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`;
 }

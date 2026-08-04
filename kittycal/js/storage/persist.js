@@ -31,7 +31,7 @@
  */
 
 /** Is the app running as an installed app rather than a browser tab? */
-export function isInstalled() {
+function isInstalled() {
   // iOS Safari predates the standard and only sets navigator.standalone.
   const iosStandalone = /** @type {any} */ (navigator).standalone === true;
   const displayMode = typeof window.matchMedia === 'function' &&
@@ -63,7 +63,7 @@ export async function requestPersistence() {
 }
 
 /** @returns {Promise<boolean>} */
-export async function isPersisted() {
+async function isPersisted() {
   try {
     return (await navigator.storage?.persisted?.()) ?? false;
   } catch {

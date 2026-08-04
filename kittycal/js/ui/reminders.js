@@ -39,7 +39,7 @@ const META_FIRED = 'remindersFired';
  */
 
 /** @returns {ReminderSettings} */
-export function defaultReminders() {
+function defaultReminders() {
   return {
     periodSoon: false,
     periodSoonDays: 2,

@@ -254,6 +254,42 @@ console.log('\nthe question every prediction is built on');
   await fresh.close();
 }
 
+console.log('\nthe calendar refuses to log a period that has not happened');
+{
+  await page.evaluate(async () => (await import('/js/state/store.js')).setView('calendar'));
+  await page.waitForTimeout(400);
+  await page.evaluate(() => {
+    /** @type {HTMLElement|undefined} */
+    ([...document.querySelectorAll('button')]
+      .find((b) => /Edit period dates/i.test(b.textContent ?? '')))?.click();
+  });
+  await page.waitForTimeout(300);
+
+  const cells = await page.evaluate(() => {
+    const today = new Date();
+    const key = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const all = [...document.querySelectorAll('.cal-cell[data-date]')];
+    const future = all.filter((c) => (c.dataset.date ?? '') > key);
+    const past = all.filter((c) => (c.dataset.date ?? '') <= key);
+    return {
+      futureCount: future.length,
+      futureDisabled: future.every((c) => c.disabled),
+      futureSaysWhy: future.every((c) => /cannot be marked/.test(c.getAttribute('aria-label') ?? '')),
+      pastEnabled: past.length > 0 && past.every((c) => !c.disabled),
+    };
+  });
+
+  /*
+    Marking one future day used to be enough to have Today announce "Day -29"
+    and "58 days to your period" while another card on the same screen said
+    there was not enough data to say anything at all.
+  */
+  ok('there are future days on this month to test', cells.futureCount > 0);
+  ok('every one of them refuses the tap in edit mode', cells.futureDisabled === true);
+  ok('and says why, rather than only looking greyed', cells.futureSaysWhy === true);
+  ok('while past days stay markable', cells.pastEnabled === true);
+}
+
 ok('no page errors throughout', errors.length === 0, errors.join(' | '));
 
 console.log(`\npolish: ${pass}/${pass + fail} checks passed`);

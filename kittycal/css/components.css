@@ -15,13 +15,6 @@
   box-shadow: var(--sh-sticker);
 }
 
-.card-soft {
-  background: var(--card);
-  border-radius: var(--r-lg);
-  padding: var(--sp-4);
-  box-shadow: var(--sh-soft);
-}
-
 .card-tinted {
   background: var(--surface-2);
   border-radius: var(--r-lg);
@@ -323,7 +316,6 @@
 }
 
 .badge-primary { background: var(--primary-soft); color: var(--ink); }
-.badge-accent  { background: var(--accent-soft);  color: var(--ink); }
 
 /* ── The data zone. Design rule 1 made mechanical. ────────────────────── */
 .data-zone {
@@ -372,24 +364,6 @@
     drop-shadow(0 3px 3px oklch(30% 0.04 var(--h) / 0.22));
 }
 
-/* Cheaper and cleaner for SVG. */
-.sticker-svg {
-  paint-order: stroke fill;
-  stroke: var(--card);
-  stroke-width: 6;
-  stroke-linejoin: round;
-}
-
-/* ── Scalloped edge, no images ────────────────────────────────────────── */
-.scallop-b {
-  --scallop-r: 9px;
-  mask:
-    radial-gradient(var(--scallop-r) at 50% 0, #0000 98%, #000)
-      50% 100% / calc(var(--scallop-r) * 2) var(--scallop-r) repeat-x,
-    linear-gradient(#000 0 0)
-      0 0 / 100% calc(100% - var(--scallop-r)) no-repeat;
-}
-
 /* ── Entrances. A 1-3 degree tilt reads hand-placed; straight vertical
       reads corporate. Overshoot on transform only.                   ── */
 @keyframes pop-in {
@@ -425,17 +399,6 @@
 @keyframes twinkle {
   0%, 100% { transform: scale(0) rotate(0deg); opacity: 0; }
   50%      { transform: scale(1) rotate(90deg); opacity: 1; }
-}
-
-/* ── Sparkles: four-point star via clip-path, no canvas, no library ───── */
-.sparkle {
-  position: absolute;
-  width: var(--sparkle-size, 13px);
-  aspect-ratio: 1;
-  background: var(--accent);
-  clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
-  animation: twinkle 1.5s var(--ease-soft) infinite;
-  pointer-events: none;
 }
 
 /* ── Toasts ───────────────────────────────────────────────────────────── */

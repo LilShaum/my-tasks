@@ -115,7 +115,7 @@ async function findDropIn(themeId) {
  * @param {string} themeId
  * @returns {Promise<{kind: 'image', url: string}|{kind: 'emblem'}>}
  */
-export async function resolveMascot(themeId) {
+async function resolveMascot(themeId) {
   try {
     const blob = await repo.loadMascot(themeId);
     if (blob) {

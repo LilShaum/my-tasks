@@ -90,6 +90,24 @@ export function exportFilename() {
  * @param {string} text
  * @returns {ImportResult}
  */
+/**
+ * A date key that names a day that exists.
+ *
+ * The shape check alone accepted `2026-13-45`, which JavaScript then rolls
+ * over into some other day entirely — so a hand-edited or corrupted file could
+ * land a log on a date she never wrote. Rebuilding the key from the parsed
+ * date and comparing is the cheapest way to reject the impossible ones.
+ *
+ * @param {unknown} key
+ * @returns {key is string}
+ */
+function isRealDate(key) {
+  if (typeof key !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(key)) return false;
+  const [y, m, d] = key.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
+}
+
 export function parseImport(text) {
   /** @type {any} */
   let raw;
@@ -117,17 +135,17 @@ export function parseImport(text) {
   if (Array.isArray(raw.logs)) {
     for (const entry of raw.logs) {
       if (!entry || typeof entry.date !== 'string') continue;
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(entry.date)) continue;
+      if (!isRealDate(entry.date)) continue;
       logs[entry.date] = normalizeLog(entry);
     }
   }
 
   const periodDays = new Set(
     Array.isArray(raw.periodDays)
-      ? raw.periodDays.filter(
-          (/** @type {unknown} */ k) =>
-            typeof k === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(k),
-        )
+      // Same rule as the logs: a period day has to name a day that exists.
+      // A phantom date here is worse than one on a log, because every cycle
+      // length in the app is measured from these.
+      ? raw.periodDays.filter(isRealDate)
       : [],
   );
 

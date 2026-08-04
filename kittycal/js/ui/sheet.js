@@ -10,7 +10,10 @@
 
 import { el, need, trapFocus, haptic } from '../utils/dom.js';
 
-/** @type {{root: HTMLElement, backdrop: HTMLElement, release: () => void, opener: Element|null}|null} */
+/** Ids handed to openers that lack one, so focus can be restored by lookup. */
+let openerSeq = 0;
+
+/** @type {{root: HTMLElement, backdrop: HTMLElement, release: () => void, opener: string|null}|null} */
 let open = null;
 
 /**
@@ -35,7 +38,35 @@ export function isSheetOpen() {
 export function openSheet({ title, body, footer, onClose }) {
   closeSheet();
 
-  const opener = document.activeElement;
+  /*
+    Where focus goes back to.
+
+    Remembering the node is not enough: the view underneath re-renders while a
+    sheet is open — applying a log notifies the store, which rebuilds Today —
+    so by the time the sheet closes the button that opened it has usually been
+    replaced. The old restore guarded on `document.contains(opener)`, found a
+    detached node, and correctly did nothing, which left focus on <body>. A
+    keyboard user was dropped at the top of the document every time.
+
+    So an id is stamped on the opener and looked up again at close, which
+    survives the node being rebuilt as long as the view redraws the same
+    control. `openerFallback` catches the case where it genuinely no longer
+    exists — the tab bar is always present and is a sane place to land.
+  */
+  const active = document.activeElement;
+  /*
+    Only a real control counts. A sheet opened by a tap rather than by keyboard
+    leaves `document.activeElement` as <body>, and an earlier version of this
+    stamped an id onto <body> and then dutifully restored focus to it — which
+    is exactly the nothing it was meant to fix, with an id attached.
+  */
+  const openerNode = active instanceof HTMLElement
+    && active !== document.body
+    && active.matches('button, [href], input, select, textarea, [tabindex]')
+    ? active
+    : null;
+  if (openerNode && !openerNode.id) openerNode.id = `sheet-opener-${(openerSeq += 1)}`;
+  const opener = openerNode ? openerNode.id : null;
 
   const backdrop = el('div', {
     class: 'sheet-backdrop',
@@ -66,6 +97,7 @@ export function openSheet({ title, body, footer, onClose }) {
   ]);
 
   document.body.append(backdrop, root);
+  holdBackground(true);
 
   // Stop the page behind from scrolling while the sheet is up.
   const previousOverflow = document.body.style.overflow;
@@ -123,6 +155,7 @@ export function closeSheet() {
   open = null;
 
   release();
+  holdBackground(false);
   root.dataset.open = 'false';
   backdrop.dataset.open = 'false';
 
@@ -131,8 +164,61 @@ export function closeSheet() {
     backdrop.remove();
   }, 340);
 
-  if (opener instanceof HTMLElement && document.contains(opener)) {
-    opener.focus({ preventScroll: true });
+  /*
+    Restored after the screen underneath has settled, not before it.
+
+    Closing a sheet usually changes state — the check-in records that it was
+    skipped, the diary applies a log — and the store notifies on a later turn,
+    so the view redraws *after* `closeSheet` has returned. Restoring focus
+    inline did work, and then the re-render replaced the freshly focused button
+    and dropped focus to <body>: the fix looked correct in the code and failed
+    on the screen. Two frames is past both the notify and the paint.
+  */
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    /*
+      Stand down only if something *else* has claimed focus — a toast action,
+      or the next sheet in a chain.
+
+      "Anything that is not <body>" was the wrong test: the sheet is still on
+      screen for the length of its exit animation, so at this point focus is
+      normally still on the close button that was just pressed, and the check
+      bailed every time. Focus inside the dying sheet is precisely the case
+      this exists to rescue.
+    */
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active !== document.body
+      && !root.contains(active)) return;
+
+    const back = opener ? document.getElementById(opener) : null;
+    const target = back
+      ?? document.querySelector('.tabbar button[aria-selected="true"]')
+      ?? document.querySelector('.tabbar button');
+    if (target instanceof HTMLElement) target.focus({ preventScroll: true });
+  }));
+}
+
+/**
+ * Take the page behind the sheet out of play.
+ *
+ * `inert` does both halves of what a modal needs in one attribute: nothing
+ * underneath can be tabbed to, and nothing underneath is announced. The sheet
+ * has always carried `aria-modal="true"` and this file has always claimed
+ * focus was "trapped there" — but nothing trapped it, and fourteen controls
+ * behind an open sheet stayed reachable by keyboard.
+ *
+ * Applied to the shells rather than to <body>, because the sheet and its
+ * backdrop are appended to <body> and would otherwise inert themselves.
+ *
+ * @param {boolean} on
+ */
+function holdBackground(on) {
+  for (const sel of ['#app-root', '#onboarding-root', '#live-region']) {
+    const node = document.querySelector(sel);
+    // The live region stays out of it: an announcement made while a sheet is
+    // open is usually about the sheet.
+    if (!(node instanceof HTMLElement) || sel === '#live-region') continue;
+    if (on) node.setAttribute('inert', '');
+    else node.removeAttribute('inert');
   }
 }
 

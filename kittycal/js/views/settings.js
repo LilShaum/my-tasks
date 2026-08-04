@@ -308,7 +308,16 @@ function reminderRows() {
       // Reflect the stored value once it loads.
       loadReminders().then((r) => {
         toggle.setAttribute('aria-checked', String(Boolean(r[key])));
-      }).catch(() => {});
+      }).catch((err) => {
+        /*
+          A switch that cannot read its own value must not sit there looking
+          off. Off is a claim — "this reminder is not set" — and making it
+          without knowing is how she misses a reminder she thought she had.
+        */
+        toggle.setAttribute('aria-checked', 'mixed');
+        toggle.setAttribute('aria-label', `${label} — could not read this setting`);
+        console.error('kittycal: could not read reminder settings', err);
+      });
 
       return el('div', { class: 'row' }, [
         el('span', { class: 'row-label' }, [
@@ -408,7 +417,18 @@ function lockRows() {
           'The code itself is never stored. It keeps the app shut to whoever ' +
           'picks up your phone, but it is not encryption.' }),
       ]);
-    }).catch(() => {});
+    }).catch((err) => {
+      // The whole passcode section used to vanish without a word if this
+      // rejected, which reads as "this app has no lock" rather than as a
+      // failure — and there is no way to notice a control that is not there.
+      console.error('kittycal: could not read the lock settings', err);
+      replace(host, [
+        el('h3', { text: 'Privacy' }),
+        el('p', { class: 'hint-sm', text:
+          'Could not read whether a passcode is set. Reopening Settings ' +
+          'usually clears this.' }),
+      ]);
+    });
   };
 
   repaint();
