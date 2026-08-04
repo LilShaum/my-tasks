@@ -45,6 +45,14 @@ const CHECKS = [
   // The same pair carries the standing-note icon and its left edge.
   ['--primary-line', '--surface-2', 4.5, 'logged tick and note icon on surface-2'],
   ['--ink', '--surface-2', 4.5, 'note body text'],
+  /*
+    Secondary text moved onto surface-2 when the "worth knowing" cards dropped
+    to the quiet tier, so the pair it is actually drawn on now has to be
+    checked. Adding the pair rather than trusting that surface-2 is close
+    enough to surface: they are different tokens with different lightness in
+    both modes, and "close enough" is how a ratio quietly slips under.
+  */
+  ['--ink-2', '--surface-2', 4.5, 'secondary text on the quiet card tier'],
   // The one destructive button in the app. Held to the text bar, not 3:1.
   ['--on-danger', '--danger-solid', 4.5, 'label on the erase button'],
 ];
@@ -123,6 +131,66 @@ for (const theme of THEMES) {
       checked++;
       if (got < Number(min)) {
         failures.push({ theme, mode, label: String(label), got, want: Number(min) });
+      }
+    }
+
+    /*
+      The phase block's wash is a composite, so no pair of tokens describes it.
+
+      It is `color-mix(phase 12%, card)` with the phase colour set from the
+      same token the ring arc uses, which means four different backgrounds per
+      theme per mode — and the menstrual one is the strongest colour in the
+      palette. Reasoning that 12% "barely moves it" is exactly the sort of
+      thing that turns out to be wrong on one theme in dark mode, so it gets
+      measured.
+
+      Through the same canvas as everything else above: a first attempt read
+      `backgroundColor` and pulled digits out of it with a regex, which for a
+      `color-mix` Chromium reports as `oklab(...)` — so it scored the app
+      against numbers that were not colours and failed a hundred pairs that
+      were fine.
+    */
+    const washes = await page.evaluate(
+      ({ theme, mode, phases }) => {
+        const root = document.documentElement;
+        root.dataset.theme = theme;
+        root.dataset.mode = mode;
+
+        const probe = document.createElement('span');
+        probe.style.display = 'none';
+        document.body.append(probe);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 1;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+        /** @type {Record<string, number[]>} */
+        const out = {};
+        for (const token of phases) {
+          probe.style.color = `color-mix(in oklab, var(${token}) 12%, var(--card))`;
+          const computed = getComputedStyle(probe).color;
+          ctx.clearRect(0, 0, 1, 1);
+          ctx.fillStyle = '#000';
+          ctx.fillStyle = computed;
+          ctx.fillRect(0, 0, 1, 1);
+          const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+          out[token] = [r, g, b];
+        }
+
+        probe.remove();
+        return out;
+      },
+      { theme, mode, phases: ['--period', '--fertile-soft', '--ovulation', '--luteal'] },
+    );
+
+    for (const [token, mixed] of Object.entries(washes)) {
+      for (const [fg, min, what] of [['--ink', 4.5, 'heading'], ['--ink-2', 4.5, 'body']]) {
+        const got = ratio(resolved[String(fg)], mixed);
+        checked++;
+        if (got < Number(min)) {
+          failures.push({ theme, mode, got, want: Number(min),
+            label: `phase-block ${what} text on a ${token} wash` });
+        }
       }
     }
   }

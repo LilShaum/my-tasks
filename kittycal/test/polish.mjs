@@ -290,6 +290,66 @@ console.log('\nthe calendar refuses to log a period that has not happened');
   ok('while past days stay markable', cells.pastEnabled === true);
 }
 
+console.log('\nthe screen has a hierarchy rather than one weight');
+{
+  await page.evaluate(async () => (await import('/js/state/store.js')).setView('today'));
+  await page.waitForTimeout(500);
+
+  const weights = await page.evaluate(() => {
+    const answer = [...document.querySelectorAll('#view-today .card')]
+      .find((c) => /Next period|days late|Fertile window/.test(c.textContent ?? ''));
+    const tip = document.querySelector('#view-today .tip-card');
+    const phase = document.querySelector('.phase-line');
+    /** Resolve a token to the same string form getComputedStyle reports. */
+    const asPainted = (/** @type {string} */ name) => {
+      const probe = document.createElement('div');
+      probe.style.backgroundColor = `var(${name})`;
+      document.body.append(probe);
+      const value = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return value;
+    };
+
+    return {
+      answerFound: !!answer,
+      tipFound: !!tip,
+      answerBg: answer ? getComputedStyle(answer).backgroundColor : null,
+      tipBg: tip ? getComputedStyle(tip).backgroundColor : null,
+      cardToken: asPainted('--card'),
+      surface2Token: asPainted('--surface-2'),
+      answerShadow: answer ? getComputedStyle(answer).boxShadow !== 'none' : null,
+      tipShadow: tip ? getComputedStyle(tip).boxShadow !== 'none' : null,
+      phaseWash: phase ? getComputedStyle(phase).backgroundColor : null,
+      phaseRule: phase ? parseFloat(getComputedStyle(phase).borderTopWidth) : null,
+    };
+  });
+
+  /*
+    Everything on Today used to be a `.card` — the same fill, border and
+    shadow — so the answer to "when is my period" carried exactly the weight of
+    a background explainer. Nothing led, so the whole screen had to be read.
+
+    Asserted on which token each card is filled with, not on border width or a
+    luminance sum. Both cards live inside a `.data-zone`, which rebinds `--bw`
+    to the thin data border, so they legitimately share a width; and two
+    earlier versions of this check compared numbers that were not colours.
+  */
+  ok('a prediction card and a reference card both exist',
+    weights.answerFound === true && weights.tipFound === true);
+  ok('the answer card is filled with the card colour',
+    weights.answerBg === weights.cardToken, `${weights.answerBg} vs ${weights.cardToken}`);
+  ok('the reference card drops to the quiet surface',
+    weights.tipBg === weights.surface2Token, `${weights.tipBg} vs ${weights.surface2Token}`);
+  ok('so the two are not drawn the same', weights.answerBg !== weights.tipBg);
+  ok('reference cards carry no sticker shadow', weights.tipShadow === false);
+  ok('while the answers keep theirs', weights.answerShadow === true);
+
+  ok('the phase block is washed in a colour, not left plain',
+    !!weights.phaseWash && weights.phaseWash !== 'rgba(0, 0, 0, 0)', String(weights.phaseWash));
+  ok('and carries a rule in that colour', (weights.phaseRule ?? 0) >= 2,
+    String(weights.phaseRule));
+}
+
 ok('no page errors throughout', errors.length === 0, errors.join(' | '));
 
 console.log(`\npolish: ${pass}/${pass + fail} checks passed`);

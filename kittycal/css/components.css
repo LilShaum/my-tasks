@@ -21,6 +21,26 @@
   padding: var(--sp-4);
 }
 
+/*
+  The quiet tier.
+
+  Everything on Today was a `.card` — the same fill, the same 2.5px border, the
+  same sticker shadow — so the answer to "when is my period" carried exactly
+  the weight of a background explainer and a reminder to export a file. With
+  nothing leading, the eye has to read the whole screen to find the one line it
+  came for.
+
+  Reference and housekeeping drop to this: no border, no shadow, a surface a
+  shade off the page. The prediction cards keep the full treatment and become
+  the only thing on the screen wearing it.
+*/
+.card-quiet {
+  background: var(--surface-2);
+  border: var(--bw-data) solid transparent;
+  border-radius: var(--r-lg);
+  padding: var(--sp-4);
+}
+
 /* ── Buttons ──────────────────────────────────────────────────────────── */
 .btn {
   display: inline-flex;

@@ -162,7 +162,16 @@
   --sh-sticker:       3px 4px 0 var(--line);
   --sh-sticker-press: 1px 1px 0 var(--line);
 
-  --pat-color: oklch(72% calc(var(--c) * 0.7) var(--h) / 0.16);
+  /*
+    Dialled back from 0.16.
+
+    The comment on the pattern block says it "sits behind content at low
+    contrast", and at 0.16 it was not low — the gingham was the strongest
+    texture on the Today screen, competing with the ring it sat behind. The
+    check is still plainly there when you look at it, which is all a background
+    is for.
+  */
+  --pat-color: oklch(72% calc(var(--c) * 0.7) var(--h) / 0.09);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -220,7 +229,7 @@
   --info:      oklch(76% 0.12 250);
   --info-bg:   oklch(28% 0.05 250);
 
-  --pat-color: oklch(70% calc(var(--c) * 0.7) var(--h) / 0.13);
+  --pat-color: oklch(70% calc(var(--c) * 0.7) var(--h) / 0.08);
 
   --sh-soft:
     0 1px 2px  oklch(8% 0.02 var(--h) / 0.5),
