@@ -117,6 +117,17 @@ export function openHelp() {
           'data underneath.'),
       ]),
 
+      section('Why it asks you to install it', [
+        p('Safari deletes what a website has stored if you go about a week ' +
+          'without opening it. Everything Kittycal knows is in that storage, ' +
+          'and there is no copy on a server to put it back.'),
+        p('A web app on your Home Screen is exempt from that rule, which is ' +
+          'why Today asks once you have a few days recorded. Tap the Share ' +
+          'button in Safari, then Add to Home Screen. "Not now" hides the ' +
+          'message for a fortnight; it comes back because the risk does not go ' +
+          'away when the message does.'),
+      ]),
+
       section('Backups and a new phone', [
         p('Settings → Export everything saves a file. That file is the only ' +
           'copy that survives losing or replacing the phone.'),

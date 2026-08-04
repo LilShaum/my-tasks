@@ -27,6 +27,8 @@ import { nothingRecorded } from '../domain/model.js';
 import { buildRecap, cluster } from '../domain/recap.js';
 import { respondToCheckin } from '../domain/response.js';
 import { backupNudge } from '../domain/backup-health.js';
+import { installNudge } from '../domain/install-health.js';
+import { storageSnapshot, installPlatform } from '../storage/persist.js';
 import { exportEverything } from '../storage/export-action.js';
 import { openLogSheet } from './log.js';
 import { openCheckin } from './checkin.js';
@@ -119,8 +121,91 @@ export function renderToday(host) {
     ]),
 
     tipsRow({ phase, prediction, log: logs[today], today }),
+    installPrompt({ logs, periodDays, settings, today }),
     backupPrompt({ logs, periodDays, settings, today }),
     disclaimerNote(),
+  ]);
+}
+
+/**
+ * The one thing that can lose all of this without her doing anything.
+ *
+ * The backup nudge below covers losing the phone. This covers the browser
+ * throwing the data away while the phone sits in her pocket, which is a real
+ * behaviour of Safari and not a hypothetical: script-writable storage goes
+ * after about a week without a visit, and a Home Screen app is exempt.
+ *
+ * It looks like a warning rather than a card because it is one, and because
+ * design rule 3 says alerts hold their contrast across all fourteen themes. It
+ * still sits near the bottom: it is urgent in a way the backup nudge is not,
+ * but the top of this screen answers "where am I in my cycle" and nothing else.
+ *
+ * The one button is the backup, not the install — installing is a thing only
+ * she can do, through browser chrome no web page can reach. So the card spends
+ * its words on the three taps involved and offers the protection a button can
+ * actually deliver.
+ *
+ * @param {Object} input
+ * @param {Record<DateKey, import('../domain/model.js').DayLog>} input.logs
+ * @param {Set<DateKey>} input.periodDays
+ * @param {import('../domain/model.js').Settings} input.settings
+ * @param {DateKey} input.today
+ */
+function installPrompt({ logs, periodDays, settings, today }) {
+  const storage = storageSnapshot();
+  if (!storage.known) return null;
+
+  const nudge = installNudge({ logs, periodDays, settings, today, storage });
+  if (!nudge) return null;
+
+  const platform = installPlatform();
+
+  const risk = platform === 'ios'
+    ? 'Safari deletes what a website has stored if you go about a week ' +
+      'without opening it. Everything you have logged lives in that storage, ' +
+      'and Kittycal has no server copy to restore it from.'
+    : 'This browser has not promised to keep this app’s data, so it may clear ' +
+      'it to free up space. Kittycal has no server copy to restore it from.';
+
+  const how = platform === 'ios'
+    ? 'On your Home Screen it is exempt. In Safari, tap the Share button — ' +
+      'the square with an arrow coming out of it — then Add to Home Screen.'
+    : platform === 'android'
+      ? 'Installing it fixes that. Open the browser menu and choose Install ' +
+        'app, or Add to Home screen.'
+      : 'Installing it fixes that. Use the install icon in the address bar, ' +
+        'or the browser menu.';
+
+  return el('div', { class: 'card-quiet data-zone install-nudge' }, [
+    el('h3', { text: 'Keep Kittycal on your Home Screen' }),
+    el('div', { class: 'alert alert-warn' }, [
+      el('span', { class: 'alert-icon', text: '!', 'aria-hidden': 'true' }),
+      el('div', { text: risk }),
+    ]),
+    el('p', { class: 'hint-sm', text: how }),
+    el('div', { class: 'backup-nudge-actions' }, [
+      el('button', {
+        type: 'button', class: 'btn',
+        onclick: async (/** @type {Event} */ e) => {
+          haptic();
+          const btn = /** @type {HTMLButtonElement} */ (e.currentTarget);
+          btn.disabled = true;
+          try {
+            await exportEverything();
+          } finally {
+            btn.disabled = false;
+          }
+        },
+      }, ['Save a backup file']),
+      el('button', {
+        type: 'button', class: 'btn btn-ghost',
+        onclick: () => {
+          // Snoozed, not silenced. Tapping this does not slow the browser down.
+          haptic();
+          store.updateSettings({ installSnoozed: today });
+        },
+      }, ['Not now']),
+    ]),
   ]);
 }
 

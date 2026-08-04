@@ -30,8 +30,28 @@
  * @property {string} summary           one line, for the user
  */
 
+/**
+ * Which set of install instructions applies.
+ *
+ * Sniffing the user agent, which is normally the wrong tool — but the question
+ * here is genuinely "which buttons are on this person's screen", and there is
+ * no feature to detect that with. Getting it wrong shows the wrong three words
+ * of guidance; it does not change what the app does.
+ *
+ * iPadOS reports itself as a Mac, so a touch-capable "Mac" is an iPad.
+ *
+ * @returns {'ios'|'android'|'desktop'}
+ */
+export function installPlatform() {
+  const ua = navigator.userAgent;
+  const iPadOS = /Macintosh/.test(ua) && navigator.maxTouchPoints > 1;
+  if (/iPhone|iPad|iPod/.test(ua) || iPadOS) return 'ios';
+  if (/Android/.test(ua)) return 'android';
+  return 'desktop';
+}
+
 /** Is the app running as an installed app rather than a browser tab? */
-function isInstalled() {
+export function isInstalled() {
   // iOS Safari predates the standard and only sets navigator.standalone.
   const iosStandalone = /** @type {any} */ (navigator).standalone === true;
   const displayMode = typeof window.matchMedia === 'function' &&
@@ -60,6 +80,38 @@ export async function requestPersistence() {
   } catch {
     return false;
   }
+}
+
+/**
+ * A synchronously readable answer to "can this app protect her data?"
+ *
+ * The real check is asynchronous, and the Today screen renders synchronously
+ * dozens of times a session. Asking the browser on every render would be both
+ * wasteful and useless: the answer only moves when `persist()` is called or
+ * the app is installed, and installing reloads the page. So it is resolved once
+ * after boot and read from here.
+ *
+ * `known` is false until that has happened, which keeps the install card from
+ * appearing for a frame on every launch and then vanishing.
+ *
+ * @type {{known: boolean, installed: boolean, persisted: boolean, canRequest: boolean}}
+ */
+let snapshot = { known: false, installed: false, persisted: false, canRequest: false };
+
+/** The cached read. `installed` is cheap, so it is always taken live. */
+export function storageSnapshot() {
+  return { ...snapshot, installed: isInstalled() };
+}
+
+/** Resolve the snapshot. Called once after boot, and cheap enough to repeat. */
+export async function refreshStorageSnapshot() {
+  snapshot = {
+    known: true,
+    installed: isInstalled(),
+    persisted: await isPersisted(),
+    canRequest: Boolean(navigator.storage?.persist),
+  };
+  return snapshot;
 }
 
 /** @returns {Promise<boolean>} */

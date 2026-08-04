@@ -125,6 +125,15 @@
 
 .onb-step { display: flex; flex-direction: column; gap: var(--sp-4); }
 
+/*
+  The remembered-periods stack. Each date carries a line underneath saying what
+  gap it implies, which is the only thing that catches a mistyped year before
+  every average in the app is built on it — so it needs to read as part of the
+  field above it and not as a preamble to the label below.
+*/
+.onb-earlier { display: flex; flex-direction: column; gap: var(--sp-4); }
+.onb-earlier .hint-sm { margin-top: var(--sp-1); }
+
 .onb-step h2 { font-size: var(--fs-xl); }
 
 /* Each step moves focus to its heading so a screen reader announces the new

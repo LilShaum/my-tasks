@@ -55,6 +55,7 @@ const PRECACHE = [
   'js/domain/cycles.js',
   'js/domain/accuracy.js',
   'js/domain/backup-check.js',
+  'js/domain/install-health.js',
   'js/domain/ovulation.js',
   'js/domain/predict.js',
   'js/domain/phases.js',

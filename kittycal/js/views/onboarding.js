@@ -16,7 +16,9 @@
 
 import { el, replace, need, haptic } from '../utils/dom.js';
 import { todayKey, addDays, fmtLong, daysBetween } from '../utils/date.js';
+import { plural } from '../utils/fmt.js';
 import { BIRTH_CONTROL } from '../domain/model.js';
+import { seedPeriodDays, CYCLE_LENGTH_FLOOR } from '../domain/cycles.js';
 import { themePicker, setPickerSelection } from '../ui/theme-picker.js';
 import { mascot, spotArt } from '../ui/mascot.js';
 import { applyTheme } from '../ui/theme.js';
@@ -35,6 +37,8 @@ const draft = {
   /** @type {string} */ name: '',
   /** @type {number|null} */ birthYear: null,
   /** @type {DateKey|null} */ lastPeriodStart: null,
+  /** @type {DateKey[]} */ earlierStarts: [],
+
   /** @type {number} */ periodLength: 5,
   /** @type {number} */ cycleLength: 28,
   /** @type {boolean} */ cycleUnknown: false,
@@ -51,6 +55,7 @@ const STEPS = [
   stepName,
   stepAge,
   stepLastPeriod,
+  stepEarlierPeriods,
   stepPeriodLength,
   stepCycleLength,
   stepBirthControl,
@@ -151,6 +156,15 @@ function footer({ nextLabel = 'Continue', canSkip = true, onNext, disabled = fal
     ]),
   ];
 }
+
+/**
+ * How many periods before the last one she is asked to remember.
+ *
+ * Three earlier starts plus the last one is four, which is three complete
+ * cycles — the point at which the prediction engine stops calling itself an
+ * estimate. Asking for more would be asking for dates nobody has.
+ */
+const MAX_EARLIER = 3;
 
 /* ── Steps ──────────────────────────────────────────────────────────────── */
 
@@ -337,6 +351,129 @@ function describeAgo(key) {
   if (days === 0) return 'today';
   if (days === 1) return 'yesterday';
   return `${days} days ago`;
+}
+
+/**
+ * The periods before the last one.
+ *
+ * This is the difference between an app that is useful now and one that is
+ * useful in three months. Almost everything Kittycal is for needs *completed*
+ * cycles: a cycle length needs two starts, the variation and the recap need
+ * three, the accuracy score and the measured luteal length need more. Asking
+ * for one date leaves her with zero of them, so the app spends its first
+ * quarter saying "not enough data yet" — which is the exact stretch in which
+ * someone decides whether an app is worth keeping.
+ *
+ * She is not starting from nothing, though. She is starting from memory, and
+ * one more remembered date is one complete cycle on day one.
+ *
+ * **Dates only, never intervals.** The tempting version of this screen offers
+ * "about 4 weeks before that", because that is how people talk. It would also
+ * be dishonest: the app already asked for her average cycle length two screens
+ * later, so an interval she estimates here adds no information — it just
+ * launders a stated guess into what then looks like observed history, and
+ * every later claim built on it (the variation, the accuracy score, the
+ * measured luteal phase) would be measuring the guess. A date she actually
+ * remembers is evidence. A gap she estimates is not.
+ *
+ * So: skippable, three slots, and nothing filled in by default.
+ */
+function stepEarlierPeriods() {
+  const today = todayKey();
+
+  // Nothing to count back from. The step still exists rather than being
+  // conditionally removed, because the progress pips are built from STEPS and
+  // a screen count that changes underfoot is worse than one short screen.
+  if (!draft.lastPeriodStart) {
+    return {
+      content: [
+        el('h2', { text: 'Any earlier periods you remember?' }),
+        el('p', { class: 'hint', text:
+          'This one needs the last period date, which you skipped. You can add ' +
+          'past periods any time by tapping days on the calendar.' }),
+      ],
+      footer: footer({ canSkip: false }),
+    };
+  }
+
+  // A plain stack, not `.rows` — that draws a card meant for tappable rows, and
+  // a `.field` label sitting inside one lands on top of its border.
+  const list = el('div', { class: 'onb-earlier' });
+
+  const redraw = () => {
+    /** @type {DateKey} */
+    const anchor = /** @type {DateKey} */ (draft.lastPeriodStart);
+
+    // One row per remembered start, plus one empty row to fill, up to three.
+    const rows = [];
+    for (let i = 0; i < Math.min(draft.earlierStarts.length + 1, MAX_EARLIER); i += 1) {
+      const value = draft.earlierStarts[i] ?? '';
+
+      /*
+        Each row's latest allowed date is a plausible cycle before the start
+        above it, so the sequence can only ever run backwards and can only ever
+        describe cycles the app would actually count.
+
+        The lower bound matters more than it looks. `periodDays` is a flat set
+        and a period is however many marked days sit next to each other, so two
+        starts closer together than a bleed do not become two short cycles —
+        their marks run together and `buildCycles` reads a single long period.
+        A mistyped year would silently turn two cycles into one, and every
+        average, prediction and flag in the app is built on that reading.
+      */
+      const previous = i === 0 ? anchor : draft.earlierStarts[i - 1];
+
+      const field = el('input', {
+        class: 'input',
+        type: 'date',
+        id: `onb-earlier-${i}`,
+        max: addDays(previous, -CYCLE_LENGTH_FLOOR),
+        min: addDays(today, -800),
+        value,
+        onchange: (/** @type {Event} */ e) => {
+          const next = /** @type {HTMLInputElement} */ (e.target).value;
+          const latest = addDays(previous, -CYCLE_LENGTH_FLOOR);
+          if (/^\d{4}-\d{2}-\d{2}$/.test(next) && next <= latest) {
+            draft.earlierStarts[i] = /** @type {DateKey} */ (next);
+            // Anything after a changed row is now measured from a different
+            // date, so it is dropped rather than left silently out of order.
+            draft.earlierStarts.length = i + 1;
+          } else {
+            draft.earlierStarts.length = i;
+          }
+          redraw();
+        },
+      });
+
+      rows.push(el('div', { class: 'field' }, [
+        el('label', { class: 'label', for: `onb-earlier-${i}`, text:
+          i === 0 ? 'The one before that' : `And the one before that` }),
+        field,
+        // The gap it implies, stated plainly. It is the only feedback that
+        // tells her a date is wrong before the app builds anything on it.
+        draft.earlierStarts[i] && el('p', { class: 'hint-sm', text:
+          `${plural(daysBetween(draft.earlierStarts[i], previous), 'day')} before ` +
+          `${fmtLong(previous)}.` }),
+      ]));
+    }
+
+    replace(list, rows);
+  };
+
+  redraw();
+
+  return {
+    content: [
+      el('h2', { text: 'Any earlier periods you remember?' }),
+      el('p', { class: 'hint', text:
+        'Every extra date is a complete cycle Kittycal can measure straight ' +
+        'away, instead of waiting a month for it. Skip this if you are not ' +
+        'sure — a guessed date is worse than none, because everything else ' +
+        'gets measured against it.' }),
+      list,
+    ],
+    footer: footer(),
+  };
 }
 
 function stepPeriodLength() {
@@ -554,17 +691,13 @@ function finish() {
     disclaimerAck: true,
   });
 
-  // Seed the first period from her answer, so the app has real data to predict
-  // from on the very first screen instead of an empty state.
-  if (draft.lastPeriodStart) {
-    const days = [];
-    for (let i = 0; i < draft.periodLength; i++) {
-      const day = addDays(draft.lastPeriodStart, i);
-      if (day > todayKey()) break; // never mark the future as bled
-      days.push(day);
-    }
-    store.setPeriodDays(days, true);
-  }
+  // Seed the periods from her answers, so the app has real data to predict from
+  // on the very first screen instead of an empty state. Every remembered start
+  // is one more completed cycle it can measure today rather than in a month.
+  const starts = /** @type {DateKey[]} */ (
+    [draft.lastPeriodStart, ...draft.earlierStarts].filter(Boolean)
+  );
+  store.setPeriodDays(seedPeriodDays(starts, draft.periodLength, todayKey()), true);
 
   haptic([12, 40, 12]);
   burst({ shape: getTheme(draft.theme).particle, count: 54 });
