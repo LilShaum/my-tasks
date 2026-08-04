@@ -350,6 +350,63 @@ console.log('\nthe screen has a hierarchy rather than one weight');
     String(weights.phaseRule));
 }
 
+console.log('\na reading that cannot be true is not kept');
+{
+  await page.evaluate(async () => {
+    const { openLogSheet } = await import('/js/views/log.js');
+    const { todayKey } = await import('/js/utils/date.js');
+    openLogSheet(todayKey());
+  });
+  await page.waitForSelector('.sheet');
+  await page.evaluate(() => {
+    document.querySelectorAll('.sheet [aria-expanded="false"]').forEach((b) => {
+      if (/Measurement/i.test(b.textContent ?? '')) b.click();
+    });
+  });
+  await page.waitForTimeout(400);
+
+  /*
+    `MEASURES` has carried a plausible range for every field since it was
+    written and nothing enforced it, so a dropped decimal point put 366 °C in
+    the database — which then dragged the six-reading baseline that
+    `detectThermalShift` measures against, and could have the app confirm
+    ovulation on a day nothing happened.
+  */
+  const typo = await page.evaluate(async () => {
+    const input = [...document.querySelectorAll('.measure-input')][0];
+    if (!input) return null;
+    const set = (v) => {
+      input.value = v;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    set('366');
+    await new Promise((r) => setTimeout(r, 150));
+    const rejected = {
+      cleared: input.value === '',
+      flagged: input.getAttribute('aria-invalid') === 'true',
+      said: document.querySelector('.measure-problem:not([hidden])')?.textContent ?? '',
+    };
+    set('36.6');
+    await new Promise((r) => setTimeout(r, 150));
+    return { ...rejected, goodKept: input.value === '36.6',
+      goodClean: input.getAttribute('aria-invalid') === null };
+  });
+
+  ok('the measurement field exists', typo !== null);
+  ok('an impossible reading is not kept', typo?.cleared === true);
+  ok('the field is marked invalid', typo?.flagged === true);
+  ok('and it says what the range is', /between/.test(typo?.said ?? ''), typo?.said);
+  ok('a plausible reading is accepted', typo?.goodKept === true);
+  ok('and clears the complaint', typo?.goodClean === true);
+
+  await page.evaluate(() => {
+    /** @type {HTMLElement|null} */
+    (document.querySelector('.sheet-close, [aria-label*="Close"]'))?.click();
+  });
+  await page.waitForTimeout(300);
+}
+
 ok('no page errors throughout', errors.length === 0, errors.join(' | '));
 
 console.log(`\npolish: ${pass}/${pass + fail} checks passed`);

@@ -12,9 +12,12 @@ import assert from 'node:assert/strict';
 
 import {
   predict, weightedAverage, detectRecalibration, rateConfidence,
-  upcomingPeriods, upcomingFertile, conceptionChance, detectThermalShift,
+  upcomingPeriods, upcomingFertile, conceptionChance,
   CYCLE_MIN_CLAMP, CYCLE_MAX_CLAMP, STALE_AFTER_DAYS,
 } from '../js/domain/predict.js';
+// Moved to its own module so that a prediction can depend on measured
+// ovulation without ovulation depending on predictions.
+import { detectThermalShift } from '../js/domain/ovulation.js';
 import { defaultSettings } from '../js/domain/model.js';
 import { phaseFor, PHASES } from '../js/domain/phases.js';
 import { buildCycles } from '../js/domain/cycles.js';

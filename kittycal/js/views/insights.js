@@ -18,7 +18,9 @@ import { plural, listJoin, fmtTemp, fmtWeight } from '../utils/fmt.js';
 import {
   buildCycles, cycleLengths, cycleLengthPoints, periodLengthPoints, summarize, currentCycle,
 } from '../domain/cycles.js';
-import { predict, detectThermalShift } from '../domain/predict.js';
+import { predict } from '../domain/predict.js';
+import { detectThermalShift } from '../domain/ovulation.js';
+import { predictionAccuracy, CLOSE_ENOUGH, MIN_SCORED } from '../domain/accuracy.js';
 import { phaseFor, PHASES } from '../domain/phases.js';
 import {
   detectPatterns, symptomPattern, symptomFrequency, series, bbtForCycle, daysLogged,
@@ -39,7 +41,7 @@ export function renderInsights(host) {
   const today = todayKey();
 
   const cycles = buildCycles(periodDays);
-  const prediction = predict({ periodDays, settings, today });
+  const prediction = predict({ periodDays, settings, today, logs });
   const lengths = cycleLengths(cycles);
   const lengthPoints = cycleLengthPoints(cycles);
   const periodPoints = periodLengthPoints(cycles, today);
@@ -72,6 +74,7 @@ export function renderInsights(host) {
     thisCycleCard(logs, cycles, today),
     cycleLengthCard(lengthPoints, prediction),
     periodLengthCard(periodPoints),
+    accuracyCard(cycles),
     loggedMostCard(logs, patterns.length),
     patternsCard(logs, cycles, prediction, patterns),
     moodCard(logs, cycles, settings),
@@ -273,6 +276,54 @@ function periodLengthCard(points) {
       summary: `Your last ${recent.length} period lengths, from ${stats.min} ` +
         `to ${stats.max} days.`,
     }),
+  ]);
+}
+
+/**
+ * How often the app has been right.
+ *
+ * Everywhere else the app describes *her*. This is the one card that describes
+ * the app, scored against her, and it is the only number on the screen that
+ * Kittycal has an incentive to hide. A confidence badge asks to be believed; a
+ * hit rate can be checked.
+ *
+ * Silent until there are enough scored cycles to mean anything — three — and
+ * silent about anything it cannot support: the bias line only appears when the
+ * app is consistently out in one direction, because "runs a day late" is
+ * actionable and "sometimes early, sometimes late" is just the error bar again.
+ *
+ * @param {import('../domain/cycles.js').Cycle[]} cycles
+ */
+function accuracyCard(cycles) {
+  const record = predictionAccuracy(cycles);
+  if (record.total < MIN_SCORED) return null;
+
+  const bias = record.bias ?? 0;
+  // Two days is the same threshold a prediction has to beat to count as a hit,
+  // so a "tends to run late" claim never rests on less than a real miss.
+  const leans = Math.abs(bias) > CLOSE_ENOUGH
+    ? (bias > 0 ? 'early' : 'late')
+    : null;
+
+  return el('div', { class: 'card' }, [
+    el('h2', { text: 'How close Kittycal has been' }),
+    el('p', { class: 'hint-sm', text:
+      `Each past cycle re-forecast from only what was known before it started, `
+      + `then compared with the day your period actually arrived.` }),
+    el('div', { class: 'stat-row' }, [
+      stat('Within ' + CLOSE_ENOUGH + ' days', `${record.hits}/${record.total}`, 'cycles'),
+      stat('Typical miss', String(record.medianError),
+        record.medianError === 1 ? 'day' : 'days'),
+    ]),
+    leans && el('p', { class: 'hint-sm', text:
+      `It tends to run ${leans} — your period usually arrives about `
+      + `${plural(Math.abs(bias), 'day')} ${leans === 'early' ? 'later' : 'sooner'} `
+      + 'than predicted.' }),
+    el('p', { class: 'hint-sm', text:
+      record.hits === record.total
+        ? 'Every prediction so far has landed within two days.'
+        : 'Cycles move for all sorts of ordinary reasons, so some misses are '
+          + 'the body rather than the maths.' }),
   ]);
 }
 

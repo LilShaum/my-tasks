@@ -52,7 +52,7 @@ function buildReport() {
   const recent = cycles.filter((c) => c.start >= from);
   const lengths = cycleLengths(cycles);
   const periods = periodLengths(cycles, today);
-  const prediction = predict({ periodDays, settings, today });
+  const prediction = predict({ periodDays, settings, today, logs });
   const stats = summarize(lengths);
 
   const flags = acog.evaluate({

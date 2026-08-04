@@ -130,9 +130,9 @@ export function openLogSheet(date) {
  * @param {DayLog} log  the saved state, not the working draft
  */
 function daySummary(date, log) {
-  const { settings, periodDays } = store.getState();
+  const { settings, periodDays, logs } = store.getState();
   const cycles = buildCycles(periodDays);
-  const prediction = predict({ periodDays, settings, today: todayKey() });
+  const prediction = predict({ periodDays, settings, today: todayKey(), logs });
   const phase = phaseFor({ date, cycles, prediction });
   const day = cycleDay(cycles, date);
 
@@ -812,11 +812,37 @@ function measureRow(measure, draft, settings, chips) {
     ]),
   ]);
 
+  /*
+    A number that cannot be true is not kept.
+
+    `MEASURES` has carried a plausible range for every field since it was
+    written — 35 to 39 °C, 30 to 200 kg — and nothing enforced it. The handler
+    checked `Number.isFinite` and stored whatever that let through, so a
+    dropped decimal point put 366 °C in the database.
+
+    That is not merely a silly number on a screen. `detectThermalShift` reads
+    the mean of the six readings before a candidate day, so one bad entry drags
+    that baseline up by fifty degrees and the app can report ovulation
+    "confirmed" on a day nothing happened — a false statement about her body,
+    from a typo. It also flattens the BBT chart to a horizontal line, because
+    the y-scale has to span the impossible value.
+
+    Rejected rather than clamped. Clamping 366 to 39 produces a number that
+    looks like a reading and is not one; nobody would ever notice it. The whole
+    point is that she gets told.
+  */
+  const lo = Number(toDisplay(measure.min));
+  const hi = Number(toDisplay(measure.max));
+
+  const problem = el('p', { class: 'hint-sm measure-problem', role: 'alert', hidden: true });
+
   const input = /** @type {HTMLInputElement} */ (el('input', {
     class: 'input num measure-input',
     type: 'number',
     inputmode: 'decimal',
     step: String(measure.step),
+    min: String(lo),
+    max: String(hi),
     placeholder: '—',
     value: toDisplay(/** @type {any} */ (draft)[measure.id]),
     'aria-label': `${measure.name} in ${unitLabel}`,
@@ -824,10 +850,35 @@ function measureRow(measure, draft, settings, chips) {
       const raw = /** @type {HTMLInputElement} */ (e.target).value;
       const target = /** @type {any} */ (draft);
       clear.hidden = raw === '';
+      problem.hidden = true;
+      input.removeAttribute('aria-invalid');
       if (raw === '') { target[measure.id] = null; chips.sync(); return; }
       const parsed = Number(raw);
       if (!Number.isFinite(parsed)) return;
+      /*
+        Out-of-range keystrokes are simply not stored, but nothing is said
+        yet — she is very likely still typing, and "35 is too low" flashing up
+        while she reaches for the decimal point would be the app arguing with
+        her mid-word. The complaint waits for `change`, which fires when she
+        leaves the field.
+      */
+      if (parsed < lo || parsed > hi) { target[measure.id] = null; chips.sync(); return; }
       target[measure.id] = toStored(parsed);
+      chips.sync();
+    },
+    onchange: () => {
+      const raw = input.value;
+      if (raw === '') return;
+      const parsed = Number(raw);
+      if (Number.isFinite(parsed) && parsed >= lo && parsed <= hi) return;
+
+      problem.textContent = `${measure.name} has to be between ${lo} and ${hi} `
+        + `${unitLabel}. Nothing was saved for it.`;
+      problem.hidden = false;
+      input.setAttribute('aria-invalid', 'true');
+      input.value = '';
+      clear.hidden = true;
+      /** @type {any} */ (draft)[measure.id] = null;
       chips.sync();
     },
   }));
@@ -836,6 +887,7 @@ function measureRow(measure, draft, settings, chips) {
     el('label', { class: 'measure-label' }, [
       el('span', { text: measure.name }),
       measure.hint && el('span', { class: 'hint-sm', text: measure.hint }),
+      problem,
     ]),
     el('div', { class: 'measure-control' }, [
       input,

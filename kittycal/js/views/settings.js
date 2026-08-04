@@ -16,6 +16,8 @@ import {
   loadReminders, saveReminders, permissionState, requestPermission,
 } from '../ui/reminders.js';
 import { BIRTH_CONTROL, HORMONAL_BIRTH_CONTROL } from '../domain/model.js';
+import { measuredLuteal } from '../domain/ovulation.js';
+import { buildCycles } from '../domain/cycles.js';
 import { themePicker, setPickerSelection } from '../ui/theme-picker.js';
 import { getTheme } from '../data/themes.js';
 import { applyTheme } from '../ui/theme.js';
@@ -184,6 +186,25 @@ function appearanceRows(settings) {
 
 /* ── Cycle ──────────────────────────────────────────────────────────────── */
 
+/**
+ * What the luteal row should say about itself.
+ *
+ * Once her own cycles can supply this number, the setting stops being the one
+ * in use — and a field that silently no longer does anything is worse than one
+ * that never worked. It stays editable, because a doctor may have told her a
+ * figure and because the measurement needs two confirmed ovulations she may
+ * not have yet.
+ */
+function lutealHint() {
+  const { periodDays, logs } = store.getState();
+  const measured = measuredLuteal(logs, buildCycles(periodDays));
+  return measured.days == null
+    ? 'Fourteen is typical. Leave it unless you have been told otherwise.'
+    : `Your own cycles measure ${plural(measured.days, 'day')}, from `
+      + `${plural(measured.samples, 'confirmed ovulation')}. That is what the app `
+      + 'is using; this box is the fallback.';
+}
+
 /** @param {import('../domain/model.js').Settings} settings */
 function cycleRows(settings) {
   const onHormonal = HORMONAL_BIRTH_CONTROL.has(settings.birthControl);
@@ -206,7 +227,7 @@ function cycleRows(settings) {
         label: 'Luteal phase length',
         value: settings.lutealLength,
         min: 8, max: 20, unit: 'days',
-        hint: 'Fourteen is typical. Leave it unless you have been told otherwise.',
+        hint: lutealHint(),
         onChange: (v) => store.updateSettings({ lutealLength: v }),
       }),
       selectRow({

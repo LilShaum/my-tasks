@@ -282,7 +282,7 @@ async function runReminderCheck() {
   const today = todayKey();
   try {
     await checkReminders({
-      prediction: predict({ periodDays, settings, today }),
+      prediction: predict({ periodDays, settings, today, logs }),
       loggedToday: logs[today] != null,
       birthControl: settings.birthControl,
     });
