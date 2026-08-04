@@ -34,7 +34,6 @@ import { severityBlock } from '../ui/severity.js';
 import { pruneSeverity } from '../domain/model.js';
 import { openLogSheet } from './log.js';
 import { burst } from '../ui/particles.js';
-import { cheerMascot } from '../ui/mascot.js';
 import { getTheme } from '../data/themes.js';
 import * as store from '../state/store.js';
 
@@ -250,9 +249,6 @@ export function openCheckin(date = todayKey()) {
     closeSheet();
     const theme = getTheme(store.getState().settings.theme);
     burst({ shape: theme.particle });
-    // After the sheet has gone and Today has re-rendered, so the rider being
-    // cheered is the one now on screen.
-    requestAnimationFrame(() => cheerMascot());
     announce(isToday ? 'Checked in for today' : `Checked in for ${whenLabel}`);
   };
 
