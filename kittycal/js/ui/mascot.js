@@ -175,32 +175,6 @@ export function mascot(themeId, opts = {}) {
   return host;
 }
 
-/**
- * Make the mascot on the ring hop.
- *
- * The design rule is that she reacts to the *act* of logging and never to what
- * was logged — celebrate "you recorded today", never "you had a heavy day".
- * That rule was written down at the start and then only half kept: particles
- * fired on a check-in, and the character herself did nothing, because she was
- * not on the screen to do anything with.
- *
- * Reduced motion removes the hop rather than shortening it. The recorded day
- * is already announced to a screen reader and drawn on the week strip, so
- * nothing is carried by the movement alone.
- */
-export function cheerMascot() {
-  const rider = document.querySelector('.ring-rider');
-  if (!(rider instanceof HTMLElement)) return;
-  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-
-  // Restart cleanly if she is still mid-hop from a previous tap.
-  rider.classList.remove('is-cheering');
-  void rider.offsetWidth;
-  rider.classList.add('is-cheering');
-  rider.addEventListener('animationend', () => rider.classList.remove('is-cheering'),
-    { once: true });
-}
-
 /** Release any object URLs we created. Called before an erase or a reload. */
 export function releaseMascotUrls() {
   for (const url of blobUrls.values()) URL.revokeObjectURL(url);

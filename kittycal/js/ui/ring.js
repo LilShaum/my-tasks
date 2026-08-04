@@ -41,10 +41,9 @@ function pointAt(fraction) {
  * @param {string} opts.headline    the big number or short word
  * @param {string} opts.caption     the line under it
  * @param {string} [opts.eyebrow]   the small line above it
- * @param {HTMLElement} [opts.marker] a mascot to park at today's position
  * @returns {HTMLElement}
  */
-export function cycleRing({ prediction, headline, caption, eyebrow, marker }) {
+export function cycleRing({ prediction, headline, caption, eyebrow }) {
   const segments = ringSegments(prediction);
   const total = prediction.avgCycleLength || 28;
 
@@ -87,51 +86,17 @@ export function cycleRing({ prediction, headline, caption, eyebrow, marker }) {
     }));
   }
 
-  /*
-    Today's position on the ring.
-
-    A disc is always drawn — it is what makes the position legible against
-    whichever phase colour happens to be underneath, and it is the whole marker
-    when there is no mascot to sit on it.
-  */
-  const here = prediction.cycleDay != null ? pointAt(progress) : null;
-
-  if (here) {
+  // Today's marker.
+  if (prediction.cycleDay != null) {
+    const { x, y } = pointAt(progress);
     ring.append(svg('circle', {
-      cx: here.x, cy: here.y, r: STROKE / 2 + 4,
+      cx: x, cy: y, r: STROKE / 2 + 4,
       fill: 'var(--card)',
       stroke: 'var(--ink)',
       'stroke-width': 3,
     }));
-    // Only when nothing else is going there. A dot under a mascot is a smudge.
-    if (!marker) {
-      ring.append(svg('circle', { cx: here.x, cy: here.y, r: 4, fill: 'var(--ink)' }));
-    }
+    ring.append(svg('circle', { cx: x, cy: y, r: 4, fill: 'var(--ink)' }));
   }
-
-  /*
-    Her mascot, riding the ring.
-
-    This was in the plan from the first day — "mascot parked on today's marker"
-    — and never got built, so the character she picked during setup, or the
-    picture of her own she uploaded, appeared during setup, in Settings, and as
-    a thirty-pixel glyph in the header. Never once on the screen she actually
-    opens. For an app whose entire premise is that it is nice enough to want to
-    open, that was the largest thing missing from it.
-
-    Positioned in percentages rather than pixels so it tracks the ring when the
-    SVG scales, and outside the SVG so an uploaded photograph works exactly as
-    well as the drawn emblem.
-  */
-  const rider = here && marker
-    ? el('div', {
-        class: 'ring-rider',
-        style: {
-          left: `${(here.x / SIZE) * 100}%`,
-          top: `${(here.y / SIZE) * 100}%`,
-        },
-      }, [marker])
-    : null;
 
   return el('div', { class: 'ring-wrap' }, [
     ring,
@@ -140,7 +105,6 @@ export function cycleRing({ prediction, headline, caption, eyebrow, marker }) {
       el('span', { class: 'ring-headline num', text: headline }),
       el('span', { class: 'ring-caption', text: caption }),
     ]),
-    rider,
   ]);
 }
 

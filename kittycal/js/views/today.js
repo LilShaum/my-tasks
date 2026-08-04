@@ -35,7 +35,7 @@ import { predict, conceptionChance } from '../domain/predict.js';
 import { phaseFor } from '../domain/phases.js';
 import { evaluate } from '../domain/acog.js';
 import { cycleRing } from '../ui/ring.js';
-import { spotArt, mascot } from '../ui/mascot.js';
+import { spotArt } from '../ui/mascot.js';
 import * as store from '../state/store.js';
 
 /**
@@ -105,13 +105,6 @@ export function renderToday(host) {
       headline: headline.value,
       caption: headline.caption,
       eyebrow: prediction.cycleDay != null ? `Day ${prediction.cycleDay}` : undefined,
-      /*
-        She sees whoever she chose, or the picture she uploaded, walking round
-        the ring as the month goes by. Decorative: the ring already carries the
-        whole cycle in its own aria-label, and a second voice saying "Hello
-        Kitty" in the middle of it would be noise.
-      */
-      marker: mascot(settings.theme, { size: 46, className: 'mascot ring-mascot' }),
     }),
 
     phaseLine(phase),
@@ -338,7 +331,7 @@ function phaseLine(phase) {
       an obvious cut, and a two-line clamp with a "What this means" button
       underneath measured the same height — the button costs a touch target
       and the clamp costs an ellipsis, so the trade was a truncated paragraph
-      for no space at all. The paragraph stays.
+      for no space at all.
     */
     el('p', { class: 'hint', text: phase.summary }),
   ]);
