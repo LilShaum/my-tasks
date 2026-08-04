@@ -435,18 +435,30 @@ function dayCell(opts) {
   if (selected) classes.push('is-selected');
   if (!isPast) classes.push('is-future');
 
+  /*
+    A period that has not happened cannot be marked as having happened.
+
+    Outside edit mode a future day is still tappable — she may well want to
+    make a note against next Tuesday, and the diary already warns her there.
+    Inside edit mode the tap means "I bled on this day", which about a day in
+    the future is not a claim she can make. One such tap used to be enough to
+    have Today announce a negative cycle day.
+  */
+  const cannotMark = editMode && !isPast;
+
   const cell = el('button', {
     type: 'button',
     class: classes.join(' '),
     role: 'gridcell',
     tabindex: isToday ? '0' : '-1',
     dataset: { date: key },
-    'aria-label': cellLabel({ key, logged, predicted, fertile, isOvulation, isToday, hasOtherData, editMode }),
-    'aria-pressed': editMode ? String(logged) : null,
+    'aria-label': cellLabel({ key, logged, predicted, fertile, isOvulation, isToday, hasOtherData, editMode, cannotMark }),
+    'aria-pressed': editMode && !cannotMark ? String(logged) : null,
     'aria-current': isToday ? 'date' : null,
-    onclick: opts.onActivate,
-    onpointerdown: opts.onDragStart,
-    onpointerenter: opts.onDragOver,
+    disabled: cannotMark || null,
+    onclick: cannotMark ? null : opts.onActivate,
+    onpointerdown: cannotMark ? null : opts.onDragStart,
+    onpointerenter: cannotMark ? null : opts.onDragOver,
   }, [
     el('span', { class: 'cal-num num', text: String(day) }),
     hasOtherData && el('span', { class: 'cal-dot', 'aria-hidden': 'true' }),
@@ -463,6 +475,9 @@ function dayCell(opts) {
 function cellLabel(o) {
   const parts = [fmtLong(o.key)];
   if (o.isToday) parts.push('today');
+  // Said rather than merely disabled, so the reason is available to anyone
+  // who cannot see that the cell is greyed.
+  if (o.cannotMark) parts.push('in the future, cannot be marked as a period day');
   if (o.logged) parts.push('period day');
   else if (o.predicted) parts.push('period expected');
   if (o.isOvulation) parts.push('ovulation estimated');

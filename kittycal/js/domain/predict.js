@@ -170,7 +170,22 @@ export function rateConfidence(cyclesLogged, spread) {
  * @returns {Prediction}
  */
 export function predict({ periodDays, settings, today }) {
-  const cycles = buildCycles(periodDays);
+  /*
+    Days that have not happened yet cannot say where she is now.
+
+    The calendar used to accept a tap on a future date, and one was enough to
+    make this whole function describe a cycle that has not started: `lastStart`
+    landed in the future, `daysBetween(lastStart, today)` went negative, and
+    Today printed "Day -29" beside "58 days to your period" — while another
+    card on the same screen said there was not enough data to say anything.
+    The staleness guard below only catches history that is too *old*.
+
+    The calendar now refuses those taps, so this is the second line: an import
+    written on a device with a wrong clock, or a file edited by hand, reaches
+    the same place and must not produce the same nonsense.
+  */
+  const usable = [...periodDays].filter((day) => day <= today);
+  const cycles = buildCycles(usable);
   const lengths = cycleLengths(cycles);
   const periods = periodLengths(cycles, today);
   const stats = summarize(lengths);

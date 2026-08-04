@@ -93,16 +93,6 @@
   font-weight: 600;
 }
 
-/* ── Day summary card, shown above the chips when a day already has data ─ */
-.log-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-1);
-  padding: var(--sp-3);
-  background: var(--surface-2);
-  border-radius: var(--r-md);
-}
-
 /* ── Mascot picker ────────────────────────────────────────────────────── */
 .crop-stage {
   position: relative;

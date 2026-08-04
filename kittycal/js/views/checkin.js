@@ -76,11 +76,11 @@ const CHECKIN_SYMPTOMS = [
  * than in a Help page nobody reads before tapping.
  */
 const FLOW_STEPS = /** @type {const} */ ([
-  { id: 'none', label: 'No bleeding', wide: true },
-  { id: 'light', label: 'Light' },
-  { id: 'medium', label: 'Medium' },
-  { id: 'heavy', label: 'Heavy' },
-  { id: 'spotting', label: 'Spotting', note: 'does not start a period' },
+  { id: 'none', wide: true },
+  { id: 'light' },
+  { id: 'medium' },
+  { id: 'heavy' },
+  { id: 'spotting', note: 'does not start a period' },
 ]);
 
 /**
@@ -282,9 +282,12 @@ export function openCheckin(date = todayKey()) {
             void finish();
           } }
         : null,
-      options: FLOW_STEPS.map(({ id, label, note, wide }) => ({
+      options: FLOW_STEPS.map(({ id, note, wide }) => ({
         id,
-        label,
+        // Taken from the taxonomy rather than retyped here. The five words
+        // existed twice, so renaming a level in one place left the app's
+        // most-used screen quietly disagreeing with the diary and the report.
+        label: labelFor('flow', id),
         note,
         wide,
         selected: flowAnswered && draft.flow === id,

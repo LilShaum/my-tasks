@@ -93,7 +93,7 @@ async function derive(pin, salt) {
  * @param {string} pin
  * @returns {Promise<LockConfig>}
  */
-export async function setPin(pin) {
+async function setPin(pin) {
   const salt = crypto.getRandomValues(new Uint8Array(new ArrayBuffer(16)));
   const hash = await derive(pin, salt);
   const config = { enabled: true, salt: toBase64(salt), hash, biometric: false };
@@ -105,7 +105,7 @@ export async function setPin(pin) {
  * @param {string} pin
  * @returns {Promise<boolean>}
  */
-export async function verifyPin(pin) {
+async function verifyPin(pin) {
   const config = await loadLock();
   if (!config.enabled || !config.salt) return true;
   const hash = await derive(pin, fromBase64(config.salt));
