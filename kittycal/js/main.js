@@ -19,6 +19,7 @@ import { renderSettings } from './views/settings.js';
 import { mountOnboarding } from './views/onboarding.js';
 import { openHelp } from './views/help.js';
 import { needsCheckin, openCheckin } from './views/checkin.js';
+import { openLogSheet } from './views/log.js';
 import { isSheetOpen } from './ui/sheet.js';
 import { toast } from './ui/toast.js';
 import { mascot } from './ui/mascot.js';
@@ -128,7 +129,40 @@ function startApp() {
   }
 
   render();
-  maybeAskForCheckin();
+  // A launch that already said what it was for does not also get asked.
+  if (!applyLaunchIntent()) maybeAskForCheckin();
+}
+
+/**
+ * Act on a home-screen shortcut.
+ *
+ * The manifest's `shortcuts` give a long-press on the app icon a menu, and each
+ * entry launches the same page with a `?go=` parameter. That is the whole
+ * mechanism: there is no router, and adding one for three destinations would be
+ * more machinery than the feature is worth.
+ *
+ * The parameter is stripped from the address bar once it has been acted on, so
+ * a reload — or a home-screen app resumed days later — does not re-open the
+ * diary at a moment she did not ask for it.
+ *
+ * @returns {boolean} whether the launch had an intent
+ */
+function applyLaunchIntent() {
+  const go = new URLSearchParams(location.search).get('go');
+  if (!go) return false;
+
+  history.replaceState(null, '', location.pathname);
+
+  if (go === 'log') {
+    store.setView('today');
+    openLogSheet(todayKey());
+    return true;
+  }
+  if (go === 'calendar' || go === 'insights') {
+    store.setView(go);
+    return true;
+  }
+  return false;
 }
 
 /**

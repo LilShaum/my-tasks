@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96">
+  <!-- Shortcut: calendar. A month page with two marked days. Original artwork. -->
+  <rect width="96" height="96" rx="22" fill="#ffe4ea"/>
+  <rect x="16" y="24" width="64" height="54" rx="10"
+        fill="#ffffff" stroke="#8c3a48" stroke-width="5"/>
+  <path d="M16 42 H80" stroke="#8c3a48" stroke-width="5"/>
+  <path d="M32 24 V16 M64 24 V16" stroke="#8c3a48" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="34" cy="56" r="6" fill="#e8465a"/>
+  <circle cx="48" cy="56" r="6" fill="#e8465a"/>
+  <!-- The predicted day is an outline, not a dash: a dashed ring at 96px
+       renders as a scatter of dots rather than as a circle. -->
+  <circle cx="62" cy="56" r="5" fill="none" stroke="#e8465a" stroke-width="3.5"/>
+  <circle cx="34" cy="70" r="4.5" fill="#f2c14e"/>
+</svg>

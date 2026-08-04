@@ -40,6 +40,12 @@ export const AMENORRHEA_DAYS = 90;
  * @property {string} detail     what it means, non-diagnostic
  */
 
+/** Spotting has to recur across at least this many cycles to be a pattern. */
+export const SPOTTING_MIN_CYCLES = 2;
+
+/** And total at least this many days, so two stray marks are not a finding. */
+export const SPOTTING_MIN_DAYS = 3;
+
 /**
  * Evaluate cycle statistics against the ranges above.
  *
@@ -52,11 +58,36 @@ export const AMENORRHEA_DAYS = 90;
  * @param {number[]} stats.cycleLengths
  * @param {number[]} stats.periodLengths
  * @param {number|null} stats.daysSinceLastPeriod
+ * @param {{days: number, cycles: number}} [stats.spotting] bleeding logged
+ *   outside a period, and how many cycles it spanned
  * @returns {Flag[]}
  */
-export function evaluate({ cycleLengths, periodLengths, daysSinceLastPeriod }) {
+export function evaluate({ cycleLengths, periodLengths, daysSinceLastPeriod, spotting }) {
   /** @type {Flag[]} */
   const flags = [];
+
+  /*
+    Bleeding between periods.
+
+    ACOG lists it alongside the cycle-length and duration deviations, and Apple
+    Health notifies on it, and Kittycal flagged the other four and simply had
+    no opinion on this one — despite storing the exact observation it needs.
+    Spotting is already kept separate from period days precisely so that it
+    can be counted on its own.
+
+    Two cycles, not one. A single cycle with a few spots is unremarkable; the
+    same thing in two separate cycles is the pattern that has a name.
+  */
+  if (spotting && spotting.cycles >= SPOTTING_MIN_CYCLES && spotting.days >= SPOTTING_MIN_DAYS) {
+    flags.push({
+      id: 'spotting',
+      title: `Bleeding between periods on ${spotting.days} days, across `
+        + `${spotting.cycles} cycles`,
+      detail: 'Spotting outside a period now and then is common, but when it '
+        + 'keeps happening it is one of the things worth mentioning at an '
+        + 'appointment.',
+    });
+  }
 
   if (cycleLengths.length >= 3) {
     const short = cycleLengths.filter((n) => n < CYCLE_MIN).length;

@@ -71,6 +71,7 @@ export function exportFilename() {
  * @typedef {Object} ImportResult
  * @property {boolean} ok
  * @property {string} [error]
+ * @property {string} [exportedAt]  ISO timestamp the file claims, if it has one
  * @property {Settings} [settings]
  * @property {Record<DateKey, DayLog>} [logs]
  * @property {Set<DateKey>} [periodDays]
@@ -151,6 +152,7 @@ export function parseImport(text) {
 
   return {
     ok: true,
+    exportedAt: typeof raw.exportedAt === 'string' ? raw.exportedAt : undefined,
     settings: normalizeSettings(raw.settings),
     logs,
     periodDays,

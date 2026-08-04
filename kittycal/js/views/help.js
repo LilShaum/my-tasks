@@ -122,7 +122,17 @@ export function openHelp() {
           'copy that survives losing or replacing the phone.'),
         p('A "Worth backing up" card appears on Today once there is a fortnight ' +
           'of entries that are not in any backup. "Not now" hides it for a month.'),
+        p('Settings → Check a backup file opens a file and says what is in it ' +
+          'without importing anything: when it was made, how much it holds, ' +
+          'and what restoring it would cost you. It is safe to run on a file ' +
+          'you are unsure about.'),
         p('On a new phone, open Kittycal and use Import.'),
+      ]),
+
+      section('Shortcuts', [
+        p('Once Kittycal is on your home screen, pressing and holding its icon ' +
+          'opens a short menu: today\'s diary, the calendar, or Insights, in ' +
+          'one tap instead of three.'),
       ]),
 
       section('Themes', [

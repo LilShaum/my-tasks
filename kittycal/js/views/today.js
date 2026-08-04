@@ -22,7 +22,7 @@ import { todayKey, fmtDayMonth, fmtRelative, daysBetween, addDays, dow, dayOfMon
 import { plural, listJoin } from '../utils/fmt.js';
 import { labelFor, labelOf, CATEGORIES, DEFAULT_CHIPS } from '../data/taxonomy.js';
 import { pick } from '../data/tips.js';
-import { loggedIds } from '../domain/stats.js';
+import { loggedIds, spottingBetweenPeriods } from '../domain/stats.js';
 import { nothingRecorded } from '../domain/model.js';
 import { buildRecap, cluster } from '../domain/recap.js';
 import { respondToCheckin } from '../domain/response.js';
@@ -115,7 +115,7 @@ export function renderToday(host) {
       prediction.stale ? staleCard(prediction)
         : prediction.isLate ? lateCard(prediction) : nextPeriodCard(prediction),
       prediction.showFertility && prediction.ovulation ? fertileCard(prediction, today) : null,
-      ...acogCards(cycles, today, prediction),
+      ...acogCards(cycles, today, prediction, logs),
     ]),
 
     tipsRow({ phase, prediction, log: logs[today], today }),
@@ -788,12 +788,14 @@ function fertileCard(prediction, today) {
  * @param {import('../domain/cycles.js').Cycle[]} cycles
  * @param {DateKey} today
  * @param {import('../domain/predict.js').Prediction} prediction
+ * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
  */
-function acogCards(cycles, today, prediction) {
+function acogCards(cycles, today, prediction, logs) {
   const flags = evaluate({
     cycleLengths: cycleLengths(cycles),
     periodLengths: periodLengths(cycles, today),
     daysSinceLastPeriod: prediction.lastStart ? daysBetween(prediction.lastStart, today) : null,
+    spotting: spottingBetweenPeriods(logs, cycles),
   });
 
   if (!flags.length) return [];

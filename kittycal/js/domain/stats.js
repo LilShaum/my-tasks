@@ -283,6 +283,40 @@ export function severitySummary(symptomId, logs) {
 }
 
 /**
+ * Spotting outside a period: how many days, across how many cycles.
+ *
+ * `flow: 'spotting'` has always been stored separately from the bleeding
+ * levels precisely so it could be counted on its own — the app just never
+ * counted it. It is the fifth of the deviations ACOG lists and the only one
+ * Kittycal had no opinion about.
+ *
+ * Cycles are counted as well as days because three spots in one bad month is
+ * not the same observation as one spot in each of three months, and only the
+ * second is a pattern.
+ *
+ * @param {Record<DateKey, DayLog>} logs
+ * @param {Cycle[]} cycles
+ * @returns {{days: number, cycles: number}}
+ */
+export function spottingBetweenPeriods(logs, cycles) {
+  let days = 0;
+  let affected = 0;
+
+  for (const cycle of cycles) {
+    let inThisCycle = 0;
+    for (const date of range(cycle.start, cycleEnd(cycle))) {
+      // Inside the period itself, spotting is the tail of a period rather than
+      // bleeding between two of them.
+      if (date <= cycle.periodEnd) continue;
+      if (logs[date]?.flow === 'spotting') inThisCycle += 1;
+    }
+    if (inThisCycle) { days += inThisCycle; affected += 1; }
+  }
+
+  return { days, cycles: affected };
+}
+
+/**
  * A numeric series for charting, oldest first, skipping days with no reading.
  * @param {Record<DateKey, DayLog>} logs
  * @param {'bbt'|'weight'|'sleep'|'water'|'steps'} field
