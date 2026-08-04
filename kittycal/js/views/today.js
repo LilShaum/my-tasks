@@ -47,7 +47,7 @@ export function renderToday(host) {
   const today = todayKey();
 
   const cycles = buildCycles(periodDays);
-  const prediction = predict({ periodDays, settings, today });
+  const prediction = predict({ periodDays, settings, today, logs });
   const phase = phaseFor({ date: today, cycles, prediction });
 
   /*
@@ -755,6 +755,20 @@ function fertileCard(prediction, today) {
       ? `Ovulation was estimated at ${fmtDayMonth(prediction.ovulation)}. `
         + `Today: ${chance.label.toLowerCase()}.`
       : `Ovulation estimated ${fmtDayMonth(prediction.ovulation)}. Today: ${chance.label.toLowerCase()}.` }),
+    /*
+      Where the luteal length came from.
+
+      This number sets the whole window, and until now it was a Settings field
+      defaulting to the population average that nothing ever checked against
+      her. When her own confirmed ovulations can supply it, the card says so —
+      because "measured from your own cycles" and "we assumed fourteen" deserve
+      different amounts of trust, and only one of them was ever on offer.
+    */
+    prediction.lutealMeasured && el('p', { class: 'hint-sm', text:
+      `Ovulation is placed ${plural(prediction.lutealDays, 'day')} before your `
+      + `period, measured from ${plural(prediction.lutealSamples, 'cycle')} where `
+      + 'a test or your temperature confirmed it.' }),
+
     prediction.fertileWidened && el('div', { class: 'alert alert-warn', style: { marginTop: 'var(--sp-3)' } }, [
       el('span', { class: 'alert-icon', text: '!', 'aria-hidden': 'true' }),
       el('div', { text:

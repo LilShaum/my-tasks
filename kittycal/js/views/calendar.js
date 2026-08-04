@@ -47,7 +47,7 @@ export function renderCalendar(host) {
   const today = todayKey();
 
   const cycles = buildCycles(periodDays);
-  const prediction = predict({ periodDays, settings, today });
+  const prediction = predict({ periodDays, settings, today, logs });
 
   // Pre-compute the forecast as lookup sets so each cell is an O(1) check
   // rather than a scan over every predicted range.

@@ -53,6 +53,8 @@ const PRECACHE = [
   'js/storage/persist.js',
   'js/domain/model.js',
   'js/domain/cycles.js',
+  'js/domain/accuracy.js',
+  'js/domain/ovulation.js',
   'js/domain/predict.js',
   'js/domain/phases.js',
   'js/domain/acog.js',

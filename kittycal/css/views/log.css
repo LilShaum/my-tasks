@@ -313,3 +313,14 @@
 }
 
 .measure-clear svg { width: 16px; height: 16px; }
+
+/* A rejected reading says why, in the alert colour rather than the hint one —
+   this is the app declining to keep something she typed, which she has to be
+   able to notice. */
+.measure-problem {
+  color: var(--danger);
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.measure-input[aria-invalid='true'] { border-color: var(--danger); }

@@ -30,6 +30,7 @@ import {
   buildCycles, cycleLengths, periodLengths, currentCycle, summarize, periodSpan,
 } from './cycles.js';
 import { HORMONAL_BIRTH_CONTROL } from './model.js';
+import { measuredLuteal } from './ovulation.js';
 import { regularity } from './acog.js';
 
 /** How many recent cycles feed the weighted average. */
@@ -94,6 +95,9 @@ export const CYCLE_MAX_CLAMP = 45;
  * @property {'regular'|'variable'|'irregular'|null} regularity
  * @property {number} cyclesLogged
  * @property {number} lutealDays    luteal length actually used
+ * @property {boolean} lutealMeasured  true when it came from her own confirmed
+ *   ovulations rather than from the setting
+ * @property {number} lutealSamples    cycles that measurement came from
  * @property {number} fertileBefore days of fertile window before ovulation
  */
 
@@ -167,9 +171,11 @@ export function rateConfidence(cyclesLogged, spread) {
  * @param {Set<DateKey>|DateKey[]} input.periodDays
  * @param {Settings} input.settings
  * @param {DateKey} input.today
+ * @param {Record<DateKey, import('./model.js').DayLog>} [input.logs] enables a
+ *   luteal length measured from her own confirmed ovulations
  * @returns {Prediction}
  */
-export function predict({ periodDays, settings, today }) {
+export function predict({ periodDays, settings, today, logs }) {
   /*
     Days that have not happened yet cannot say where she is now.
 
@@ -186,6 +192,24 @@ export function predict({ periodDays, settings, today }) {
   */
   const usable = [...periodDays].filter((day) => day <= today);
   const cycles = buildCycles(usable);
+
+  /*
+    Her own luteal length, where her own data can supply one.
+
+    Every fertile window in the app is `next period − this number`, and it was
+    a Settings field defaulting to the population average of 14 that nothing
+    ever checked. Fourteen is a fine prior and a poor measurement: luteal
+    phases vary from about 10 to 16 days between people and are stable within
+    one, so being two days out is not noise — it is the same two-day error,
+    every cycle, forever, in the one figure the app offers for planning.
+
+    `logs` is optional so that callers with no need for this (and the tests
+    that predate it) keep working on the stated setting.
+  */
+  const measured = logs ? measuredLuteal(logs, cycles) : { days: null, samples: 0 };
+  const lutealDays = measured.days ?? settings.lutealLength;
+  const lutealMeasured = measured.days != null;
+  const lutealSamples = measured.samples;
   const lengths = cycleLengths(cycles);
   const periods = periodLengths(cycles, today);
   const stats = summarize(lengths);
@@ -261,7 +285,7 @@ export function predict({ periodDays, settings, today }) {
   if (showFertility && nextStart) {
     // Luteal-phase method: the luteal phase is the stable part of the cycle,
     // so counting back from the next period beats halving the cycle.
-    ovulation = addDays(nextStart, -settings.lutealLength);
+    ovulation = addDays(nextStart, -lutealDays);
 
     if (confidence === 'low' || confidence === 'none') {
       // Don't draw a narrow window we can't support. Widen and say so.
@@ -305,7 +329,9 @@ export function predict({ periodDays, settings, today }) {
     spread: stats.spread,
     regularity: stats.spread == null ? null : regularity(stats.spread),
     cyclesLogged: lengths.length,
-    lutealDays: settings.lutealLength,
+    lutealDays,
+    lutealMeasured,
+    lutealSamples,
     fertileBefore,
   };
 }
@@ -384,30 +410,6 @@ export function conceptionChance(prediction, date) {
   return { tier: 'some', label: 'Some chance of getting pregnant' };
 }
 
-/**
- * Detect a BBT thermal shift, which retroactively confirms that ovulation
- * happened. Three consecutive readings at least 0.2°C above the mean of the
- * previous six is the standard rule.
- *
- * Retrospective by nature — it tells you ovulation already occurred, not that
- * it's coming.
- *
- * @param {{date: DateKey, bbt: number}[]} readings chronological, °C
- * @returns {DateKey|null} the first day of the shift
- */
-export function detectThermalShift(readings) {
-  const BASELINE_DAYS = 6;
-  const RISE = 0.2;
-  const SUSTAINED = 3;
-
-  for (let i = BASELINE_DAYS; i + SUSTAINED <= readings.length; i++) {
-    const baseline = readings.slice(i - BASELINE_DAYS, i);
-    const mean = baseline.reduce((a, r) => a + r.bbt, 0) / baseline.length;
-    const window = readings.slice(i, i + SUSTAINED);
-    if (window.every((r) => r.bbt - mean >= RISE)) return window[0].date;
-  }
-  return null;
-}
 
 /** @param {number} n @param {number} lo @param {number} hi */
 function clamp(n, lo, hi) {
