@@ -303,3 +303,41 @@ export function summarize(lengths) {
 export function periodSpan(start, length) {
   return { start, end: addDays(start, Math.max(1, Math.round(length)) - 1) };
 }
+
+/**
+ * Turn a set of remembered period *starts* into the days to mark.
+ *
+ * Onboarding asks for first days and one average bleed length, which is not
+ * quite enough information on its own: applied literally, a five-day bleed
+ * against a remembered 23-day gap would run into the next start and `buildCycles`
+ * would read the two as one long period. So each run is clipped at the next
+ * start, and at today — the future has not been bled.
+ *
+ * Clipping rather than rejecting: the gap she remembers is evidence and the
+ * bleed length is an average, so where they disagree the average is the one to
+ * bend. A short cycle is a real thing to have, and refusing to record it would
+ * lose the cycle entirely.
+ *
+ * @param {DateKey[]} starts        in any order; duplicates are ignored
+ * @param {number} periodLength     her stated typical bleed, in days
+ * @param {DateKey} today
+ * @returns {DateKey[]} every day to mark, oldest first
+ */
+export function seedPeriodDays(starts, periodLength, today) {
+  const ordered = [...new Set(starts)].filter(Boolean).sort();
+  const length = Math.max(1, Math.round(periodLength));
+
+  /** @type {DateKey[]} */
+  const days = [];
+  ordered.forEach((start, i) => {
+    const nextStart = ordered[i + 1];
+    for (let d = 0; d < length; d += 1) {
+      const day = addDays(start, d);
+      if (day > today) break;
+      if (nextStart && day >= nextStart) break;
+      days.push(day);
+    }
+  });
+
+  return days;
+}

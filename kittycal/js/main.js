@@ -25,7 +25,7 @@ import { toast } from './ui/toast.js';
 import { mascot } from './ui/mascot.js';
 import { loadLock, showLockScreen } from './ui/lock.js';
 import { checkReminders } from './ui/reminders.js';
-import { requestPersistence } from './storage/persist.js';
+import { requestPersistence, refreshStorageSnapshot } from './storage/persist.js';
 import { buildCycles } from './domain/cycles.js';
 import { predict } from './domain/predict.js';
 
@@ -96,7 +96,12 @@ async function boot() {
   // Ask the browser not to evict her data. Done after boot rather than before,
   // so it never delays first paint, and it's safe to call on every launch —
   // it resolves immediately once granted.
-  void requestPersistence();
+  // Then work out whether it worked, and redraw — Today only warns her about
+  // installing once it knows the app cannot protect the data by itself.
+  void requestPersistence()
+    .then(refreshStorageSnapshot)
+    .then(() => { if (store.getState().ready) render(); })
+    .catch(() => { /* the warning simply stays hidden; nothing else depends on it */ });
 }
 
 function startOnboarding() {

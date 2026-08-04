@@ -298,6 +298,16 @@
 */
 .backup-nudge { margin-top: var(--sp-4); }
 
+/*
+  The install warning shares the nudge's shape and its action row, but carries
+  a real alert inside it rather than a hint. That is deliberate: the backup
+  nudge describes something that would take an accident, and this one describes
+  something the browser will do on a timer unless she acts.
+*/
+.install-nudge { margin-top: var(--sp-4); }
+.install-nudge .alert { margin-top: var(--sp-2); }
+.install-nudge .hint-sm { margin-top: var(--sp-3); }
+
 .backup-nudge-actions {
   display: flex;
   flex-wrap: wrap;

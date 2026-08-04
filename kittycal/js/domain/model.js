@@ -59,6 +59,7 @@
  * @property {string} recapSeen       cycleStart of the last recap dismissed, or ''
  * @property {number} lastBackupAt    epoch ms of the last export, or 0
  * @property {string} backupSnoozed   DateKey the backup prompt was dismissed, or ''
+ * @property {string} installSnoozed  DateKey the install prompt was dismissed, or ''
  * @property {string} checkinSkipped  DateKey the daily check-in was skipped, or ''
  * @property {boolean} onboarded
  * @property {boolean} disclaimerAck
@@ -109,6 +110,7 @@ export function defaultSettings() {
     recapSeen: '',
     lastBackupAt: 0,
     backupSnoozed: '',
+    installSnoozed: '',
     checkinSkipped: '',
     onboarded: false,
     disclaimerAck: false,
