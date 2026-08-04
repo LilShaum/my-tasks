@@ -146,10 +146,17 @@
   flex-direction: column;
   gap: var(--sp-1);
   padding: var(--sp-4);
-  background: var(--card);
-  border: var(--bw) solid var(--line);
+  /*
+    The quiet tier, not the full sticker treatment.
+
+    These are background reading — what a luteal phase is, why spotting is
+    counted separately — and they were the two biggest, heaviest blocks on the
+    screen, drawn identically to the card that answers "when is my period".
+    With everything shouting, nothing leads.
+  */
+  background: var(--surface-2);
+  border: var(--bw-data) solid var(--line-soft);
   border-radius: var(--r-lg);
-  box-shadow: var(--sh-sticker);
 }
 
 .tip-card h4 {
@@ -171,7 +178,20 @@
   flex-direction: column;
   gap: var(--sp-1);
   margin: calc(var(--sp-2) * -1) 0 var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
   text-align: center;
+  /*
+    A wash of the phase's own colour, and a rule in it along the top.
+
+    `--phase` is set inline by the view from the same token the ring arc uses,
+    so the block naming the phase and the arc showing it are the same colour by
+    construction rather than by two lists agreeing. 12% keeps it a hint: the
+    text on top stays on what is effectively the card colour, so nothing that
+    passed the contrast sweep stops passing.
+  */
+  background: color-mix(in oklab, var(--phase, var(--primary)) 12%, var(--card));
+  border-top: 3px solid var(--phase, var(--primary));
+  border-radius: var(--r-md);
 }
 
 .phase-line-head {

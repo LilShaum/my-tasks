@@ -147,7 +147,7 @@ function backupPrompt({ logs, periodDays, settings, today }) {
   const nudge = backupNudge({ logs, periodDays, settings, today });
   if (!nudge) return null;
 
-  return el('div', { class: 'card data-zone backup-nudge' }, [
+  return el('div', { class: 'card-quiet data-zone backup-nudge' }, [
     el('h3', { text: 'Worth backing up' }),
     el('p', { class: 'hint-sm', text:
       nudge.neverBackedUp
@@ -315,7 +315,21 @@ function notableLine(item) {
  * @param {import('../domain/phases.js').PhaseInfo} phase
  */
 function phaseLine(phase) {
-  return el('div', { class: 'phase-line' }, [
+  /*
+    The phase's own colour, handed to the block that names it.
+
+    The four phases are the app's central idea and the colour that stands for
+    each of them appeared in exactly two places: an arc on the ring, and an
+    eight-pixel dot. Nothing connected the two. Washing the block that says
+    "Ovulatory phase" in the same colour as the arc it belongs to is what makes
+    the ring readable without a legend — you look at the words, you see the
+    colour, and the arc on the ring means something.
+
+    Kept to a wash rather than a fill: this sits under body text, and the
+    colour has to stay a hint about which phase it is, not a surface the text
+    has to fight.
+  */
+  return el('div', { class: 'phase-line', style: { '--phase': `var(${phase.token})` } }, [
     el('div', { class: 'phase-line-head' }, [
       el('span', {
         class: 'phase-dot',
