@@ -9,7 +9,7 @@
 
 import { el, replace, haptic, announce } from '../utils/dom.js';
 import { checkStorage, fmtBytes } from '../storage/persist.js';
-import { todayKey, daysBetween } from '../utils/date.js';
+import { todayKey, daysBetween, fmtLong } from '../utils/date.js';
 import { plural } from '../utils/fmt.js';
 import { loadLock, disableLock, promptForNewPin } from '../ui/lock.js';
 import {
@@ -17,12 +17,14 @@ import {
 } from '../ui/reminders.js';
 import { BIRTH_CONTROL, HORMONAL_BIRTH_CONTROL } from '../domain/model.js';
 import { measuredLuteal } from '../domain/ovulation.js';
+import { describeBackup } from '../domain/backup-check.js';
 import { buildCycles } from '../domain/cycles.js';
 import { themePicker, setPickerSelection } from '../ui/theme-picker.js';
 import { getTheme } from '../data/themes.js';
 import { applyTheme } from '../ui/theme.js';
 import { toast } from '../ui/toast.js';
 import { confirmSheet } from '../ui/dialog.js';
+import { openSheet } from '../ui/sheet.js';
 import { releaseMascotUrls, mascot } from '../ui/mascot.js';
 import { openMascotPicker } from '../ui/image-picker.js';
 import { openHelp } from './help.js';
@@ -518,7 +520,11 @@ function storageHealthCard() {
 }
 
 function dataRows() {
-  const fileInput = /** @type {HTMLInputElement} */ (el('input', {
+  /**
+   * One hidden file input per action, because the two do opposite things.
+   * @param {(file: File) => Promise<void>} handle
+   */
+  const picker = (handle) => /** @type {HTMLInputElement} */ (el('input', {
     type: 'file',
     accept: 'application/json,.json',
     style: { display: 'none' },
@@ -527,21 +533,38 @@ function dataRows() {
       const file = input.files?.[0];
       input.value = '';
       if (!file) return;
-      await doImport(file);
+      await handle(file);
     },
   }));
 
+  const importInput = picker(doImport);
+  const checkInput = picker(doCheck);
+
   return el('div', { class: 'rows' }, [
-    fileInput,
+    importInput,
+    checkInput,
     buttonRow({
       label: 'Export everything',
       value: 'JSON file',
       onClick: exportEverything,
     }),
+    /*
+      Checking a backup sits above importing one deliberately.
+
+      Until this existed, the only way to find out whether an exported file was
+      any good was to import it — which overwrites the data you were hedging
+      against. "I have backups" and "I have working backups" are different
+      sentences, and this is the row that turns one into the other.
+    */
+    buttonRow({
+      label: 'Check a backup file',
+      value: 'Reads it, changes nothing',
+      onClick: () => checkInput.click(),
+    }),
     buttonRow({
       label: 'Import from a backup',
       value: 'Replaces current data',
-      onClick: () => fileInput.click(),
+      onClick: () => importInput.click(),
     }),
     buttonRow({
       label: 'Erase all my data',
@@ -590,6 +613,132 @@ async function doImport(file) {
   const settings = store.getState().settings;
   applyTheme(settings.theme, settings.colorMode);
   toast(`Imported ${result.logCount} logged days`);
+}
+
+/**
+ * Read a backup file and report what it holds, without importing it.
+ * @param {File} file
+ */
+async function doCheck(file) {
+  let text;
+  try {
+    text = await backup.readFile(file);
+  } catch {
+    toast('Could not read that file');
+    return;
+  }
+
+  const { logs, periodDays } = store.getState();
+  const check = describeBackup(backup.parseImport(text), { logs, periodDays });
+
+  const tone = !check.ok || check.state === 'empty' ? 'alert-warn'
+    : check.state === 'match' ? 'alert-ok'
+      : check.state === 'diverged' ? 'alert-warn' : 'alert-info';
+
+  const sheet = openSheet({
+    title: 'Backup check',
+    body: [
+      el('div', { class: `alert ${tone}` }, [
+        el('span', {
+          class: 'alert-icon',
+          text: tone === 'alert-ok' ? '✓' : tone === 'alert-warn' ? '!' : 'i',
+          'aria-hidden': 'true',
+        }),
+        el('div', { text: verdict(check) }),
+      ]),
+
+      ...contents(check).map((line) =>
+        el('p', { class: 'hint dialog-body-p', text: line })),
+
+      // Said last and said plainly. The whole value of this screen is that it
+      // is safe to run on a file you are unsure about.
+      el('p', { class: 'hint-sm', style: { marginTop: 'var(--sp-4)' }, text:
+        'Nothing was changed. This only read the file.' }),
+    ],
+    footer: [
+      el('button', {
+        type: 'button',
+        class: 'btn btn-block',
+        onclick: () => { haptic(); sheet.close(); },
+      }, ['Done']),
+    ],
+  });
+
+  announce(verdict(check));
+}
+
+/**
+ * The one-sentence answer to "is this file any good?"
+ * @param {import('../domain/backup-check.js').BackupCheck} check
+ */
+function verdict(check) {
+  if (!check.ok) return check.error ?? 'That file could not be read.';
+
+  switch (check.state) {
+    case 'empty':
+      return 'This is a valid Kittycal file, but there is nothing in it. ' +
+        'Restoring it would leave you with an empty app.';
+    case 'match':
+      return 'This is a complete copy of everything on this phone.';
+    case 'behind':
+      // The ordinary case for any backup older than the last time she logged.
+      // It is not a fault, and the wording should not imply one.
+      return `This is an older backup. Everything in it is still here, and ` +
+        `${plural(check.onlyHere, 'day')} on this phone came after it.`;
+    case 'ahead':
+      return `This file holds ${plural(check.onlyInFile, 'day')} that are not ` +
+        `on this phone.`;
+    default:
+      return 'This file and this phone disagree. Some days are in one and not ' +
+        'the other, or answered differently in each.';
+  }
+}
+
+/**
+ * What is actually inside, in the order it is worth knowing.
+ * @param {import('../domain/backup-check.js').BackupCheck} check
+ * @returns {string[]}
+ */
+function contents(check) {
+  if (!check.ok) {
+    return ['A backup can only be restored by Kittycal if it is the JSON file ' +
+      'that "Export everything" produced. Renaming another file does not make ' +
+      'it one.'];
+  }
+
+  const lines = [
+    check.ageDays == null
+      ? 'The file does not say when it was made.'
+      : check.ageDays === 0
+        ? 'Made today.'
+        : `Made ${plural(check.ageDays, 'day')} ago.`,
+  ];
+
+  if (check.state !== 'empty') {
+    lines.push(`It holds ${plural(check.logCount, 'logged day')} and ` +
+      `${plural(check.periodCount, 'period day')}.`);
+    if (check.firstDate && check.lastDate) {
+      lines.push(check.firstDate === check.lastDate
+        ? `All of it on ${fmtLong(check.firstDate)}.`
+        : `Covering ${fmtLong(check.firstDate)} to ${fmtLong(check.lastDate)}.`);
+    }
+  }
+
+  // Restoring is the decision this screen exists to inform, so it gets said in
+  // terms of what she would lose, not in terms of set differences.
+  const cost = [];
+  if (check.onlyHere) cost.push(`lose ${plural(check.onlyHere, 'day')} recorded here`);
+  if (check.onlyInFile) cost.push(`bring back ${plural(check.onlyInFile, 'day')} that are gone from here`);
+  if (check.differ) cost.push(`overwrite ${plural(check.differ, 'day')} that differ`);
+  if (cost.length) lines.push(`Restoring it would ${joinList(cost)}.`);
+
+  return lines;
+}
+
+/** @param {string[]} parts */
+function joinList(parts) {
+  if (parts.length <= 1) return parts[0] ?? '';
+  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
 }
 
 async function doErase() {

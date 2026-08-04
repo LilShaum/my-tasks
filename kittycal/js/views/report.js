@@ -18,7 +18,8 @@ import { todayKey, addDays, fmtLong, fmtDayMonth, daysBetween } from '../utils/d
 import { plural } from '../utils/fmt.js';
 import { buildCycles, cycleLengths, periodLengths, summarize } from '../domain/cycles.js';
 import { predict } from '../domain/predict.js';
-import { detectPatterns, symptomFrequency, daysLogged, severitySummary } from '../domain/stats.js';
+import { detectPatterns, symptomFrequency, daysLogged, severitySummary,
+  spottingBetweenPeriods } from '../domain/stats.js';
 import { labelFor, labelOf, isMood, severityLabel } from '../data/taxonomy.js';
 import * as acog from '../domain/acog.js';
 import * as store from '../state/store.js';
@@ -59,6 +60,7 @@ function buildReport() {
     cycleLengths: lengths,
     periodLengths: periods,
     daysSinceLastPeriod: prediction.lastStart ? daysBetween(prediction.lastStart, today) : null,
+    spotting: spottingBetweenPeriods(logs, cycles),
   });
 
   // Only symptoms logged inside the covered window.

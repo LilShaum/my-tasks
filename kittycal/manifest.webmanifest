@@ -9,6 +9,29 @@
   "background_color": "#fff6f2",
   "theme_color": "#fff6f2",
   "categories": ["health", "lifestyle"],
+  "shortcuts": [
+    {
+      "name": "Log today",
+      "short_name": "Log today",
+      "description": "Open today's diary",
+      "url": "./?go=log",
+      "icons": [{ "src": "assets/icons/shortcut-log.png", "sizes": "96x96", "type": "image/png" }]
+    },
+    {
+      "name": "Calendar",
+      "short_name": "Calendar",
+      "description": "See the month",
+      "url": "./?go=calendar",
+      "icons": [{ "src": "assets/icons/shortcut-calendar.png", "sizes": "96x96", "type": "image/png" }]
+    },
+    {
+      "name": "Insights",
+      "short_name": "Insights",
+      "description": "Cycle history and patterns",
+      "url": "./?go=insights",
+      "icons": [{ "src": "assets/icons/shortcut-insights.png", "sizes": "96x96", "type": "image/png" }]
+    }
+  ],
   "icons": [
     {
       "src": "assets/icons/icon.svg",

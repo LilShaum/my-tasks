@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96">
+  <!-- Shortcut: log today. A page with a pencil. Original artwork. -->
+  <rect width="96" height="96" rx="22" fill="#ffe4ea"/>
+  <rect x="22" y="20" width="42" height="56" rx="9"
+        fill="#ffffff" stroke="#8c3a48" stroke-width="5"/>
+  <path d="M32 38 H54 M32 50 H54 M32 62 H44"
+        stroke="#e8465a" stroke-width="5" stroke-linecap="round"/>
+  <path d="M60 62 L76 46 L82 52 L66 68 L58 70 Z"
+        fill="#f2c14e" stroke="#8c3a48" stroke-width="5" stroke-linejoin="round"/>
+</svg>
