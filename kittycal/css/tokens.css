@@ -121,17 +121,39 @@
   --line:      oklch(55% calc(var(--c) * 0.75) var(--h));
   --line-soft: oklch(80% calc(var(--c) * 0.45) var(--h));
 
-  /* ── Cycle semantics. Held constant across themes so the calendar
-        always reads the same way, with only a light hue nudge.       ── */
-  --period:        oklch(58% 0.19 12);
-  --period-soft:   oklch(86% 0.09 12);
-  --period-pred:   oklch(68% 0.15 12);
-  --fertile:       oklch(72% 0.12 195);
-  --fertile-soft:  oklch(91% 0.06 195);
-  --ovulation:     oklch(58% 0.14 195);
+  /* ── Cycle semantics ───────────────────────────────────────────────
+        Hue and lightness are held constant across all fourteen themes:
+        red means bleeding and cyan means fertile wherever you are, and
+        lightness is what the contrast guarantees are built on. Both stay
+        pinned.
+
+        Saturation is not part of that promise, and it used to be pinned
+        anyway — at 0.19 and 0.12 against a theme running at --c ≈ 0.11.
+        The result was the most prominent element of the app, the cycle
+        ring, reading as a chart pasted in from somewhere else: neon
+        against Kuromi's near-black, and cold cyan cutting across Hello
+        Kitty's warm pink. Tying chroma to the theme's own puts them in
+        the same family without moving what they mean, and because every
+        cycle colour shifts together their relationships hold.
+
+        The floor matters: the low-chroma themes (Badtz-Maru, Aggretsuko)
+        would otherwise wash these out to the point where a period day
+        and a luteal day are the same grey.                            ── */
+  --c-cycle: clamp(0.085, calc(var(--c) * 1.15), 0.15);
+
+  --period:        oklch(58% var(--c-cycle) 12);
+  --period-soft:   oklch(86% calc(var(--c-cycle) * 0.55) 12);
+  --period-pred:   oklch(68% calc(var(--c-cycle) * 0.85) 12);
+  /* The cyan family gets cut harder than the red. Hue 195 is close to the
+     opposite of the warm hues most of these themes use, so it reads as cold
+     at any saturation the red would tolerate — and unlike the red, nothing is
+     lost by muting it: a soft slate-teal is still unmistakably not-bleeding,
+     which is the only distinction it has to carry. */
+  --fertile:       oklch(68% calc(var(--c-cycle) * 0.62) 195);
+  --fertile-soft:  oklch(91% calc(var(--c-cycle) * 0.26) 195);
+  --ovulation:     oklch(54% calc(var(--c-cycle) * 0.66) 195);
   --luteal:        oklch(78% 0.035 var(--h));
   --luteal-soft:   oklch(90% 0.02 var(--h));
-  --delay:         oklch(65% 0.02 var(--h));
 
   /* ── Alerts. Theme-immune by design: fixed L and C, so a warning is
         never softened below threshold by a pastel theme.             ── */
@@ -205,17 +227,29 @@
   --line:      oklch(70% calc(var(--c) * 0.55) var(--h));
   --line-soft: oklch(40% calc(var(--c) * 0.40) var(--h));
 
-  --period:       oklch(70% 0.17 12);
-  --period-soft:  oklch(38% 0.10 12);
-  --period-pred:  oklch(62% 0.13 12);
-  --fertile:      oklch(78% 0.11 195);
+  /* Same reasoning as light, and more visible here: a saturated cyan at L78
+     on a near-black surface is the single loudest thing in the app. */
+  --c-cycle: clamp(0.075, calc(var(--c) * 1.05), 0.14);
+
+  --period:       oklch(70% var(--c-cycle) 12);
+  --period-soft:  oklch(38% calc(var(--c-cycle) * 0.60) 12);
+  --period-pred:  oklch(62% calc(var(--c-cycle) * 0.80) 12);
+  /*
+    Fertile and ovulation are pushed apart in lightness here.
+
+    They were L78 and L82 at the same hue and near-identical chroma, which is
+    the same colour twice — and they sit next to each other on the ring, where
+    the whole job of the ovulation band is to mark one day inside the fertile
+    window. That predates the chroma work below; measuring separation is what
+    turned it up.
+  */
+  --fertile:      oklch(70% calc(var(--c-cycle) * 0.55) 195);
   /* Kept well clear of the dark surface — this doubles as the follicular arc
      on the cycle ring, and at L36 it vanished against the background. */
-  --fertile-soft: oklch(52% 0.08 195);
-  --ovulation:    oklch(82% 0.13 195);
+  --fertile-soft: oklch(52% calc(var(--c-cycle) * 0.40) 195);
+  --ovulation:    oklch(88% calc(var(--c-cycle) * 0.62) 195);
   --luteal:       oklch(42% 0.03 var(--h));
   --luteal-soft:  oklch(30% 0.02 var(--h));
-  --delay:        oklch(60% 0.02 var(--h));
 
   --danger:    oklch(74% 0.17 25);
   --danger-bg: oklch(30% 0.07 25);
