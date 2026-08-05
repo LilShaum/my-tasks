@@ -5,13 +5,18 @@
 
 #view-insights .card { margin-bottom: var(--sp-4); }
 
-/* The app header's h1 already names this view, so its cards are the level
-   below it. They were h3, which skipped a level for anyone navigating by
-   headings. */
-#view-insights .card h2 {
+/* h1 in the app header names the view, h2 names each group of cards, h3 names
+   the card. The cards were briefly h2 — correct while they sat directly under
+   the h1, and a skipped level once the groups arrived. */
+#view-insights .card h3 {
   font-size: var(--fs-md);
   margin-bottom: var(--sp-1);
 }
+
+/* Groups are separated by more air than the cards inside them, which is what
+   makes them read as groups rather than as one longer list. */
+.insight-group + .insight-group { margin-top: var(--sp-6); }
+.insight-group .section-label { margin-left: var(--sp-1); }
 
 /* ── Charts ───────────────────────────────────────────────────────────── */
 /*

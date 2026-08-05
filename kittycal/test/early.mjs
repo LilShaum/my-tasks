@@ -121,7 +121,7 @@ async function insightsWith(shape) {
   await page.evaluate(async () => (await import('/js/state/store.js')).setView('insights'));
   await page.waitForTimeout(500);
 
-  const headings = await page.$$eval('#view-insights h2', (n) => n.map((h) => h.textContent));
+  const headings = await page.$$eval('#view-insights .card h3', (n) => n.map((h) => h.textContent));
   const text = await page.$eval('#view-insights', (n) => n.textContent ?? '');
 
   return { page, ctx, errors, headings, text };
@@ -197,7 +197,7 @@ console.log('\nthree periods marked, so two completed cycles');
     has enough points to draw — asserting "no chart anywhere" would have been
     asserting a bug.
   */
-  const cycleCard = await page.$('.card:has(h2:text-is("Cycle length"))');
+  const cycleCard = await page.$('.card:has(h3:text-is("Cycle length"))');
   ok('stated in words rather than drawn as a two-point line',
     /Your cycles so far/.test(text) && (await cycleCard.$$('.chart')).length === 0,
     text.match(/Your cycles so far[^.]*\./)?.[0] ?? '(not found)');
@@ -234,6 +234,56 @@ console.log('\nfive periods marked, so four completed cycles');
   ok('one entry per chart on the screen', entries.length >= 5, JSON.stringify(entries));
 
   ok('no page errors', errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
+/* ── The groups, at every age ───────────────────────────────────────────── */
+
+/*
+  Insights is grouped into named sections, and every card in it decides for
+  itself whether it has anything to say. Those two facts fight: at three days
+  of use most cards stand down, and a group whose cards have all gone is a
+  heading over nothing — which is worse than no heading, because it reads as a
+  section that failed to load.
+
+  Checked at all four ages rather than one, since which cards survive is
+  exactly what changes between them.
+*/
+console.log('\nno group is ever a heading over nothing');
+for (const shape of [
+  { cycles: 0, loggedDays: 3 },
+  { cycles: 1, loggedDays: 12 },
+  { cycles: 3, loggedDays: 40 },
+  { cycles: 6, loggedDays: 120 },
+]) {
+  const { page, ctx, errors } = await insightsWith(shape);
+  const label = `${shape.cycles} cycles, ${shape.loggedDays} days logged`;
+
+  const groups = await page.$$eval('#view-insights .insight-group', (nodes) =>
+    nodes.map((g) => ({
+      label: g.querySelector('.section-label')?.textContent ?? '(unnamed)',
+      cards: g.querySelectorAll('.card').length,
+    })));
+
+  ok(`${label}: every group has cards`,
+    groups.every((g) => g.cards > 0),
+    JSON.stringify(groups.filter((g) => !g.cards)));
+
+  ok(`${label}: every group is named`,
+    groups.every((g) => g.label !== '(unnamed)'), JSON.stringify(groups));
+
+  /*
+    And the heading levels still descend without a gap: h1 in the app header
+    names the view, h2 names the group, h3 names the card. The cards were h2
+    before the groups existed, so getting this wrong was one careless find and
+    replace away.
+  */
+  const levels = await page.$$eval('#view-insights h1, #view-insights h2, #view-insights h3',
+    (nodes) => nodes.map((n) => Number(n.tagName[1])));
+  const skips = levels.filter((lvl, i) => i > 0 && lvl > levels[i - 1] + 1);
+  ok(`${label}: no heading level is skipped`, skips.length === 0, JSON.stringify(levels));
+
+  ok(`${label}: no page errors`, errors.length === 0, errors.join(' | '));
   await ctx.close();
 }
 
