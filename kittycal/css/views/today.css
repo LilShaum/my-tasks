@@ -16,7 +16,26 @@
   height: 240px;
 }
 
-.cycle-ring { display: block; }
+/*
+  A disc behind the ring.
+
+  Every other block on this screen sits on a surface; the ring — the one thing
+  the screen exists for — sat directly on the background pattern, which made
+  the app's centrepiece look like the one element nobody had finished, and put
+  a busy gingham directly behind a thin arc. A circle rather than a card,
+  because the shape it is anchoring is a circle.
+*/
+.ring-wrap::before {
+  content: '';
+  position: absolute;
+  inset: -14px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: var(--sh-soft);
+}
+
+.cycle-ring { display: block; position: relative; }
+.ring-center { z-index: 1; }
 
 .ring-center {
   position: absolute;

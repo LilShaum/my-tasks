@@ -100,8 +100,6 @@ export function renderToday(host) {
   replace(host, [
     greeting(settings.name, today),
 
-    showRecap ? recapCard(/** @type {NonNullable<typeof recap>} */ (recap)) : null,
-
     cycleRing({
       prediction,
       headline: headline.value,
@@ -112,6 +110,17 @@ export function renderToday(host) {
     phaseLine(phase),
     logButton(logs[today], today, logs, cycles),
     weekStrip(logs, periodDays, today),
+
+    /*
+      The recap sits under the daily loop, not over it.
+
+      It is a good card and it is also five hundred pixels of retrospective
+      that appears once a cycle. Above the ring it pushed the answer to "where
+      am I today", the log button and the week strip all below the fold — so on
+      the one morning a month it shows up, the screen stopped doing its job.
+      Here it is still the first thing under the fold and impossible to miss.
+    */
+    showRecap ? recapCard(/** @type {NonNullable<typeof recap>} */ (recap)) : null,
 
     el('div', { class: 'section stagger' }, [
       prediction.stale ? staleCard(prediction)

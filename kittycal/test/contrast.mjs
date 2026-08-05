@@ -74,6 +74,40 @@ function ratio(a, b) {
   return (hi + 0.05) / (lo + 0.05);
 }
 
+/**
+ * Cycle colours that have to stay distinguishable *from each other*.
+ *
+ * Contrast against a background says nothing about this, and it is what breaks
+ * when saturation is tuned: the cycle palette's chroma is now derived from the
+ * theme's rather than pinned, which is what stops the ring reading as a chart
+ * from another app — and which, pushed too far, would quietly turn a period
+ * day and a luteal day into the same circle.
+ *
+ * Pairs, not a cross product. `--period-pred` is deliberately the same hue as
+ * `--period` and is told apart by being a dashed outline against a filled
+ * circle; demanding a colour gap there would be measuring the wrong thing and
+ * would force the two apart for no one's benefit. Listed here are the pairs
+ * where colour is the only thing doing the work: filled calendar circles that
+ * appear in the same month, and solid arcs that touch on the ring.
+ *
+ * Measured in OKLab, where a fixed distance means roughly the same perceptual
+ * difference anywhere in the space — the reason the palette is authored in
+ * OKLCH to begin with. 0.09 is comfortably past "these are two colours"
+ * without demanding the loud separation the palette used to have.
+ */
+const MIN_CYCLE_SEPARATION = 0.09;
+
+const CYCLE_PAIRS = [
+  ['--period', '--fertile'],
+  ['--period', '--ovulation'],
+  ['--period', '--luteal'],
+  ['--fertile', '--ovulation'],
+  ['--fertile', '--luteal'],
+  ['--ovulation', '--luteal'],
+];
+
+const CYCLE_TOKENS = [...new Set(CYCLE_PAIRS.flat())];
+
 const browser = await chromium.launch({
   executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
 });
@@ -193,6 +227,56 @@ for (const theme of THEMES) {
         }
       }
     }
+
+    /*
+      The cycle colours have to stay distinguishable from *each other*.
+
+      Contrast against a background says nothing about this, and it is the
+      thing that breaks when saturation is tuned: the cycle palette's chroma is
+      now derived from the theme's rather than pinned, which is what stops the
+      ring reading as a chart from another app — and which, taken too far or
+      applied to an already-desaturated theme, would quietly turn a period day
+      and a luteal day into the same grey circle.
+
+      Measured in OKLab, where a fixed numeric distance means roughly the same
+      perceptual difference anywhere in the space, which is the entire reason
+      the palette is authored in OKLCH to begin with.
+    */
+    const cycleColours = await page.evaluate(
+      ({ theme, mode, tokens }) => {
+        const root = document.documentElement;
+        root.dataset.theme = theme;
+        root.dataset.mode = mode;
+
+        const probe = document.createElement('span');
+        probe.style.display = 'none';
+        document.body.append(probe);
+
+        /** @type {Record<string, number[]>} */
+        const out = {};
+        for (const token of tokens) {
+          // Straight to OKLab: no canvas, because this is about perceptual
+          // distance rather than the sRGB bytes a contrast ratio needs.
+          probe.style.color = `oklab(from var(${token}) l a b)`;
+          const m = getComputedStyle(probe).color.match(/-?[\d.]+/g) ?? [];
+          out[token] = m.slice(0, 3).map(Number);
+        }
+        probe.remove();
+        return out;
+      },
+      { theme, mode, tokens: CYCLE_TOKENS },
+    );
+
+    for (const [an, bn] of CYCLE_PAIRS) {
+      const a = cycleColours[an];
+      const b = cycleColours[bn];
+      const dist = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+      checked++;
+      if (dist < MIN_CYCLE_SEPARATION) {
+        failures.push({ theme, mode, got: dist, want: MIN_CYCLE_SEPARATION,
+          label: `${an} vs ${bn} too alike`, unit: 'ΔOKLab' });
+      }
+    }
   }
 }
 
@@ -204,8 +288,13 @@ if (failures.length) {
   console.log(`\n${failures.length} FAILED:\n`);
   for (const f of failures) {
     console.log(
-      `  ${f.theme.padEnd(12)} ${f.mode.padEnd(5)} ${f.label.padEnd(28)} ` +
-      `${f.got.toFixed(2)}:1  (needs ${f.want}:1)`,
+      `  ${f.theme.padEnd(12)} ${f.mode.padEnd(5)} ${f.label.padEnd(30)} `
+      // Parenthesised: `+` binds tighter than `===`, so without these the
+      // label was concatenated into the comparison and silently discarded,
+      // and every failure printed as a bare number with no name on it.
+      + (f.unit === 'ΔOKLab'
+        ? `${f.got.toFixed(3)}  (needs ${f.want})`
+        : `${f.got.toFixed(2)}:1  (needs ${f.want}:1)`),
     );
   }
   process.exit(1);
