@@ -666,3 +666,21 @@
   color: var(--on-primary);
   font-weight: 800;
 }
+
+/*
+  A group label — the small uppercase eyebrow that names a run of cards.
+
+  Lives here rather than beside either of its two callers because it is the
+  same thing in both: "Worth knowing" over Today's tips, and the five group
+  headings on Insights. Two copies of this rule is how the two screens
+  gradually stop matching.
+*/
+.section-label {
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-family: var(--font-body);
+  margin-bottom: var(--sp-2);
+}

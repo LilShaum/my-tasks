@@ -69,21 +69,58 @@ export function renderInsights(host) {
   */
   const patterns = detectPatterns(logs, cycles);
 
-  const cards = [
-    overviewCard(logs, cycles, lengths, today),
-    thisCycleCard(logs, cycles, today),
-    cycleLengthCard(lengthPoints, prediction),
-    periodLengthCard(periodPoints),
-    accuracyCard(cycles),
-    loggedMostCard(logs, patterns.length),
-    patternsCard(logs, cycles, prediction, patterns),
-    moodCard(logs, cycles, settings),
-    bbtCard(logs, cycles, settings),
-    trendCard(logs, settings),
-    notesCard(),
-  ].filter(Boolean);
+  /*
+    Grouped, rather than one column of eleven.
 
-  if (!cards.length) {
+    Every card here is the same shape — a heading, some figures, a chart — so
+    presented as a flat list they read as one undifferentiated four-screen
+    scroll, and finding the thing she came for means reading all of it. The
+    groups are not decoration: they are the four different questions this
+    screen answers, and saying which is which is the difference between a page
+    and a report.
+
+    Cards still decide for themselves whether they have anything to say, so a
+    group whose cards all stood down disappears with them — a heading over
+    nothing is worse than no heading.
+  */
+  /** @type {[string, (HTMLElement|null)[]][]} */
+  const groups = [
+    ['Where you are', [
+      overviewCard(logs, cycles, lengths, today),
+      thisCycleCard(logs, cycles, today),
+    ]],
+    ['Your cycle', [
+      cycleLengthCard(lengthPoints, prediction),
+      periodLengthCard(periodPoints),
+      accuracyCard(cycles),
+    ]],
+    ['How you feel', [
+      loggedMostCard(logs, patterns.length),
+      patternsCard(logs, cycles, prediction, patterns),
+      moodCard(logs, cycles, settings),
+    ]],
+    ['What you measure', [
+      bbtCard(logs, cycles, settings),
+      trendCard(logs, settings),
+    ]],
+    ['Read and share', [
+      notesCard(),
+      reportCard(),
+    ]],
+  ];
+
+  // Flattened once, for the two questions that are about the page as a whole:
+  // whether there is anything on it at all, and whether anything on it is a
+  // chart the reading guide could explain.
+  const cards = groups.flatMap(([, group]) => group.filter(Boolean));
+
+  /*
+    The report card is always offered, so it alone is not evidence that there
+    is anything to look at — without this, a brand-new install would show a
+    "Read and share" heading over a lone "print a report of nothing" button
+    instead of the empty state.
+  */
+  if (cards.length <= 1) {
     replace(host, [notEnoughYet(cycles.length)]);
     return;
   }
@@ -93,9 +130,18 @@ export function renderInsights(host) {
       // Only offered once there is a chart to explain. Before that it would be
       // a guide to things she cannot see.
       cards.some(hasChart) ? readingGuideButton() : null,
-      ...cards,
+
+      ...groups.map(([label, group]) => {
+        const present = group.filter(Boolean);
+        return present.length
+          ? el('section', { class: 'insight-group' }, [
+              el('h2', { class: 'section-label', text: label }),
+              ...present,
+            ])
+          : null;
+      }),
+
       comingUpCard(cycles, complete, logs),
-      reportCard(),
       footnote(),
     ]),
   ]);
@@ -146,7 +192,7 @@ function overviewCard(logs, cycles, lengths, today) {
   ].filter(Boolean);
 
   return el('div', { class: 'card' }, [
-    el('h2', { text: 'Your history' }),
+    el('h3', { text: 'Your history' }),
     el('div', { class: 'stat-row' }, figures),
     stats.mean != null && el('p', { class: 'hint-sm', text:
       `Average cycle ${Math.round(stats.mean)} days, ` +
@@ -185,7 +231,7 @@ function cycleLengthCard(points, prediction) {
 
   if (points.length < CHART_MIN) {
     return el('div', { class: 'card' }, [
-      el('h2', { text: 'Cycle length' }),
+      el('h3', { text: 'Cycle length' }),
       el('p', { text: `${points.length === 1 ? 'Your first cycle was' : 'Your cycles so far:'} ` +
         `${listJoin(points.map((p) => `${p.length} days`))}.` }),
       el('p', { class: 'hint-sm', text:
@@ -214,9 +260,9 @@ function cycleLengthCard(points, prediction) {
   };
 
   return el('div', { class: 'card' }, [
-    el('h2', { text: 'Cycle length' }),
+    el('h3', { text: 'Cycle length' }),
     el('p', { class: 'hint-sm', text:
-      `One dot per cycle, oldest first. Inside the green band is the typical ` +
+      `One dot per cycle, oldest first. Inside the shaded band is the typical ` +
       `${acog.CYCLE_MIN}–${acog.CYCLE_MAX} days.` }),
     trendChart({
       data,
@@ -250,7 +296,7 @@ function periodLengthCard(points) {
 
   if (points.length < CHART_MIN) {
     return el('div', { class: 'card' }, [
-      el('h2', { text: 'Period length' }),
+      el('h3', { text: 'Period length' }),
       el('p', { text: `${points.length === 1 ? 'Your last period lasted' : 'Your periods so far:'} ` +
         `${listJoin(points.map((p) => `${p.length} days`))}.` }),
       el('p', { class: 'hint-sm', text:
@@ -259,7 +305,7 @@ function periodLengthCard(points) {
   }
 
   return el('div', { class: 'card' }, [
-    el('h2', { text: 'Period length' }),
+    el('h3', { text: 'Period length' }),
     el('p', { class: 'hint-sm', text:
       `Days of bleeding per period. Typical is ${acog.PERIOD_MIN}–` +
       `${acog.PERIOD_MAX}.` }),
@@ -306,7 +352,7 @@ function accuracyCard(cycles) {
     : null;
 
   return el('div', { class: 'card' }, [
-    el('h2', { text: 'How close Kittycal has been' }),
+    el('h3', { text: 'How close Kittycal has been' }),
     el('p', { class: 'hint-sm', text:
       `Each past cycle re-forecast from only what was known before it started, `
       + `then compared with the day your period actually arrived.` }),
@@ -359,7 +405,7 @@ function thisCycleCard(logs, cycles, today) {
   const top = cycles.length > 1 ? summary.logged.slice(0, 6) : [];
 
   return el('div', { class: 'card' }, [
-    el('h2', { text: 'This cycle' }),
+    el('h3', { text: 'This cycle' }),
     el('p', { class: 'hint-sm', text:
       `Since your period started on ${fmtDayMonth(cycle.start)}.` }),
     el('div', { class: 'stat-row' }, [
@@ -395,7 +441,7 @@ function loggedMostCard(logs, patternCount) {
   const most = top[0].count;
 
   return el('div', { class: 'card' }, [
-    el('h2', { text: 'What you log most' }),
+    el('h3', { text: 'What you log most' }),
     el('p', { class: 'hint-sm', text:
       'Every day you have recorded, counted up. Not a pattern yet — just what ' +
       'you have written down.' }),
@@ -446,7 +492,7 @@ function comingUpCard(cycles, complete, logs) {
   if (!waiting.length) return null;
 
   return el('div', { class: 'card' }, [
-    el('h2', { text: 'Still to come' }),
+    el('h3', { text: 'Still to come' }),
     el('ul', { class: 'coming-list' },
       waiting.map((line) => el('li', { text: `${line[0].toUpperCase()}${line.slice(1)}.` }))),
     el('p', { class: 'hint-sm', text:
@@ -496,7 +542,7 @@ function moodCard(logs, cycles, settings) {
   const total = rows.reduce((n, r) => n + (r.data?.total ?? 0), 0);
 
   return el('div', { class: 'card' }, [
-    el('h2', { text: 'Mood by phase' }),
+    el('h3', { text: 'Mood by phase' }),
     el('p', { class: 'hint-sm', text:
       `What you logged most at each point in your cycle, as a share of the ` +
       `days you recorded a mood. Based on ${plural(total, 'day')}.` }),
@@ -551,7 +597,7 @@ function patternsCard(logs, cycles, prediction, patterns) {
   if (!patterns.length) return null;
 
   return el('div', { class: 'card' }, [
-    el('h2', { text: 'Patterns' }),
+    el('h3', { text: 'Patterns' }),
     el('p', { class: 'hint-sm', text:
       // The strips are a darkness ramp and nothing said so, which left the
       // one thing they encode to be guessed at.
@@ -647,7 +693,7 @@ function bbtCard(logs, cycles, settings) {
     settings.unitTemp === 'F' ? c * 9 / 5 + 32 : c;
 
   return el('div', { class: 'card' }, [
-    el('h2', { text: 'Basal body temperature' }),
+    el('h3', { text: 'Basal body temperature' }),
     el('p', { class: 'hint-sm', text: `This cycle, ${plural(readings.length, 'reading')}.` }),
     lineChart({
       data: readings.map((r) => ({ x: r.day, y: toDisplay(r.bbt) })),
@@ -685,7 +731,7 @@ function trendCard(logs, settings) {
   if (weights.length < 3 && sleeps.length < 3) return null;
 
   return el('div', { class: 'card' }, [
-    el('h2', { text: 'Trends' }),
+    el('h3', { text: 'Trends' }),
 
     weights.length >= 3 && el('div', {}, [
       el('p', { class: 'hint-sm', text:
@@ -740,7 +786,7 @@ function notesCard() {
   if (!n) return null;
 
   return el('div', { class: 'card' }, [
-    el('h2', { text: 'Your notes' }),
+    el('h3', { text: 'Your notes' }),
     el('p', { class: 'hint-sm', text:
       `${plural(n, 'thing')} you have written in the diary. Searchable, newest ` +
       'first, and tapping one opens that day.' }),
@@ -756,7 +802,7 @@ function notesCard() {
 
 function reportCard() {
   return el('div', { class: 'card' }, [
-    el('h2', { text: 'Report for a doctor' }),
+    el('h3', { text: 'Report for a doctor' }),
     el('p', { class: 'hint-sm', text:
       'A printable summary of your last six months — cycle lengths, period ' +
       'lengths, recurring symptoms and anything outside the typical ranges. ' +
@@ -819,7 +865,7 @@ function openReadingGuide() {
     body: [
       entry('Cycle length and period length',
         'One dot per cycle, oldest on the left, labelled with the month it '
-        + 'began. The green band is the typical range and its edges are '
+        + 'began. The shaded band is the typical range and its edges are '
         + 'numbered on the left. A dot outside it is ringed and its value '
         + 'written next to it. The dashed line is your own average.'),
 
@@ -870,7 +916,7 @@ function stat(label, value, unit) {
 function notEnoughYet(cycleCount) {
   return el('div', { class: 'empty' }, [
     spotArt('chart'),
-    el('h2', { text: 'Not enough to analyse yet' }),
+    el('h3', { text: 'Not enough to analyse yet' }),
     el('p', { text: cycleCount === 0
       ? 'Once you have logged a couple of periods, this is where your cycle ' +
         'length, patterns and trends show up.'

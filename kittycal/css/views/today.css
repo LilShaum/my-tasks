@@ -131,15 +131,8 @@
 /* ── Daily insight cards ──────────────────────────────────────────────── */
 .tips { margin-bottom: var(--sp-5); }
 
-.tips-heading {
-  font-size: var(--fs-xs);
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  font-family: var(--font-body);
-  margin-bottom: var(--sp-2);
-}
+/* The eyebrow itself is .section-label in components.css — shared with the
+   group headings on Insights so the two screens cannot drift apart. */
 
 .tips-scroller {
   display: flex;

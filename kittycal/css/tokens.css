@@ -155,6 +155,23 @@
   --luteal:        oklch(78% 0.035 var(--h));
   --luteal-soft:   oklch(90% 0.02 var(--h));
 
+  /*
+    The "typical range" band on the Insights charts.
+
+    Its own token, not `--ok`. It was drawing itself from the alert palette,
+    which is theme-immune *by design* — a warning must never be softened below
+    threshold by a pastel theme — so a chart decoration was pinned to the
+    contrast contract for errors, in both directions: nobody could soften this
+    band without weakening every alert in the app, and nobody could restyle
+    alerts without silently restyling the charts.
+
+    Hue stays green and away from the theme, because the band has to be
+    distinguishable from the data drawn on top of it and the data is
+    theme-coloured. Only the saturation comes down, on the same reasoning as
+    the cycle colours above.
+  */
+  --band: oklch(62% calc(var(--c-cycle) * 0.55) 150);
+
   /* ── Alerts. Theme-immune by design: fixed L and C, so a warning is
         never softened below threshold by a pastel theme.             ── */
   --danger:      oklch(52% 0.20 25);
@@ -250,6 +267,7 @@
   --ovulation:    oklch(88% calc(var(--c-cycle) * 0.62) 195);
   --luteal:       oklch(42% 0.03 var(--h));
   --luteal-soft:  oklch(30% 0.02 var(--h));
+  --band:         oklch(70% calc(var(--c-cycle) * 0.55) 150);
 
   --danger:    oklch(74% 0.17 25);
   --danger-bg: oklch(30% 0.07 25);

@@ -95,7 +95,7 @@ export function trendChart({
   /*
     The typical range, with hairline edges.
 
-    It used to be a 10%-opacity wash with no boundary, so "the green band is
+    It used to be a 10%-opacity wash with no boundary, so "the band is
     21-35 days" was a sentence you had to take on trust — there was nothing on
     the chart at 21 or at 35 to look at. Drawing and numbering the edges is
     what turns it from a tint into a scale.
@@ -105,14 +105,14 @@ export function trendChart({
     chart.append(svg('rect', {
       x: PAD.left, y: y(bandHi),
       width: plotW, height: Math.max(1, y(bandLo) - y(bandHi)),
-      fill: 'var(--ok)', opacity: '0.14',
+      fill: 'var(--band)', opacity: '0.16',
     }));
 
     for (const edge of [bandLo, bandHi]) {
       chart.append(svg('line', {
         x1: PAD.left, x2: width - PAD.right,
         y1: y(edge), y2: y(edge),
-        stroke: 'var(--ok)', 'stroke-width': '1', opacity: '0.55',
+        stroke: 'var(--band)', 'stroke-width': '1', opacity: '0.6',
       }));
       tick(edge);
     }

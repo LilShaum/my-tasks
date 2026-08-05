@@ -124,7 +124,7 @@ ok('none of them overflows the phone',
 
 console.log('\nthe cycle-length chart says what it is showing');
 
-const cycleCard = await page.$('.card:has(h2:text-is("Cycle length"))');
+const cycleCard = await page.$('.card:has(h3:text-is("Cycle length"))');
 const labels = await cycleCard.$$eval('.chart text', (n) => n.map((t) => t.textContent));
 
 ok('the x-axis is labelled with months, not row numbers',
@@ -181,7 +181,7 @@ console.log('\na nightly series does not repeat itself');
 
 const sleepLabels = await page.evaluate(() => {
   const cards = [...document.querySelectorAll('.card')];
-  const trends = cards.find((c) => c.querySelector('h2')?.textContent === 'Trends');
+  const trends = cards.find((c) => c.querySelector('h3')?.textContent === 'Trends');
   if (!trends) return null;
   const charts = [...trends.querySelectorAll('.chart')];
   const last = charts[charts.length - 1];

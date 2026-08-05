@@ -688,7 +688,7 @@ function tipsRow({ phase, prediction, log, today }) {
   if (!tips.length) return null;
 
   return el('section', { class: 'tips', 'aria-label': 'Things to know today' }, [
-    el('h3', { class: 'tips-heading', text: 'Worth knowing' }),
+    el('h3', { class: 'section-label', text: 'Worth knowing' }),
     el('ul', {
       class: 'tips-scroller',
       // A horizontal scroller is a nuisance with a keyboard unless it's
