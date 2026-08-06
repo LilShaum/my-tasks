@@ -28,6 +28,7 @@ import { openSheet } from '../ui/sheet.js';
 import { releaseMascotUrls, mascot } from '../ui/mascot.js';
 import { openMascotPicker } from '../ui/image-picker.js';
 import { openHelp } from './help.js';
+import { openStickerBook, stickerCounts } from './stickers.js';
 import { exportEverything } from '../storage/export-action.js';
 import * as store from '../state/store.js';
 import * as repo from '../storage/repo.js';
@@ -54,6 +55,7 @@ export function renderSettings(host) {
       picker,
       el('p', { class: 'hint-sm', text: getTheme(settings.theme).blurb }),
       mascotRow(settings.theme),
+      stickerRow(),
       appearanceRows(settings),
     ]),
 
@@ -152,6 +154,37 @@ function mascotRow(themeId) {
   }).catch(() => { /* the default label is fine */ });
 
   return row;
+}
+
+/**
+ * The way into the sticker book.
+ *
+ * Under Look rather than in the tab bar. It is the least important thing here
+ * on any given day and one of the few that is purely nice, which is exactly
+ * where the design rules put decoration — and it wears the same cast as the
+ * theme picker directly above it, so this is where she will look for it.
+ */
+function stickerRow() {
+  const { earned, total } = stickerCounts();
+
+  return el('button', {
+    type: 'button',
+    class: 'row',
+    style: { border: 'var(--bw-data) solid var(--line-soft)',
+             borderRadius: 'var(--r-lg)', background: 'var(--card)',
+             marginTop: 'var(--sp-3)' },
+    onclick: () => { haptic(); openStickerBook(); },
+  }, [
+    el('span', { class: 'row-label' }, [
+      'Sticker book',
+      el('span', { class: 'choice-sub', text: earned === 0
+        ? `${total} to collect, from using Kittycal`
+        // Never "you are missing six". The count only ever goes up, and the
+        // phrasing has to go up with it.
+        : `${earned} of ${total} collected` }),
+    ]),
+    el('span', { class: 'row-value', 'aria-hidden': 'true', text: '›' }),
+  ]);
 }
 
 /* ── Appearance ─────────────────────────────────────────────────────────── */

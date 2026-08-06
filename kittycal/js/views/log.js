@@ -33,6 +33,8 @@ import {
 import { buildCycles, cycleDay } from '../domain/cycles.js';
 import { predict } from '../domain/predict.js';
 import { phaseFor } from '../domain/phases.js';
+import { earnedIds, newlyEarned } from '../domain/stickers.js';
+import { stickerContext } from './stickers.js';
 import * as store from '../state/store.js';
 
 /** How many recently-used chips float to the top of a category. */
@@ -1086,9 +1088,23 @@ function selectionCount(cat, draft) {
 function commit(date, draft, before) {
   const settings = store.getState().settings;
 
+  /*
+    The diary is where most of the sticker book is actually earned. Notes,
+    a symptom she named herself, how bad something was, a temperature — none
+    of those are reachable from the check-in, so a book that only listened to
+    check-ins would leave half its slots unfillable by anything she does.
+
+    `putLog` updates the store synchronously and returns a promise only for
+    the disk write, so the two contexts either side of it are the before and
+    after they look like.
+  */
+  const stickersBefore = earnedIds(stickerContext());
+
   store.rememberPicks(draft);
   store.putLog(draft);
   closeSheet();
+
+  const won = newlyEarned(stickersBefore, stickerContext());
 
   const nowEmpty = nothingRecorded(draft);
   const wasEmpty = nothingRecorded(before);
@@ -1098,6 +1114,24 @@ function commit(date, draft, before) {
     return;
   }
   if (nowEmpty) return;
+
+  /*
+    A sticker gets its own toast, above the recap of what was saved.
+
+    Not instead of it. The recap is the confirmation that the write landed,
+    and it is also the only thing announced to a screen reader — replacing it
+    with the sticker would trade the important message for the charming one.
+    So the sticker toast is silent and goes up first; `toast` keeps two on
+    screen at once, which is exactly the two there are.
+  */
+  if (won) {
+    burst({ shape: getTheme(settings.theme).particle, count: 34 });
+    mascotReact();
+    haptic([10, 30, 10]);
+    toast(`Sticker earned — ${won.title}`, { silent: true });
+    toast(summarise(draft, date));
+    return;
+  }
 
   // Celebrate the act of logging, never what was logged. A heavy day and a
   // good day get exactly the same response.

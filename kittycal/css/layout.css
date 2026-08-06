@@ -253,6 +253,73 @@
   border: 1px solid oklch(50% 0 0 / 0.18);
 }
 
+/* ── The sticker book ─────────────────────────────────────────────────── */
+.sticker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: var(--sp-3);
+  margin-top: var(--sp-3);
+}
+
+.sticker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: var(--sp-3) var(--sp-2) var(--sp-2);
+  border-radius: var(--r-lg);
+  border: var(--bw) dashed var(--line-soft);
+  background: var(--surface-2);
+  text-align: center;
+}
+
+/*
+  Earned: solid edge, its own palette, and the die-cut shadow the theme cards
+  use. The difference has to be legible without colour, because a sticker that
+  reads as earned only by being more saturated is a sticker that reads as
+  earned to nobody using this in bright sun — hence dashed against solid, and
+  the shadow appearing rather than deepening.
+*/
+.sticker.is-earned {
+  border-style: solid;
+  border-color: var(--line);
+  background: var(--card);
+  box-shadow: var(--sh-sticker);
+}
+
+.sticker-art {
+  display: block;
+  width: 52px;
+  height: 52px;
+}
+
+.sticker-art svg { width: 52px; height: 52px; }
+
+/*
+  An unearned slot is the shape of what is coming, not a picture of it.
+  Draining the fill rather than dimming the whole card keeps the title and the
+  requirement at full contrast — the text is the part she actually needs to
+  read, and greying the card wholesale would have failed that.
+*/
+.sticker:not(.is-earned) .sticker-art {
+  opacity: 0.4;
+  filter: grayscale(1);
+}
+
+.sticker-title {
+  font-family: var(--font-display);
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.sticker-sub {
+  font-size: 10px;
+  line-height: 1.3;
+  color: var(--ink-2);
+}
+
 /* ── Settings rows ────────────────────────────────────────────────────── */
 .rows {
   display: flex;
