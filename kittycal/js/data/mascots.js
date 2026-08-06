@@ -45,6 +45,27 @@ const P = 'var(--primary)';     // fill
 const A = 'var(--accent)';      // accent fill
 const W = 'var(--card)';        // "paper" white, follows dark mode
 
+/*
+  Shading planes.
+
+  A single flat fill inside an outline is what makes an icon read as clip art:
+  the form has a silhouette and no volume. Every emblem here now carries at
+  least one lighter or darker plane, which is the cheapest way to turn a shape
+  into an object — the light falls from the top-left throughout the set.
+
+  These come from `--emb-*` rather than `--primary-soft` / `--primary-deep`,
+  which swap places between light and dark mode and would light the drawings
+  from opposite corners depending on the time of day. See tokens.css.
+*/
+const HI = 'var(--emb-hi)';     // lighter plane, same hue as the fill
+const LO = 'var(--emb-lo)';     // darker plane
+const HI_A = 'var(--emb-hi-a)'; // the same pair for accent-coloured forms
+const LO_A = 'var(--emb-lo-a)';
+
+/** An internal plane: no outline of its own, the fold line is drawn separately. */
+const plane = (/** @type {string} */ d, /** @type {string} */ fill) =>
+  `<path d="${d}" fill="${fill}" stroke="none"/>`;
+
 /** The one stroke weight, in viewBox units. */
 const SW = 5;
 
@@ -102,12 +123,16 @@ const round = (/** @type {number} */ n) => Math.round(n * 100) / 100;
  * @param {number} from @param {number} to @param {number} sides
  */
 function spokes(cx, cy, from, to, sides) {
-  return Array.from({ length: sides }, (_, i) => {
+  const d = Array.from({ length: sides }, (_, i) => {
     const angle = (Math.PI * 2 * i) / sides - Math.PI / 2;
     const [dx, dy] = [Math.cos(angle), Math.sin(angle)];
-    return `<path d="M${round(cx + from * dx)} ${round(cy + from * dy)} `
-      + `L${round(cx + to * dx)} ${round(cy + to * dy)}"/>`;
-  }).join('');
+    return `M${round(cx + from * dx)} ${round(cy + from * dy)} `
+      + `L${round(cx + to * dx)} ${round(cy + to * dy)}`;
+  }).join(' ');
+
+  // One element with five subpaths rather than five elements: identical
+  // rendering, and the detail budget counts shapes.
+  return `<path d="${d}"/>`;
 }
 
 /**
@@ -116,24 +141,35 @@ function spokes(cx, cy, from, to, sides) {
  * @type {Record<string, string>}
  */
 export const EMBLEMS = {
-  /* Ribbon bow — two symmetric loops, a knot, two tails. */
+  /* Ribbon bow. Fold lines rather than shaded planes: the loops are drawn with
+     quadratics whose interior is awkward to nest a second shape inside, and a
+     crease running from the knot is what says "tied fabric" anyway. */
   hellokitty: ink(`
     <path d="M50 42 Q31 20 21 29 Q12 38 22 49 Q35 56 50 42 Z" fill="${P}"/>
     <path d="M50 42 Q69 20 79 29 Q88 38 78 49 Q65 56 50 42 Z" fill="${P}"/>
-    <path d="M43 50 Q38 64 42 75"/>
-    <path d="M57 50 Q62 64 58 75"/>
-    <circle cx="50" cy="42" r="9" fill="${A}"/>`),
+    <path d="M45 45 Q34 45 25 41 M55 45 Q66 45 75 41" stroke-width="${SW_FINE}"/>
+    <path d="M43 50 Q38 64 42 75 M57 50 Q62 64 58 75"/>
+    <circle cx="50" cy="42" r="9" fill="${A}"/>
+    <circle cx="47" cy="39" r="3" fill="${HI_A}" stroke="none"/>`),
 
   /* Heart. Was a heart plus a bow plus a bead; three motifs stacked in one
      emblem is what "busy" means, and none of them survived 30px. */
   mymelody: ink(`
     <path d="M50 84 C26 66 18 54 18 42 A16 16 0 0 1 50 36 A16 16 0 0 1 82 42
              C82 54 74 66 50 84 Z" fill="${P}"/>
+    <ellipse cx="32" cy="43" rx="8" ry="6.5" fill="${HI}" stroke="none"/>
     <circle cx="50" cy="41" r="7" fill="${A}"/>`),
 
-  /* Three-point jester cap with bell tips. */
+  /* Three-point jester cap.
+
+     The three panels are filled separately and the silhouette is stroked over
+     the top of them, which is what turns a flat outline into something with a
+     near side and a far side. */
   kuromi: ink(`
-    <path d="M23 81 Q23 46 35 30 L41 48 L50 26 L59 48 L65 30 Q77 46 77 81 Z" fill="${P}"/>
+    ${plane('M23 81 Q23 46 35 30 L41 48 L41 81 Z', P)}
+    ${plane('M41 48 L50 26 L59 48 L59 81 L41 81 Z', HI)}
+    ${plane('M59 48 L65 30 Q77 46 77 81 L59 81 Z', LO)}
+    <path d="M23 81 Q23 46 35 30 L41 48 L50 26 L59 48 L65 30 Q77 46 77 81 Z"/>
     <circle cx="35" cy="28" r="6.5" fill="${A}"/>
     <circle cx="50" cy="24" r="6.5" fill="${A}"/>
     <circle cx="65" cy="28" r="6.5" fill="${A}"/>`),
@@ -141,71 +177,79 @@ export const EMBLEMS = {
   /* Cloud puff with a curled tail. */
   cinnamoroll: ink(`
     <path d="M29 70 A15 15 0 0 1 31 42 A18 18 0 0 1 63 38 A15 15 0 0 1 71 70 Z" fill="${P}"/>
+    <ellipse cx="41" cy="50" rx="9" ry="6" fill="${HI}" stroke="none"/>
     <path d="M71 62 Q84 58 80 47 Q76 40 70 46"/>
-    <circle cx="41" cy="56" r="3.5" fill="${S}" stroke="none"/>
-    <circle cx="57" cy="56" r="3.5" fill="${S}" stroke="none"/>`),
+    <circle cx="41" cy="58" r="3.5" fill="${S}" stroke="none"/>
+    <circle cx="57" cy="58" r="3.5" fill="${S}" stroke="none"/>`),
 
   /* Lily pad with a droplet.
 
      The notch used to be a thin wedge running all the way to the centre, which
      does not read as a lily pad — it reads as a pie chart with a slice taken
-     out. It now opens wide at the rim and stops short of the middle. */
+     out. It now opens wide at the rim and stops short of the middle, and three
+     veins radiate from it, which is the detail that makes it a leaf. */
   keroppi: ink(`
     <path d="M62 21.3 A32 32 0 1 1 38 21.3 L50 45 Z" fill="${P}"/>
-    <path d="M74 23 Q84 37 84 44 A11 11 0 0 1 62 44 Q62 37 74 23 Z" fill="${A}"/>`),
+    <path d="M50 45 L27 57 M50 45 L50 78 M50 45 L73 57" stroke-width="${SW_FINE}"/>
+    <path d="M74 23 Q84 37 84 44 A11 11 0 0 1 62 44 Q62 37 74 23 Z" fill="${A}"/>
+    <circle cx="70" cy="41" r="3" fill="${HI_A}" stroke="none"/>`),
 
   /* Yolk dome on a wobbly white. */
   gudetama: ink(`
     <path d="M22 71 Q12 64 18 53 Q24 48 30 51 Q29 36 45 35 Q50 37 52 43
              Q61 34 75 40 Q80 44 78 52 Q88 55 86 65 Q84 71 77 71 Z" fill="${W}"/>
     <circle cx="51" cy="56" r="15" fill="${P}"/>
-    <path d="M44.5 54 q3.5 3.5 7 0" stroke-width="${SW_FINE}"/>
-    <path d="M55 54 q3.5 3.5 7 0" stroke-width="${SW_FINE}"/>`),
+    <circle cx="45.5" cy="50.5" r="5" fill="${HI}" stroke="none"/>
+    <path d="M44.5 57 q3.5 3.5 7 0 M55 57 q3.5 3.5 7 0" stroke-width="${SW_FINE}"/>`),
 
   /* Two stars, one large and one small — Little Twin Stars.
 
      Computed rather than typed. The old star was a hand-written point list,
-     which is why it was neither regular nor centred. */
+     which is why it was neither regular nor centred. The inner star is the
+     same shape at half the radii, so it nests exactly. */
   twinstars: ink(`
     <path d="${polygon(41, 63, 25, 5, 10.2)}" fill="${P}"/>
+    ${plane(polygon(41, 63, 13, 5, 5.3), LO)}
     <path d="${polygon(74, 28, 10.5, 5, 4.3)}" fill="${A}"/>`),
 
-  /* Lightning bolt. Was a thin outline in the accent colour at a third of the
-     area of every other emblem, parked in the top-left corner. */
+  /* Lightning bolt. The lower arm is a face of the same solid, so shading it
+     costs nothing in shapes and gives the one emblem with no curves somewhere
+     for the light to fall. */
   badtzmaru: ink(`
-    <path d="M60 16 L28 55 H46 L42 84 L74 45 H56 Z" fill="${A}"/>`),
+    <path d="M60 16 L28 55 H46 L42 84 L74 45 H56 Z" fill="${A}"/>
+    ${plane('M60 16 L28 55 L46 55 L56 45 Z', HI_A)}`),
 
   /* Paw print. */
   chococat: ink(`
     <ellipse cx="50" cy="67" rx="21" ry="17" fill="${P}"/>
+    <ellipse cx="44" cy="62" rx="8" ry="5.5" fill="${HI}" stroke="none"/>
     <ellipse cx="25" cy="45" rx="8.5" ry="10.5" fill="${P}"/>
     <ellipse cx="41" cy="31" rx="8.5" ry="10.5" fill="${P}"/>
     <ellipse cx="59" cy="31" rx="8.5" ry="10.5" fill="${P}"/>
     <ellipse cx="75" cy="45" rx="8.5" ry="10.5" fill="${P}"/>`),
 
   /* Beret. The band has to be *narrower* than the crown or the two read as a
-     lid on a pot rather than a hat — which is exactly what a full-width band
-     under a dome looked like. */
+     lid on a pot rather than a hat. */
   pompompurin: ink(`
     <ellipse cx="50" cy="54" rx="30" ry="18" fill="${P}"/>
+    <ellipse cx="40" cy="48" rx="13" ry="7" fill="${HI}" stroke="none"/>
     <rect x="32" y="66" width="36" height="12" rx="6" fill="${A}"/>
     <circle cx="50" cy="32" r="6" fill="${A}"/>`),
 
-  /* Microphone with two rage shards. Fewer, larger parts than the first cut:
-     a 24-wide head with two grille lines and a long thin stem was six things
-     to resolve inside 30 pixels, and resolved as none of them. */
+  /* Microphone with two rage shards. */
   aggretsuko: ink(`
     <rect x="35" y="17" width="30" height="42" rx="15" fill="${P}"/>
+    <rect x="40" y="24" width="7" height="28" rx="3.5" fill="${HI}" stroke="none"/>
     <path d="M35 38 H65" stroke-width="${SW_FINE}"/>
     <path d="M50 59 V71"/>
     <rect x="33" y="71" width="34" height="11" rx="5.5" fill="${A}"/>
-    <path d="M19 26 L28 34"/>
-    <path d="M81 26 L72 34"/>`),
+    <path d="M19 26 L28 34 M81 26 L72 34"/>`),
 
   /* Football. One centred pentagon and five radial seams, both generated, so
      it is symmetric instead of approximately symmetric. */
   pochacco: ink(`
     <circle cx="50" cy="50" r="32" fill="${W}"/>
+    <ellipse cx="37" cy="37" rx="9" ry="6.5" fill="${HI}" stroke="none"/>
     ${spokes(50, 50, 14, 32, 5)}
     <path d="${polygon(50, 50, 14, 5)}" fill="${P}"/>`),
 
@@ -214,6 +258,7 @@ export const EMBLEMS = {
      being a leaf. */
   hangyodon: ink(`
     <path d="M28 76 C33 48 48 27 67 18 C61 42 66 60 82 74 C64 78 45 78 28 76 Z" fill="${P}"/>
+    ${plane('M28 76 C33 48 48 27 67 18 C56 34 45 53 41 76 Z', HI)}
     <circle cx="28" cy="38" r="6.5" stroke="${A}"/>
     <circle cx="22" cy="56" r="4.5" stroke="${A}"/>`),
 

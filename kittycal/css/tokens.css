@@ -117,6 +117,25 @@
   --accent:       oklch(74% calc(var(--c) * 0.85) calc(var(--h) + 150));
   --accent-soft:  oklch(90% calc(var(--c) * 0.5)  calc(var(--h) + 150));
 
+  /*
+    Emblem shading — the light and dark planes inside a mascot.
+
+    Deliberately not `--primary-soft` / `--primary-deep`, which mean "recedes
+    into the page" and "stands out from the page" and therefore swap places
+    between modes: soft is L88 in light and L38 in dark. Shading a drawing with
+    them lights it from the top-left in one mode and from the bottom-right in
+    the other.
+
+    These are relative to the *form*, not the page: hi is always lighter than
+    --primary and lo is always darker, in both modes. An emblem is a small
+    solid object, and which way the light falls on it should not depend on
+    whether the phone is in night mode.
+  */
+  --emb-hi:   oklch(86% calc(var(--c) * 0.50) var(--h));
+  --emb-lo:   oklch(52% calc(var(--c) * 1.00) var(--h));
+  --emb-hi-a: oklch(88% calc(var(--c) * 0.42) calc(var(--h) + 150));
+  --emb-lo-a: oklch(56% calc(var(--c) * 0.85) calc(var(--h) + 150));
+
   /* ── Lines: >=3:1 for borders, icons, chart marks (WCAG 1.4.11) ───── */
   --line:      oklch(55% calc(var(--c) * 0.75) var(--h));
   --line-soft: oklch(80% calc(var(--c) * 0.45) var(--h));
@@ -240,6 +259,14 @@
   --primary-line: oklch(80% calc(var(--c) * 0.75) var(--h));
   --accent:       oklch(80% calc(var(--c) * 0.80) calc(var(--h) + 150));
   --accent-soft:  oklch(40% calc(var(--c) * 0.45) calc(var(--h) + 150));
+
+  /* Same job as in light, retuned around dark's brighter --primary (L78). */
+  --emb-hi:   oklch(93% calc(var(--c) * 0.42) var(--h));
+  --emb-lo:   oklch(60% calc(var(--c) * 0.90) var(--h));
+  /* Carries more chroma than its light-mode twin: the bolt is half highlight,
+     and at 0.36 chroma on a dark page it went silver and stopped being yellow. */
+  --emb-hi-a: oklch(89% calc(var(--c) * 0.58) calc(var(--h) + 150));
+  --emb-lo-a: oklch(62% calc(var(--c) * 0.75) calc(var(--h) + 150));
 
   --line:      oklch(70% calc(var(--c) * 0.55) var(--h));
   --line-soft: oklch(40% calc(var(--c) * 0.40) var(--h));
