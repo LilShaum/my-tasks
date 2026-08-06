@@ -36,18 +36,25 @@ test('every drawing goes through the shared stroke contract', () => {
   }
 });
 
-test('no shape sets its own outline weight', () => {
+test('line weight comes from the sanctioned scale', () => {
   /*
-    The whole point of `ink()` is that the weight cannot be set per shape. The
-    one sanctioned exception is interior detail — a face, a grille, a ruled
-    line — which steps down to 3 so a closed shape does not fill in at small
-    sizes. Any other value means the set has started to drift, which is exactly
-    how it looked before: 2.5, 3, 3.5 and 4 all in play at once.
+    This used to read "no shape sets its own weight", and it was the right rule
+    for the problem it was written against: the set had 2.5, 3, 3.5 and 4 all in
+    play at once for no reason, and pinning it to one value fixed that.
+
+    One value turned out to be the next problem. A drawing where the outer
+    silhouette, a form sitting inside it and a crease across that form are all
+    inked at exactly the same width is a drawing nothing was decided about,
+    and it was a good part of why the set read as generated. So there are three
+    weights now — silhouette, form, mark — and the rule is that a shape uses one
+    of them rather than whatever looked right at the time.
   */
+  const ALLOWED = new Set(['6', '4', '2.5']);
+
   for (const [name, markup] of Object.entries(ALL)) {
     for (const [, width] of markup.matchAll(/stroke-width="([^"]+)"/g)) {
-      assert.ok(width === '5' || width === '3',
-        `${name} sets stroke-width="${width}"; only the shared 5 and the fine 3 are allowed`);
+      assert.ok(ALLOWED.has(width),
+        `${name} sets stroke-width="${width}"; the scale is ${[...ALLOWED].join(', ')}`);
     }
   }
 });
@@ -63,10 +70,10 @@ test('colours come from theme tokens, never baked in', () => {
 
 test('the detail budget holds', () => {
   /*
-    An emblem renders at 30px in the header. Past about half a dozen shapes
-    there is not enough room to resolve them and the thing becomes a smudge —
-    which is what happened to the microphone, at six parts plus two grille
-    lines.
+    An emblem renders at 30px in the header, and there is a point past which
+    more shapes stop adding detail and start adding mud. The ceiling has moved
+    up twice as the drawings got better — it is a guard against a runaway
+    emblem, not a target.
   */
   for (const [name, markup] of Object.entries(EMBLEMS)) {
     const shapes = [...markup.matchAll(/<(path|circle|ellipse|rect)\b/g)].length;
