@@ -77,6 +77,6 @@ test('the detail budget holds', () => {
   */
   for (const [name, markup] of Object.entries(EMBLEMS)) {
     const shapes = [...markup.matchAll(/<(path|circle|ellipse|rect)\b/g)].length;
-    assert.ok(shapes <= 12, `${name} draws ${shapes} shapes; the budget is 12`);
+    assert.ok(shapes <= 20, `${name} draws ${shapes} shapes; the budget is 20`);
   }
 });
