@@ -63,25 +63,19 @@ const measured = await page.evaluate(async () => {
   return [...Object.entries(EMBLEMS), ...Object.entries(SPOT_ART)].map(([name, markup]) => {
     const node = draw(markup);
 
-    // Painted bounds, stroke included — the stroke is half the reason a
-    // drawing overflows, and measuring the path alone would miss it.
-    const box = node.getBBox({ stroke: true });
-
     /*
-      And the same bounds with every shading plane removed.
+      Measured with the shading removed.
 
-      A plane is a lighter or darker *face of a form*, positioned by hand to sit
-      inside the form it shades, with no clip keeping it there — so the failure
-      is a pale wedge poking out past an outline, which looks like a rendering
-      bug rather than a drawing. If the silhouette does not change when every
-      plane is removed, all of them are inside.
-
-      Found by the marker `plane()` leaves rather than by being unstroked, so
-      that floating detail — sparkles, bubbles, specks sitting in space beside
-      the form on purpose — is not mistaken for a plane that escaped.
+      Shading is drawn as a crude blob deliberately larger than the form and cut
+      back by a clip path — that is what stops it wandering off the edge. But
+      `getBBox` reports raw geometry and knows nothing about clipping, so the
+      blob's own bounds are meaningless and would drag every measurement here
+      out to wherever it happened to be drawn. What is painted is the silhouette
+      plus whatever floats beside it, which is exactly what is left once the
+      clipped groups are gone.
     */
     for (const el of [...node.querySelectorAll('[data-plane]')]) el.remove();
-    const outline = node.getBBox({ stroke: true });
+    const box = node.getBBox({ stroke: true });
     node.remove();
 
     return {
@@ -90,12 +84,6 @@ const measured = await page.evaluate(async () => {
       right: box.x + box.width, bottom: box.y + box.height,
       cx: box.x + box.width / 2, cy: box.y + box.height / 2,
       size: Math.max(box.width, box.height),
-      spill: Math.max(
-        outline.x - box.x,
-        outline.y - box.y,
-        (box.x + box.width) - (outline.x + outline.width),
-        (box.y + box.height) - (outline.y + outline.height),
-      ),
     };
   });
 });
@@ -120,14 +108,6 @@ console.log('\nand carries the same visual weight as the rest of the set');
 for (const m of measured) {
   ok(m.name, m.size >= SIZE_MIN && m.size <= SIZE_MAX,
     `${n(m.size)} across (allowed ${SIZE_MIN}–${SIZE_MAX})`);
-}
-
-console.log('\nand its shading stays inside the form it is shading');
-for (const m of measured) {
-  // A hair of tolerance: an unstroked shape sitting exactly on the outline's
-  // path sits half a stroke width inside the painted edge, and rounding at
-  // that boundary is not a spill.
-  ok(m.name, m.spill <= 0.5, `${n(m.spill)} units outside the outline`);
 }
 
 /*

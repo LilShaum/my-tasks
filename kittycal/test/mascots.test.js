@@ -70,13 +70,55 @@ test('colours come from theme tokens, never baked in', () => {
 
 test('the detail budget holds', () => {
   /*
-    An emblem renders at 30px in the header, and there is a point past which
-    more shapes stop adding detail and start adding mud. The ceiling has moved
-    up twice as the drawings got better — it is a guard against a runaway
-    emblem, not a target.
+    Counted in *forms*, not in paths.
+
+    A clipped form is three paths — the clip's geometry, the fill, and the
+    outline stroked over the top — so counting `<path>` would triple every
+    emblem overnight and say nothing about how busy it looks. Each form
+    contributes three paths and one clipPath, and every loose mark contributes
+    one path, so subtracting twice the clips leaves one count per thing the eye
+    actually resolves.
+
+    An emblem renders at 30px in the header, and past a certain number of things
+    more detail stops being detail and starts being mud. The ceiling is a guard
+    against a runaway emblem, not a target.
   */
   for (const [name, markup] of Object.entries(EMBLEMS)) {
-    const shapes = [...markup.matchAll(/<(path|circle|ellipse|rect)\b/g)].length;
-    assert.ok(shapes <= 20, `${name} draws ${shapes} shapes; the budget is 20`);
+    const paths = [...markup.matchAll(/<path\b/g)].length;
+    const clips = [...markup.matchAll(/<clipPath\b/g)].length;
+    const forms = paths - 2 * clips;
+    assert.ok(forms <= 14, `${name} draws ${forms} separate things; the budget is 14`);
+  }
+});
+
+test('every shading plane is clipped to the form it shades', () => {
+  /*
+    This used to be a measured check — draw the emblem, remove the planes, see
+    whether the silhouette changed. It caught real spills, and it could only
+    ever catch them after the fact.
+
+    Shading is now clipped to its form, so a plane cannot cross an outline: the
+    clip removes the edge for it to cross. That turns the guarantee from
+    something observed into something structural, and this asserts the structure
+    rather than re-measuring the consequence.
+  */
+  for (const [name, markup] of Object.entries(ALL)) {
+    for (const [chunk] of markup.matchAll(/<g[^>]*data-plane[^>]*>/g)) {
+      assert.match(chunk, /clip-path="url\(#/,
+        `${name} has a shading group that is not clipped to anything`);
+    }
+  }
+});
+
+test('every clip a form references is a clip that form defines', () => {
+  // A dangling url(#…) does not fail loudly — it renders as no clipping at all,
+  // which puts the shading straight back over the outline it was cut away from.
+  for (const [name, markup] of Object.entries(ALL)) {
+    const defined = new Set(
+      [...markup.matchAll(/<clipPath id="([^"]+)"/g)].map((m) => m[1]),
+    );
+    for (const [, id] of markup.matchAll(/clip-path="url\(#([^)]+)\)"/g)) {
+      assert.ok(defined.has(id), `${name} clips to #${id}, which it never defines`);
+    }
   }
 });
