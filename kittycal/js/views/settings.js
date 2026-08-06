@@ -138,7 +138,8 @@ function mascotRow(themeId) {
     el('span', { class: 'row-label' }, [
       `${theme.name} picture`,
       el('span', { class: 'choice-sub', text:
-        'Use one of your own images instead of the built-in art' }),
+        `Put any picture from your phone here instead of the ${theme.name} `
+        + 'emblem — it is cropped on the device and never leaves it' }),
     ]),
     el('span', { class: 'row-value', 'aria-hidden': 'true', text: '›' }),
   ]);
