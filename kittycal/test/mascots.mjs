@@ -50,17 +50,35 @@ await page.goto(BASE, { waitUntil: 'networkidle' });
 const measured = await page.evaluate(async () => {
   const { EMBLEMS, SPOT_ART } = await import('/js/data/mascots.js');
 
-  return [...Object.entries(EMBLEMS), ...Object.entries(SPOT_ART)].map(([name, markup]) => {
+  const draw = (/** @type {string} */ markup) => {
     const node = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     node.setAttribute('viewBox', '0 0 100 100');
     node.setAttribute('width', '300');
     node.setAttribute('height', '300');
     node.innerHTML = markup;
     document.body.append(node);
+    return node;
+  };
+
+  return [...Object.entries(EMBLEMS), ...Object.entries(SPOT_ART)].map(([name, markup]) => {
+    const node = draw(markup);
 
     // Painted bounds, stroke included — the stroke is half the reason a
     // drawing overflows, and measuring the path alone would miss it.
     const box = node.getBBox({ stroke: true });
+
+    /*
+      And the same bounds with every unstroked interior shape removed.
+
+      Those are the shading planes: the lighter and darker faces that give each
+      emblem some volume. A plane is positioned by hand to sit inside the form
+      it is shading, and there is no clip keeping it there — so the failure is
+      a pale wedge poking out past the outline, which looks like a rendering
+      bug rather than a drawing. If the silhouette does not change when they
+      are all removed, every one of them is inside.
+    */
+    for (const el of [...node.querySelectorAll('[stroke="none"]')]) el.remove();
+    const outline = node.getBBox({ stroke: true });
     node.remove();
 
     return {
@@ -69,6 +87,12 @@ const measured = await page.evaluate(async () => {
       right: box.x + box.width, bottom: box.y + box.height,
       cx: box.x + box.width / 2, cy: box.y + box.height / 2,
       size: Math.max(box.width, box.height),
+      spill: Math.max(
+        outline.x - box.x,
+        outline.y - box.y,
+        (box.x + box.width) - (outline.x + outline.width),
+        (box.y + box.height) - (outline.y + outline.height),
+      ),
     };
   });
 });
@@ -93,6 +117,14 @@ console.log('\nand carries the same visual weight as the rest of the set');
 for (const m of measured) {
   ok(m.name, m.size >= SIZE_MIN && m.size <= SIZE_MAX,
     `${n(m.size)} across (allowed ${SIZE_MIN}–${SIZE_MAX})`);
+}
+
+console.log('\nand its shading stays inside the form it is shading');
+for (const m of measured) {
+  // A hair of tolerance: an unstroked shape sitting exactly on the outline's
+  // path sits half a stroke width inside the painted edge, and rounding at
+  // that boundary is not a spill.
+  ok(m.name, m.spill <= 0.5, `${n(m.spill)} units outside the outline`);
 }
 
 /*
