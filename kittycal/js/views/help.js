@@ -146,6 +146,18 @@ export function openHelp() {
           'one tap instead of three.'),
       ]),
 
+      section('Using your own pictures', [
+        p('The built-in emblems are original artwork — a bow, a cloud, a star. ' +
+          'They are motifs rather than the characters the themes are named ' +
+          'after, because those characters belong to somebody else and are not ' +
+          'ours to draw or ship.'),
+        p('Your phone is a different matter. Settings → Themes → the picture ' +
+          'row under the theme you are using lets you put any image from your ' +
+          'camera roll in its place. It is cropped in the app, stored on the ' +
+          'device, and never uploaded anywhere — Kittycal makes no internet ' +
+          'requests at all.'),
+      ]),
+
       section('Themes', [
         p(`${THEMES.length} themes, each with a light and dark version. Any of ` +
           'them can use your own picture instead of the built-in art.'),
