@@ -68,16 +68,19 @@ const measured = await page.evaluate(async () => {
     const box = node.getBBox({ stroke: true });
 
     /*
-      And the same bounds with every unstroked interior shape removed.
+      And the same bounds with every shading plane removed.
 
-      Those are the shading planes: the lighter and darker faces that give each
-      emblem some volume. A plane is positioned by hand to sit inside the form
-      it is shading, and there is no clip keeping it there — so the failure is
-      a pale wedge poking out past the outline, which looks like a rendering
-      bug rather than a drawing. If the silhouette does not change when they
-      are all removed, every one of them is inside.
+      A plane is a lighter or darker *face of a form*, positioned by hand to sit
+      inside the form it shades, with no clip keeping it there — so the failure
+      is a pale wedge poking out past an outline, which looks like a rendering
+      bug rather than a drawing. If the silhouette does not change when every
+      plane is removed, all of them are inside.
+
+      Found by the marker `plane()` leaves rather than by being unstroked, so
+      that floating detail — sparkles, bubbles, specks sitting in space beside
+      the form on purpose — is not mistaken for a plane that escaped.
     */
-    for (const el of [...node.querySelectorAll('[stroke="none"]')]) el.remove();
+    for (const el of [...node.querySelectorAll('[data-plane]')]) el.remove();
     const outline = node.getBBox({ stroke: true });
     node.remove();
 
