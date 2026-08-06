@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * theme-picker.js — the sticker book.
+ * theme-picker.js — the theme grid.
  *
  * A grid of theme cards, each previewing itself: the card sets its own --h and
  * --c so the swatch *is* the theme rather than a description of it. Used in

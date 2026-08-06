@@ -37,6 +37,9 @@ import { burst } from '../ui/particles.js';
 import { mascotReact } from '../ui/mascot.js';
 import { loggingStreak } from '../domain/stats.js';
 import { STREAK_MARKS } from '../domain/response.js';
+import { earnedIds, newlyEarned } from '../domain/stickers.js';
+import { stickerContext } from './stickers.js';
+import { toast } from '../ui/toast.js';
 import { getTheme } from '../data/themes.js';
 import * as store from '../state/store.js';
 
@@ -234,6 +237,11 @@ export function openCheckin(date = todayKey()) {
     // symptom list could never learn from the taps it collects.
     store.rememberPicks(draft);
 
+    // What the book looked like before this day existed, so a sticker earned
+    // by this very check-in can be told apart from the thirteen she already
+    // had. Taken before the write for the obvious reason.
+    const stickersBefore = earnedIds(stickerContext());
+
     // Nothing is celebrated until it is actually on the disk. Saying "checked
     // in" over a write that failed is worse than the failure: she would not
     // know to do it again.
@@ -268,7 +276,26 @@ export function openCheckin(date = todayKey()) {
     */
     const streak = loggingStreak(store.getState().logs, draft.date, addDays);
     mascotReact(STREAK_MARKS.has(streak) ? 'cheer' : 'bob');
-    announce(isToday ? 'Checked in for today' : `Checked in for ${whenLabel}`);
+
+    /*
+      A sticker earned by this check-in, said out loud once.
+
+      The book itself is three taps away in Settings and she has no reason to
+      go looking, so a collection nobody is ever told about is a collection
+      that does not exist. One toast, at most one sticker, and never a nudge
+      towards the ones she has not got — the empty slots are hers to find.
+
+      The toast is silent and the two facts are announced together, rather than
+      each calling `announce` for itself. A live region holds one message: the
+      second call replaces the first, so a screen reader was hearing about the
+      sticker *instead of* hearing that the day had saved. The confirmation is
+      the part that must never be lost.
+    */
+    const won = newlyEarned(stickersBefore, stickerContext());
+    if (won) toast(`Sticker earned — ${won.title}`, { silent: true });
+
+    const confirmation = isToday ? 'Checked in for today' : `Checked in for ${whenLabel}`;
+    announce(won ? `${confirmation}. Sticker earned, ${won.title}` : confirmation);
   };
 
   /* ── 1. Flow ───────────────────────────────────────────────────────── */
