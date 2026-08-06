@@ -103,15 +103,119 @@ test('closes the previous cycle when a period starts', () => {
   assert.match(/** @type {string} */ (said), /28 days/);
 });
 
-test('counts down to patterns while the history is thin', () => {
+test('counts down to patterns as each cycle closes', () => {
+  const { logs, periodDays } = history({ first: '2026-01-01', count: 2 });
+  // Open a third period, which closes the second cycle: two complete, one to go.
+  const date = addDays('2026-01-01', 2 * 28);
+  periodDays.add(date);
+  const log = { ...emptyLog(date), flow: /** @type {const} */ ('medium'), checkedIn: true };
+
+  const said = respondToCheckin({
+    log, logs, cycles: buildCycles(periodDays), today: date,
+  });
+  assert.match(/** @type {string} */ (said), /closes your last cycle at 28 days/);
+  assert.match(/** @type {string} */ (said), /One more/);
+});
+
+test('says the countdown when a cycle closes, not every day until then', () => {
+  /*
+    This is the whole point of attaching it to the cycle close. The number only
+    changes when a cycle ends; repeating it daily in between was the app saying
+    the same sentence for two months, which is how a line stops being read.
+  */
   const { logs, cycles } = history({ first: '2026-01-01', count: 3 });
-  // Three starts means two *complete* cycles; the third is still running.
   const date = addDays('2026-01-01', 2 * 28 + 10);
   const log = { ...emptyLog(date), checkedIn: true };
 
+  assert.equal(respondToCheckin({ log, logs, cycles, today: date }), null);
+});
+
+test('notices a symptom that showed up at this point last cycle', () => {
+  // Two cycles, cramps on day 6 of each — one short of anything the pattern
+  // detector will touch, and the second month is exactly when she needs the
+  // app to have noticed something.
+  const { logs, cycles } = history({
+    first: '2026-01-01', count: 2, mark: { day: 6, ids: ['cramps'] },
+  });
+  const date = addDays('2026-01-01', 28 + 5);
+  const log = { ...emptyLog(date), symptoms: ['cramps'], checkedIn: true };
+
   const said = respondToCheckin({ log, logs, cycles, today: date });
-  assert.match(/** @type {string} */ (said), /2 cycles logged/);
-  assert.match(/** @type {string} */ (said), /One more/);
+  assert.match(/** @type {string} */ (said), /cramps/);
+  assert.match(/** @type {string} */ (said), /last cycle/);
+  // And it must not dress two occurrences up as a tendency.
+  assert.doesNotMatch(/** @type {string} */ (said), /pattern|usually|typical|always/i);
+});
+
+test('does not reach past the previous cycle for an echo', () => {
+  // Cramps on day 6 of the first cycle only. By the third cycle "last cycle
+  // too" would be false, so it says nothing.
+  const { logs, cycles } = history({
+    first: '2026-01-01', count: 3, mark: { day: 6, ids: ['cramps'], inCycles: 1 },
+  });
+  const date = addDays('2026-01-01', 2 * 28 + 5);
+  const log = { ...emptyLog(date), symptoms: ['cramps'], checkedIn: true };
+
+  assert.equal(respondToCheckin({ log, logs, cycles, today: date }), null);
+});
+
+test('marks the first time something is logged, once there is a baseline', () => {
+  /** @type {Record<string, import('../js/domain/model.js').DayLog>} */
+  const logs = {};
+  const first = '2026-02-01';
+  for (let i = 0; i < 8; i += 1) {
+    const key = addDays(first, i);
+    logs[key] = { ...emptyLog(key), symptoms: ['cramps'], checkedIn: true };
+  }
+
+  const date = addDays(first, 8);
+  const log = { ...emptyLog(date), symptoms: ['nausea'], checkedIn: true };
+  const said = respondToCheckin({ log, logs, cycles: [], today: date });
+  assert.match(/** @type {string} */ (said), /First time/);
+  assert.match(/** @type {string} */ (said), /nausea/i);
+});
+
+test('stays quiet in the first days, when everything is a first', () => {
+  /** @type {Record<string, import('../js/domain/model.js').DayLog>} */
+  const logs = {};
+  const first = '2026-02-01';
+  for (let i = 0; i < 2; i += 1) {
+    const key = addDays(first, i);
+    logs[key] = { ...emptyLog(key), symptoms: ['cramps'], checkedIn: true };
+  }
+
+  const date = addDays(first, 2);
+  const log = { ...emptyLog(date), symptoms: ['nausea'], checkedIn: true };
+  assert.equal(respondToCheckin({ log, logs, cycles: [], today: date }), null);
+});
+
+test('counts a run of the same symptom, at marked lengths only', () => {
+  /** @type {Record<string, import('../js/domain/model.js').DayLog>} */
+  const logs = {};
+  const first = '2026-02-01';
+  // Enough prior days that the first-ever line is done with headache.
+  for (let i = 0; i < 6; i += 1) {
+    const key = addDays(first, i);
+    logs[key] = { ...emptyLog(key), symptoms: ['headache'], checkedIn: true };
+  }
+
+  // Day 7 of the run is a marked length.
+  const seventh = addDays(first, 6);
+  const said = respondToCheckin({
+    log: { ...emptyLog(seventh), symptoms: ['headache'], checkedIn: true },
+    logs, cycles: [], today: seventh,
+  });
+  assert.match(/** @type {string} */ (said), /7 days in a row/);
+  assert.match(/** @type {string} */ (said), /headache/i);
+
+  // Day 6 is not, and nothing else has anything to say about it.
+  const sixth = addDays(first, 5);
+  const upToFifth = Object.fromEntries(
+    Object.entries(logs).filter(([key]) => key < sixth),
+  );
+  assert.equal(respondToCheckin({
+    log: logs[sixth], logs: upToFifth, cycles: [], today: sixth,
+  }), null);
 });
 
 test('explains what logging is for when there is no history at all', () => {

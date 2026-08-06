@@ -1075,6 +1075,132 @@ for (const reduced of [false, true]) {
   }, { reducedMotion: reduced });
 }
 
+/* ── 21. The mascot reacting to the act, not the content ───────────────
+   Design rule 2 says the mascot reacts to logging and never to what was
+   logged. The rule is only worth anything if the reaction is identical for a
+   heavy day and a quiet one, so both are driven here and the class recorded.
+
+   The animation clears itself on `animationend`, well before the check-in
+   settles, so a class read afterwards is always empty. An observer installed
+   before the save catches it instead of racing it. */
+for (const { flow, label } of [
+  { flow: 'No bleeding', label: 'a quiet day' },
+  { flow: 'Heavy', label: 'a heavy day' },
+]) {
+  console.log(`\nthe mascot reacts to ${label}`);
+  // eslint-disable-next-line no-await-in-loop
+  await withPage(async (p) => {
+    await p.goto(BASE, { waitUntil: 'networkidle' });
+    await seed(p, true);
+    await p.reload({ waitUntil: 'networkidle' });
+    await p.waitForTimeout(1500);
+
+    await p.evaluate(() => {
+      const host = document.querySelector('#header-mascot .mascot-host');
+      /** @type {string[]} */ (window.seenBeats = []);
+      if (!host) return;
+      new MutationObserver(() => {
+        for (const cls of host.classList) {
+          if (cls.startsWith('mascot-') && cls !== 'mascot-host') window.seenBeats.push(cls);
+        }
+      }).observe(host, { attributes: true, attributeFilter: ['class'] });
+    });
+
+    await p.locator('.checkin-option', { hasText: flow }).click();
+    await p.waitForTimeout(250);
+    await p.locator('.checkin-next').click();
+    await p.waitForTimeout(250);
+    await p.locator('.checkin-next').click();
+    await p.waitForTimeout(1200);
+
+    const beats = await p.evaluate(() => window.seenBeats);
+    check(beats.includes('mascot-bob'), 'the header mascot plays the log beat',
+      beats.join(', ') || 'nothing');
+    /*
+      And the identical one either way. The first draft of this picked the
+      bigger beat when the check-in opened a cycle, and this case caught it:
+      "Heavy" on a day with no period running starts one, so a heavy day was
+      getting a livelier mascot than a quiet day. That is the mascot reacting
+      to what was logged, which is exactly what design rule 2 forbids.
+    */
+    check(!beats.includes('mascot-cheer'), 'and never a different beat for a worse day',
+      beats.join(', '));
+
+    // And it cleans up after itself, so a stuck class cannot leave the mascot
+    // mid-squash for the rest of the session.
+    const stuck = await p.evaluate(() =>
+      document.querySelector('#header-mascot .mascot-host')?.className ?? '');
+    check(!/mascot-(bob|cheer)/.test(stuck), 'and clears the class when it ends', stuck);
+  });
+}
+
+/* ── 22. The bigger beat, on the one thing that is about her ───────────
+   Six days already logged, so today's check-in is the seventh in a row — a
+   streak mark, the same list the response line uses. This is the only thing
+   the mascot gets louder about, and it is decided by her having shown up
+   rather than by anything she recorded. */
+console.log('\nthe mascot celebrates a streak, not a symptom');
+await withPage(async (p) => {
+  await p.goto(BASE, { waitUntil: 'networkidle' });
+  await seed(p, true);
+
+  await p.evaluate(async () => {
+    const { emptyLog } = await import('/js/domain/model.js');
+    const pad = (/** @type {number} */ n) => String(n).padStart(2, '0');
+    const db = await new Promise((res) => {
+      const r = indexedDB.open('kittycal', 1); r.onsuccess = () => res(r.result);
+    });
+    await new Promise((res) => {
+      const tx = db.transaction(['logs'], 'readwrite');
+      for (let i = 1; i <= 6; i += 1) {
+        const d = new Date(); d.setDate(d.getDate() - i);
+        const key = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        tx.objectStore('logs').put({ ...emptyLog(key), checkedIn: true });
+      }
+      tx.oncomplete = () => res(undefined);
+    });
+  });
+
+  await p.reload({ waitUntil: 'networkidle' });
+  await p.waitForTimeout(1500);
+
+  await p.evaluate(() => {
+    const host = document.querySelector('#header-mascot .mascot-host');
+    /** @type {string[]} */ (window.seenBeats = []);
+    if (!host) return;
+    new MutationObserver(() => {
+      for (const cls of host.classList) {
+        if (cls.startsWith('mascot-') && cls !== 'mascot-host') window.seenBeats.push(cls);
+      }
+    }).observe(host, { attributes: true, attributeFilter: ['class'] });
+  });
+
+  await completeCheckin(p, 'No bleeding');
+
+  const beats = await p.evaluate(() => window.seenBeats);
+  check(beats.includes('mascot-cheer'), 'seven days running gets the bigger beat',
+    beats.join(', ') || 'nothing');
+
+  const said = await p.locator('.today-said').innerText().catch(() => '');
+  check(/7 days in a row/.test(said), 'and the line agrees about what a milestone is', said);
+});
+
+console.log('\nand not at all with motion off');
+await withPage(async (p) => {
+  await p.goto(BASE, { waitUntil: 'networkidle' });
+  await seed(p, true);
+  await p.reload({ waitUntil: 'networkidle' });
+  await p.waitForTimeout(1500);
+  await completeCheckin(p, 'Medium');
+
+  // The class may still be applied; what matters is that it animates nothing.
+  const duration = await p.evaluate(() => {
+    const host = document.querySelector('#header-mascot .mascot-host');
+    return host ? parseFloat(getComputedStyle(host).animationDuration) : -1;
+  });
+  check(duration <= 0.01, 'the reaction is removed, not merely shortened', `${duration}s`);
+}, { reducedMotion: true });
+
 await browser.close();
 
 console.log(`\ndaily loop: ${checks - failures}/${checks} checks passed`);

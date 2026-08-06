@@ -185,3 +185,38 @@ export function releaseMascotUrls() {
 export function invalidateMascotCache() {
   manifestPromise = null;
 }
+
+
+/**
+ * Make the header mascot react to something having been logged.
+ *
+ * The only animation in the app that is *about* the user rather than about a
+ * screen appearing, and the one design rule 2 has been promising since the
+ * first commit. It reacts to the act, never to the content: a quiet day and a
+ * heavy day get the identical bob, because a mascot that droops at bad news is
+ * a mascot that teaches you to stop entering bad news.
+ *
+ * `cheer` is reserved for a cycle closing, which happens once a month and is
+ * the one moment worth a bigger movement.
+ *
+ * Silent on failure by design. This is decoration on top of a save that has
+ * already reported its own outcome — if the mascot is missing, nothing about
+ * what she needs to know has changed.
+ *
+ * @param {'bob'|'cheer'} [beat]
+ */
+export function mascotReact(beat = 'bob') {
+  const host = document.querySelector('#header-mascot .mascot-host');
+  if (!(host instanceof HTMLElement)) return;
+
+  const cls = beat === 'cheer' ? 'mascot-cheer' : 'mascot-bob';
+
+  // Restarting means removing the class, forcing layout, and adding it back —
+  // without the reflow the browser coalesces the two style changes and the
+  // animation never replays on a second log in the same day.
+  host.classList.remove('mascot-bob', 'mascot-cheer');
+  void host.offsetWidth;
+  host.classList.add(cls);
+
+  host.addEventListener('animationend', () => host.classList.remove(cls), { once: true });
+}
