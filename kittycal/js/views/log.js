@@ -26,6 +26,7 @@ import { burst } from '../ui/particles.js';
 import { toast } from '../ui/toast.js';
 import { promptSheet } from '../ui/dialog.js';
 import { getTheme } from '../data/themes.js';
+import { mascotReact } from '../ui/mascot.js';
 import {
   cToF, fToC, kgToLb, lbToKg, mlToOz, fmtWater, fmtTemp, fmtWeight, round,
 } from '../utils/fmt.js';
@@ -1102,6 +1103,7 @@ function commit(date, draft, before) {
   // good day get exactly the same response.
   if (wasEmpty) {
     burst({ shape: getTheme(settings.theme).particle, count: 34 });
+    mascotReact();
     haptic([10, 30, 10]);
   } else {
     haptic(12);

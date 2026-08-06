@@ -684,3 +684,37 @@
   font-family: var(--font-body);
   margin-bottom: var(--sp-2);
 }
+
+/* ── The mascot reacting to being logged to ──────────────────────────────
+
+   Design rule 2 has said from the beginning that the mascot reacts to the
+   *act* of logging and never to what was logged — a mascot that looks sad at a
+   heavy day teaches you to stop recording heavy days. The rule was written and
+   then never implemented: the header mascot has sat perfectly still since it
+   was built.
+
+   Two beats, both on transform only so nothing reflows and nothing flashes:
+   a squash-and-stretch when something is saved, and a slower nod reserved for
+   a cycle closing. Reduced motion flattens both to nothing through the global
+   rule in reset.css, which is why neither carries meaning by itself — the
+   toast and the response line say what happened.
+*/
+@keyframes mascot-bob {
+  0%   { transform: scale(1) translateY(0) rotate(0deg); }
+  22%  { transform: scale(1.16, 0.86) translateY(2px) rotate(-4deg); }
+  48%  { transform: scale(0.94, 1.1) translateY(-6px) rotate(3deg); }
+  72%  { transform: scale(1.03, 0.98) translateY(0) rotate(-1.5deg); }
+  100% { transform: scale(1) translateY(0) rotate(0deg); }
+}
+
+@keyframes mascot-cheer {
+  0%   { transform: translateY(0) rotate(0deg); }
+  15%  { transform: translateY(2px) scale(1.1, 0.9); }
+  40%  { transform: translateY(-10px) rotate(-8deg); }
+  60%  { transform: translateY(-4px) rotate(6deg); }
+  80%  { transform: translateY(-7px) rotate(-3deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+
+.mascot-bob   { animation: mascot-bob 620ms var(--ease-spring); }
+.mascot-cheer { animation: mascot-cheer 900ms var(--ease-spring); }

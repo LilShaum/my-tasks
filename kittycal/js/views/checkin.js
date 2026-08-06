@@ -27,13 +27,16 @@
  */
 
 import { el, haptic, announce } from '../utils/dom.js';
-import { todayKey, fmtRelative } from '../utils/date.js';
+import { todayKey, fmtRelative, addDays } from '../utils/date.js';
 import { CATEGORIES, DEFAULT_CHIPS, labelFor } from '../data/taxonomy.js';
 import { openSheet, closeSheet } from '../ui/sheet.js';
 import { severityBlock } from '../ui/severity.js';
 import { pruneSeverity } from '../domain/model.js';
 import { openLogSheet } from './log.js';
 import { burst } from '../ui/particles.js';
+import { mascotReact } from '../ui/mascot.js';
+import { loggingStreak } from '../domain/stats.js';
+import { STREAK_MARKS } from '../domain/response.js';
 import { getTheme } from '../data/themes.js';
 import * as store from '../state/store.js';
 
@@ -249,6 +252,22 @@ export function openCheckin(date = todayKey()) {
     closeSheet();
     const theme = getTheme(store.getState().settings.theme);
     burst({ shape: theme.particle });
+
+    /*
+      The bigger beat is reserved for a logging milestone, and deliberately not
+      for a cycle opening.
+
+      A cycle opening was the obvious choice and it is the wrong one: whether a
+      check-in starts a cycle is decided entirely by the flow she picked, so
+      cheering there would mean a heavy day gets a bigger celebration than a
+      quiet one. That is the mascot reacting to what was logged, which is the
+      thing design rule 2 exists to prevent — and cheering at a period starting
+      is celebrating a medical event besides.
+
+      A streak is the one thing that is purely about her having shown up.
+    */
+    const streak = loggingStreak(store.getState().logs, draft.date, addDays);
+    mascotReact(STREAK_MARKS.has(streak) ? 'cheer' : 'bob');
     announce(isToday ? 'Checked in for today' : `Checked in for ${whenLabel}`);
   };
 
