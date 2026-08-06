@@ -150,20 +150,14 @@ export const EMBLEMS = {
              C60 45 58 38 62 34 C62 27 66 23 70 22 Z" fill="${A}"/>
     ${plane('M68 27 C72 25 77 26 79 30 C75 28 71 27 68 27 Z', HI_A)}`),
 
-  /* Fried egg.
-
-     The white was a ring of eight evenly-sized rounded bumps, which is the
-     recipe for a cloud and read as one. An egg spreads: it is flatter than it
-     is tall, one side runs further than the other, and the edge alternates
-     between a long lazy stretch and a short tongue rather than repeating the
-     same bump all the way round. */
+  /* Fried egg — an irregular white with the yolk sitting off to one side. */
   gudetama: ink(`
-    <path d="M25 64 C19 62 18 54 24 51 C21 45 27 40 34 44 C37 35 49 33 54 40
-             C61 35 72 38 73 46 C80 48 81 57 75 61 C77 67 69 71 61 69
-             C51 73 34 72 25 64 Z" fill="${W}"/>
-    <path d="M47 40 C56 39 61 46 60 54 C58 63 47 66 41 60 C34 53 38 41 47 40 Z"
+    <path d="M25 73 C15 72 10 62 17 55 C13 47 21 41 28 45 C27 34 39 29 46 36
+             C50 29 60 28 65 34 C73 31 82 37 80 46 C89 49 90 60 82 65
+             C84 72 76 76 68 73 Z" fill="${W}"/>
+    <path d="M46 43 C57 41 66 49 65 59 C64 69 53 74 45 69 C36 63 36 47 46 43 Z"
           fill="${P}" stroke-width="${SW_MID}"/>
-    ${plane('M45 43 C40 46 38 52 39 58 C36 50 39 44 45 43 Z', HI)}`),
+    ${plane('M46 46 C41 49 39 55 40 61 C38 53 40 47 46 46 Z', HI)}`),
 
   /* Three stars with curved arms. They used to come out of a `polygon()` call,
      which is the single most generated-looking thing this set contained. */
@@ -213,7 +207,9 @@ export const EMBLEMS = {
     <path d="M51 59 C51 64 51 68 51 72" stroke-width="${SW_MID}"/>
     <path d="M35 72 C44 69 57 69 66 72 C68 77 66 82 60 83 C51 85 42 84 37 81
              C34 79 33 75 35 72 Z" fill="${A}"/>
-    <path d="M63 80 C70 79 72 73 70 67" stroke-width="${SW_FINE}"/>`),
+    <path d="M65 78 C77 79 80 70 77 62" stroke-width="${SW_FINE}"/>
+    <path d="M24 28 C28 32 31 35 34 38 M78 27 C74 31 71 34 68 37"
+          stroke-width="${SW_FINE}"/>`),
 
   /* A ball. It was a football first — five perfectly regular panels on five
      perfectly regular seams, which is a shape a compass draws rather than one

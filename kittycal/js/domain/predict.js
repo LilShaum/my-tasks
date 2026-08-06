@@ -79,7 +79,8 @@ export const CYCLE_MAX_CLAMP = 45;
  * @property {boolean} recalibrated
  * @property {DateKey|null} lastStart
  * @property {DateKey|null} nextStart
- * @property {{start: DateKey, end: DateKey}|null} nextPeriod
+ * @property {{start: DateKey, end: DateKey}|null} nextPeriod  the bleed itself
+ * @property {{from: DateKey, to: DateKey, days: number}|null} startWindow
  * @property {DateKey|null} ovulation
  * @property {{start: DateKey, end: DateKey}|null} fertileWindow
  * @property {boolean} fertileWidened
@@ -155,6 +156,43 @@ export function detectRecalibration(lengths) {
  * @param {number|null} spread
  * @returns {Confidence}
  */
+/**
+ * The window the next period could plausibly start in.
+ *
+ * The "Next period" card headlined a date range that was the predicted *bleed*
+ * — a start plus the average period length — which at a glance says "it will
+ * begin somewhere in here" while carrying no information about the start at
+ * all. A regular 28-day cycle and a wildly irregular one produced identically
+ * wide headlines. That is the app's own rule about stating uncertainty broken
+ * in the card most likely to be read.
+ *
+ * The spread between her shortest and longest cycle was already being computed
+ * and spent entirely on choosing an adjective. Half of it either side of the
+ * estimate is a crude interval and an honest one: it is derived from her own
+ * variation, it widens when she is irregular, and it collapses to the estimate
+ * itself when she is not.
+ *
+ * Null when there is not enough history to have observed any variation — a
+ * window invented from one cycle would be the same false precision in the
+ * other direction.
+ *
+ * @param {DateKey|null} nextStart
+ * @param {number|null} spread   longest observed cycle minus shortest
+ * @param {number} cyclesLogged
+ * @returns {{from: DateKey, to: DateKey, days: number}|null}
+ */
+export function startWindow(nextStart, spread, cyclesLogged) {
+  if (!nextStart || spread == null || cyclesLogged < 2) return null;
+
+  // Half the spread, rounded up so a 1-day spread still reads as a day either
+  // side rather than vanishing. Capped: past a week the honest message is the
+  // confidence line saying the history is too variable to narrow down, not a
+  // fortnight-wide band presented as a forecast.
+  const days = Math.min(Math.max(Math.ceil(spread / 2), 1), 7);
+
+  return { from: addDays(nextStart, -days), to: addDays(nextStart, days), days };
+}
+
 export function rateConfidence(cyclesLogged, spread) {
   if (cyclesLogged === 0) return 'none';
   if (cyclesLogged < 2) return 'low';
@@ -315,6 +353,7 @@ export function predict({ periodDays, settings, today, logs }) {
     lastStart,
     nextStart: stale ? null : nextStart,
     nextPeriod: !stale && nextStart ? periodSpan(nextStart, avgPeriod) : null,
+    startWindow: stale ? null : startWindow(nextStart, stats.spread, lengths.length),
     ovulation,
     fertileWindow,
     fertileWidened,

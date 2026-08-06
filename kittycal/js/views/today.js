@@ -709,14 +709,30 @@ function tipsRow({ phase, prediction, log, today }) {
 function nextPeriodCard(prediction) {
   if (!prediction.nextPeriod) return null;
   const { start, end } = prediction.nextPeriod;
+  const window = prediction.startWindow;
 
+  /*
+    The headline is the window the period could *start* in, not the span it
+    might cover once it does.
+
+    It used to be the latter — start plus average period length — which reads
+    at a glance as "somewhere in here" while saying nothing about the start,
+    and which was exactly as wide for a metronome-regular cycle as for a wildly
+    irregular one. The bleed length is a real thing to know and it is still
+    here, one line down, where it is a fact about the period rather than a
+    claim about the forecast.
+  */
   return el('div', { class: 'card data-zone' }, [
     el('h3', { text: 'Next period' }),
-    el('p', { class: 'big-value num', text: `${fmtDayMonth(start)} – ${fmtDayMonth(end)}` }),
-    // The basis for the estimate is the confidence line's whole job, so saying
-    // it here as well was the same fact twice, two lines apart.
-    el('p', { class: 'hint-sm', text:
-      `Estimated ${prediction.avgPeriodLength}-day period.` }),
+    el('p', { class: 'big-value num', text: window
+      ? `${fmtDayMonth(window.from)} – ${fmtDayMonth(window.to)}`
+      : fmtDayMonth(start) }),
+    el('p', { class: 'hint-sm', text: window
+      ? `Most likely ${fmtDayMonth(start)}, give or take `
+        + `${plural(window.days, 'day')}. Usually a `
+        + `${prediction.avgPeriodLength}-day period, so ${fmtDayMonth(start)}`
+        + ` to ${fmtDayMonth(end)}.`
+      : `Estimated ${prediction.avgPeriodLength}-day period.` }),
     confidenceLine(prediction),
   ]);
 }
