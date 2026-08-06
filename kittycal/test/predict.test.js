@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import {
   predict, weightedAverage, detectRecalibration, rateConfidence,
   upcomingPeriods, upcomingFertile, conceptionChance,
-  CYCLE_MIN_CLAMP, CYCLE_MAX_CLAMP, STALE_AFTER_DAYS,
+  CYCLE_MIN_CLAMP, CYCLE_MAX_CLAMP, STALE_AFTER_DAYS, startWindow,
 } from '../js/domain/predict.js';
 // Moved to its own module so that a prediction can depend on measured
 // ovulation without ovulation depending on predictions.
@@ -558,4 +558,63 @@ test('every phase heading reads as a heading on its own', () => {
     assert.doesNotMatch(phase.heading, /data phase|date phase/,
       `${phase.id} heading reads badly`);
   }
+});
+
+/* ── The start window ─────────────────────────────────────────────────── */
+
+test('no window until there is variation to have observed', () => {
+  // One cycle has no spread, so any width would be invented rather than
+  // measured — which is the same false precision the window exists to remove.
+  assert.equal(startWindow('2026-08-14', null, 0), null);
+  assert.equal(startWindow('2026-08-14', 0, 1), null);
+  assert.equal(startWindow(null, 4, 6), null);
+});
+
+test('the window is half the observed spread, either side', () => {
+  const w = startWindow('2026-08-14', 6, 6);
+  assert.ok(w);
+  assert.equal(w.days, 3);
+  assert.equal(w.from, '2026-08-11');
+  assert.equal(w.to, '2026-08-17');
+});
+
+test('a regular cycle gets a narrow window, an irregular one a wide one', () => {
+  const regular = startWindow('2026-08-14', 2, 6);
+  const irregular = startWindow('2026-08-14', 11, 6);
+  assert.ok(regular && irregular);
+  assert.ok(irregular.days > regular.days,
+    'the whole point: the headline widens when her cycles do');
+});
+
+test('a one-day spread still reads as a day either side', () => {
+  // Rounding down would collapse it to the bare estimate and quietly claim
+  // more certainty than a spread of one supports.
+  assert.equal(startWindow('2026-08-14', 1, 4)?.days, 1);
+});
+
+test('the window is capped rather than growing without limit', () => {
+  // Past about a week the honest message is the confidence line saying the
+  // history is too variable, not a fortnight-wide band drawn as a forecast.
+  assert.equal(startWindow('2026-08-14', 40, 8)?.days, 7);
+});
+
+test('the card headline is the start window, not the bleed', () => {
+  const periodDays = new Set([
+    ...range('2026-04-01', '2026-04-05'),
+    ...range('2026-05-01', '2026-05-05'),   // 30-day cycle
+    ...range('2026-05-27', '2026-05-31'),   // 26-day cycle
+    ...range('2026-06-24', '2026-06-28'),   // 28-day cycle
+  ]);
+  const p = predict({
+    periodDays, settings: defaultSettings(), today: '2026-07-10', logs: {},
+  });
+
+  assert.ok(p.startWindow, 'four cycles is plenty of history for a window');
+  assert.ok(p.nextPeriod);
+  assert.notEqual(p.startWindow.to, p.nextPeriod.end,
+    'the window and the bleed span are different facts and must not coincide');
+  assert.ok(p.startWindow.from < /** @type {string} */ (p.nextStart),
+    'the window opens before the estimate');
+  assert.ok(p.startWindow.to > /** @type {string} */ (p.nextStart),
+    'and closes after it');
 });
