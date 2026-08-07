@@ -4,11 +4,11 @@ A competitive audit. `AUDIT.md` asks whether the app does what it says correctly
 this asks whether what it says is the right list, measured against the apps
 people actually use.
 
-**Status.** Eight gaps, two closed. G2 — the Next period headline — was fixed in
-[#58](https://github.com/LilShaum/my-tasks/commit/5e9fa79). G1 — the lateness
-model — is fixed in this branch. Both entries are kept as the record. The other
-six are open and verified open against this commit; the line references have
-been re-resolved, not assumed.
+**Status.** Eight gaps, four closed. G2 — the Next period headline — was fixed in
+[#58](https://github.com/LilShaum/my-tasks/commit/5e9fa79). G1, G3 and G4 are fixed on this
+branch. Closed entries are kept as the record. The other four are open and
+verified open against this commit; the line references have been re-resolved,
+not assumed.
 
 ## 0. What counts as a gap
 
@@ -158,32 +158,74 @@ the honest message is the confidence line saying the history is too variable,
 not a fortnight-wide band drawn as a forecast. The bleed length survives a line
 down, stated as a fact about the period rather than a claim about the forecast.
 
-### G3 — Nothing can get in except Kittycal's own export · S3
+### G3 — Nothing could get in except Kittycal's own export · S3 · **CLOSED**
 
-`parseImport` accepts one shape: Kittycal's own (`backup.js:112`). For anyone
-with three years of history in Flo or Clue, the cost of switching is retyping it
-or losing it — and losing it is what actually happens.
+`parseImport` accepted one shape: Kittycal's own (`backup.js:112`). For anyone
+with three years of history in Flo or Clue, the cost of switching was retyping
+it or losing it — and losing it is what actually happens. The largest adoption
+barrier in this document, and nothing to do with features.
 
-This is the largest adoption barrier in the document and it has nothing to do
-with features. Clue exports CSV. Parsing a CSV is local file reading; it costs
-nothing in the privacy model, needs no network, and doesn't touch the CSP.
+**A correction to this document.** It previously said "Clue exports CSV". That
+is wrong, and checking it changed the design. Clue's export is a
+password-protected zip containing JSON, delivered by email; Apple Health's is a
+zipped XML. Neither can be opened by an app with no dependencies and no
+network, and writing a parser for a format I could not obtain a sample of would
+have produced exactly the kind of importer that half-works and silently drops
+data.
 
-**Verdict: build.** An importer for Clue's CSV export, and a tolerant
-date+flow CSV path for everything else. It should report what it understood and
-what it skipped rather than silently dropping rows — the existing importer's
-sanitise-don't-swallow discipline already sets that standard.
+**So the importer is format-tolerant rather than app-specific**
+(`csv.js parseCSVImport`). It sniffs a delimiter (comma, semicolon or tab),
+finds the date column by name, finds flow, symptom and note columns if they are
+there, and reports what it understood before writing anything: which column it
+read as dates, which as flow, and how many rows it could not read. Everyone in
+the field either exports CSV directly or can be got into a spreadsheet in one
+step, and this reads whatever comes out of that.
 
-### G4 — Export is JSON only · S3
+Two decisions worth keeping:
 
-One `Blob`, `application/json` (`backup.js:171`). It's complete and readable,
-and nobody can do anything with it. A spreadsheet can't open it, a doctor can't
-read it, a researcher can't load it. The print report covers the
-hand-to-a-clinician case, so CSV is the real hole: her own data, in the format
-that every tool on earth accepts.
+**Dates are never guessed.** `03/04/2026` is 3 April or 4 March, and picking
+the wrong one moves a period start by a month and quietly corrupts every cycle
+length after it. The importer only accepts a day-first or month-first column
+when the file itself settles the question — a component above 12 somewhere in
+that column can only be a day. When nothing settles it, the import stops and
+says to reformat as `YYYY-MM-DD`. Refusing is the honest failure; guessing is
+the one that costs her data.
 
-**Verdict: build.** Two files — one row per logged day, one row per cycle.
-Small, and squarely rule 4: data that goes in and can't come out is data that
-wasn't worth collecting.
+**It merges, it does not replace** (`store.js mergeIn`). Restoring a backup
+means "this file is the truth"; bringing in three years from another app means
+"add this to what I have". A day already logged in Kittycal always wins, since
+hers carries symptoms, severities and a note where the imported one carries a
+date and a flow. It sits on its own settings row for the same reason — putting
+both on one row and switching on the file extension would make the destructive
+one reachable by accident.
+
+### G4 — Export was JSON only · S3 · **CLOSED**
+
+One `Blob`, `application/json`. Complete, readable, and useless to every tool
+anyone owns: a spreadsheet can't open it, a clinician can't read it, a
+researcher can't load it. Rule 4 — data that goes in and can't come out is data
+that wasn't worth collecting.
+
+Now `toCSV` writes one row per day with the cycle number and cycle day already
+computed, so cycle-level analysis needs no second file — which is why this
+shipped as one table rather than the two the plan called for. Period days get a
+row even when nothing else was logged on them, or the file's period column
+would disagree with the app.
+
+Two things the plan didn't anticipate:
+
+**Labels, not ids.** `Tender breasts`, not `tender-breasts`. The CSV is for
+reading; the JSON is the lossless one, and this is the right trade for a format
+whose entire purpose is being opened by something else.
+
+**Formula injection is defused** (`csv.js csvField`). Excel, Sheets and Numbers
+all execute a cell beginning `=`, `+`, `-` or `@`. Notes are free text, so
+without this her own export could hand a spreadsheet something to run when she
+opens it. A leading apostrophe makes it a string again.
+
+It deliberately does not touch `lastBackup`: the CSV cannot restore her, so
+letting it silence the backup prompt would trade a real safeguard for a file
+that only looks like one.
 
 ### G5 — Birth control tracking is a checkbox · S3
 

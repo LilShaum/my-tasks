@@ -29,10 +29,11 @@ import { releaseMascotUrls, mascot } from '../ui/mascot.js';
 import { openMascotPicker } from '../ui/image-picker.js';
 import { openHelp } from './help.js';
 import { openStickerBook, stickerCounts } from './stickers.js';
-import { exportEverything } from '../storage/export-action.js';
+import { exportEverything, exportCSV } from '../storage/export-action.js';
 import * as store from '../state/store.js';
 import * as repo from '../storage/repo.js';
 import * as backup from '../storage/backup.js';
+import * as csv from '../storage/csv.js';
 
 /** @param {HTMLElement} host */
 export function renderSettings(host) {
@@ -574,13 +575,47 @@ function dataRows() {
   const importInput = picker(doImport);
   const checkInput = picker(doCheck);
 
+  /* The CSV picker takes a different set of extensions, so it cannot reuse
+     `picker` above — that one is scoped to JSON on purpose, to stop a
+     spreadsheet being offered to the importer that will reject it. */
+  const csvInput = /** @type {HTMLInputElement} */ (el('input', {
+    type: 'file',
+    accept: 'text/csv,.csv,.tsv,.txt',
+    style: { display: 'none' },
+    onchange: async (/** @type {Event} */ e) => {
+      const input = /** @type {HTMLInputElement} */ (e.target);
+      const file = input.files?.[0];
+      input.value = '';
+      if (file) await doCsvImport(file);
+    },
+  }));
+
   return el('div', { class: 'rows' }, [
     importInput,
     checkInput,
+    csvInput,
     buttonRow({
       label: 'Export everything',
       value: 'JSON file',
       onClick: exportEverything,
+    }),
+    buttonRow({
+      label: 'Export as a spreadsheet',
+      value: 'CSV file',
+      onClick: exportCSV,
+    }),
+    /*
+      Bringing history in from somewhere else.
+
+      Separate from "Import from a backup" because the two do genuinely
+      different things: a backup replaces everything, and this merges into what
+      is already here. Putting them on one row and switching on the file
+      extension would make the destructive one reachable by accident.
+    */
+    buttonRow({
+      label: 'Bring in data from another app',
+      value: 'CSV file, merged',
+      onClick: () => csvInput.click(),
     }),
     /*
       Checking a backup sits above importing one deliberately.
@@ -647,6 +682,53 @@ async function doImport(file) {
   const settings = store.getState().settings;
   applyTheme(settings.theme, settings.colorMode);
   toast(`Imported ${result.logCount} logged days`);
+}
+
+/**
+ * Bring days in from another app's CSV.
+ *
+ * The confirm sheet lists what the parser actually understood — which column
+ * it read as dates, which as flow, how many rows it could not read — before
+ * anything is written. An importer that says "imported 412 days" without
+ * saying it silently dropped 90 of them is how someone believes she has moved
+ * her history when she has not.
+ *
+ * @param {File} file
+ */
+async function doCsvImport(file) {
+  let text;
+  try {
+    text = await backup.readFile(file);
+  } catch {
+    toast('Could not read that file');
+    return;
+  }
+
+  const result = csv.parseCSVImport(text);
+  if (!result.ok) {
+    toast(result.error ?? 'That file could not be read');
+    return;
+  }
+
+  const confirmed = await confirmSheet({
+    title: `Bring in ${plural(result.understood ?? 0, 'day')}?`,
+    body: [
+      ...(result.notes ?? []),
+      'Days you have already logged in Kittycal are kept as they are — this ' +
+      'only fills the gaps.',
+    ],
+    confirmLabel: 'Bring them in',
+  });
+  if (!confirmed) return;
+
+  const { added, kept } = store.mergeIn({
+    logs: result.logs ?? {},
+    periodDays: result.periodDays ?? new Set(),
+  });
+
+  toast(kept
+    ? `Added ${added} days, kept ${kept} of your own`
+    : `Added ${plural(added, 'day')}`);
 }
 
 /**

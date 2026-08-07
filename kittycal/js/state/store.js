@@ -399,6 +399,44 @@ export function replaceAll(data) {
   return flushNow();
 }
 
+/**
+ * Merge days in from another app's export, keeping what is already here.
+ *
+ * Distinct from `replaceAll` because the two answer different questions.
+ * Restoring a backup is "this file is the truth"; bringing in three years from
+ * Clue is "add this to what I have", and a merge that clobbered a day she had
+ * already logged in Kittycal would destroy the better record with the worse
+ * one — the imported day carries a date and a flow, hers carries symptoms,
+ * severities and a note.
+ *
+ * So the rule is: an existing day always wins, and imported days only fill
+ * gaps. Period days are a union, since those are a set of dates and there is
+ * no such thing as a conflicting one.
+ *
+ * @param {{logs: Record<DateKey, DayLog>, periodDays: Set<DateKey>}} data
+ * @returns {{added: number, kept: number}} days written, and days left alone
+ */
+export function mergeIn(data) {
+  let added = 0;
+  let kept = 0;
+
+  for (const [date, log] of Object.entries(data.logs)) {
+    if (state.logs[date]) { kept += 1; continue; }
+    state.logs[date] = log;
+    dirty.logs.add(date);
+    added += 1;
+  }
+
+  const periods = new Set(state.periodDays);
+  for (const date of data.periodDays) periods.add(date);
+  state.periodDays = periods;
+
+  dirty.periods = true;
+  notify();
+  flushNow();
+  return { added, kept };
+}
+
 /** Reset the in-memory store after an erase, without reloading the page. */
 export function resetToDefaults() {
   state = {

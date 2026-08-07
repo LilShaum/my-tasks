@@ -49,6 +49,7 @@ const PRECACHE = [
   'js/storage/db.js',
   'js/storage/repo.js',
   'js/storage/backup.js',
+  'js/storage/csv.js',
   'js/storage/export-action.js',
   'js/storage/persist.js',
   'js/domain/model.js',
