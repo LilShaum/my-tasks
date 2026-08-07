@@ -335,42 +335,31 @@ export const EMBLEMS = {
     ${spark(24, 33, 4.5, P)}
     ${spark(77, 66, 3.5, P)}`),
 
-  /* Paw print — the pad in one colour, the four toes in the other.
+  /* A mug of cocoa — steam, a painted band, a marshmallow floating in it.
 
-     This was the emptiest drawing in the set: five brown blobs in one colour,
-     nothing inside any of them, and a shadow across the main pad that landed
-     as a hard vertical edge, because a single `lit()` boundary through a wide
-     low form is very nearly a straight line. Slivers down both sides leave the
-     form's own colour through the middle, which is what the good ones do.
+     This was a paw print for four attempts and a paw print is the wrong object
+     for this theme. Four small forms above one large one is a face waiting to
+     happen: the accent went inside the pad and read as a hole, went on the
+     toes and left rings with dots in them, went along the bottom of the pad
+     and became an open mouth with two toes for eyes. The version that finally
+     passed all the rules did it by giving up and parking a heart next to the
+     paw, which is decoration bolted onto a drawing rather than a drawing.
 
-     The accent went inside the pad first and read as a hole punched through
-     it — which turns out to be the rule the four best emblems were already
-     following: the cap's brim, the hood's bows, the pad's bloom and the bow's
-     knot all sit at an *edge* or a junction, never as an island surrounded by
-     the primary form.
-
-     The second attempt put it on the toes, and those are too small to hold a
-     fill at silhouette weight: six units of outline on a seventeen-unit form
-     leaves a ring with a dot in it, which is the same hole by another route.
-
-     The third put a band along the bottom of the pad, where kuromi's brim
-     goes, and it read as an open mouth — two toes above it immediately became
-     eyes. That is the real constraint here and it rules out the whole family:
-     a paw is four small forms above one large one, which is a face waiting to
-     happen, and *any* mark low on the pad completes it. So the second colour
-     leaves the paw entirely and becomes a thing beside it, the way keroppi's
-     bloom sits beside the lily pad. */
+     The theme is called "warm cocoa". A mug was there the whole time: it takes
+     a band round its middle the way the jester cap takes a brim, the steam is
+     floating detail that belongs to the object rather than sitting beside it,
+     and there is nowhere on it for a face to appear by accident. */
   chococat: ink(`
-    ${shaded('M50 85 C38 85 28 77 29 67 C30 57 40 51 52 51 C64 51 73 58 73 68 '
-             + 'C73 78 62 85 50 85 Z', P,
-             lit(38) + shade(64))}
-    ${shaded('M24 51 C18 48 17 39 22 35 C27 32 33 36 34 43 C35 49 30 54 24 51 Z', P)}
-    ${shaded('M42 38 C36 34 36 24 42 21 C48 19 53 24 52 31 C52 37 47 41 42 38 Z', P)}
-    ${shaded('M61 39 C56 35 57 26 63 24 C69 22 73 28 71 34 C70 40 65 43 61 39 Z', P)}
-    ${shaded('M79 53 C74 51 72 43 76 39 C81 36 87 40 87 46 C87 52 83 55 79 53 Z', P)}
-    ${shaded('M25 31 C21 27 17 24 18 21 C19 18 23 18 25 21 C27 17 31 17 32 20 '
-             + 'C33 24 29 27 25 31 Z', A, '', SW_FINE)}
-    ${spark(80, 68, 4)}`),
+    <path d="M36 26 C30 22 42 19 36 15 M56 25 C51 21 61 18 56 15"
+          stroke="${A}" stroke-width="${SW_MID}"/>
+    ${shaded('M68 38 C78 36 83 45 81 54 C79 61 72 65 66 63 C72 60 76 56 76 51 '
+             + 'C77 45 73 41 68 38 Z', P)}
+    ${shaded('M24 34 C25 52 28 68 32 76 C36 81 42 82 47 82 C52 82 58 81 62 76 '
+             + 'C66 68 69 52 70 34 C64 44 30 44 24 34 Z', P,
+             shade(60))}
+    ${shaded('M26 54 C38 57 58 57 68 54 C67 60 66 65 65 69 C55 72 39 72 29 69 '
+             + 'C28 65 27 60 26 54 Z', A)}
+    ${shaded('M24 34 C31 26 63 26 70 34 C64 44 30 44 24 34 Z', W, '', SW_MID)}`),
 
   /* Beret — a slouched crown, a band in front of it, a stalk behind.
 
@@ -406,27 +395,24 @@ export const EMBLEMS = {
     <path d="M43 27 C49 25 55 25 60 27 M43 35 C49 33 55 33 60 35
              M44 43 C49 41 55 41 59 43" stroke-width="${SW_FINE}"/>`),
 
-  /* Football — a hand-drawn ball, a centre panel, and two more panels the
-     seams run to, none of them quite regular.
+  /* Beach ball — panels sweeping pole to pole, and one bouncing away.
 
-     It used to be white with blue seams and one blue panel, which made it the
-     only emblem in the set with no second colour in it at all — and four stray
-     fine arcs near the rim that read as scuffs rather than as seams. Two more
-     filled panels is what a ball actually looks like and what gives the accent
-     somewhere to live. */
+     A football twice, and a football is the wrong ball to draw at this size.
+     Its panels are a pentagon-hexagon tiling: every panel edge has to meet a
+     seam, every seam has to end on the rim, and getting one of them a couple
+     of units out leaves a white notch at twelve o'clock and a stray triangle
+     at seven — which is exactly what it did, both times, because those edges
+     were hand-typed rather than derived.
+
+     A beach ball's panels are four curves between the same two poles. They
+     cannot be misaligned, because they all start and end at the same place. */
   pochacco: ink(`
     ${shaded('M50 19 C68 19 81 33 81 50 C81 68 67 81 50 81 C32 81 19 67 19 50 '
-             + 'C19 32 33 19 50 19 Z', W)}
-    ${shaded('M53 34 C53 30 53 27 54 24 C60 23 66 26 70 31 C73 35 75 38 76 41 '
-             + 'C72 43 68 45 65 46 C62 42 58 38 53 34 Z', A, '', SW_MID)}
-    ${shaded('M37 50 C33 48 29 46 26 44 C22 50 21 57 22 62 C26 66 31 68 36 69 '
-             + 'C36 62 36 56 37 50 Z', A, '', SW_MID)}
-    <path d="M50 36 C50 28 50 23 50 20 M63 46 C70 43 75 41 78 39
-             M58 61 C61 68 64 73 66 76 M42 61 C39 68 36 73 34 76
-             M37 46 C30 44 25 42 22 40" stroke-width="${SW_MID}"/>
-    ${shaded('M50 36 C56 38 61 42 63 47 C60 53 56 58 50 60 C44 58 39 53 37 47 '
-             + 'C40 41 44 38 50 36 Z', P,
-             lit(50), SW_MID)}`),
+             + 'C19 32 33 19 50 19 Z', W,
+             lit(36))}
+    ${shaded('M50 19 C29 30 29 70 50 81 C53 70 53 30 50 19 Z', P, '', SW_MID)}
+    ${shaded('M50 19 C53 30 53 70 50 81 C75 70 75 30 50 19 Z', A, '', SW_MID)}
+    ${spark(78, 24, 5)}`),
 
   /* Dorsal fin — a lit leading edge, a ridge, bubbles rising past it.
 
