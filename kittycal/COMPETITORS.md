@@ -4,9 +4,9 @@ A competitive audit. `AUDIT.md` asks whether the app does what it says correctly
 this asks whether what it says is the right list, measured against the apps
 people actually use.
 
-**Status.** Eight gaps, four closed. G2 — the Next period headline — was fixed in
-[#58](https://github.com/LilShaum/my-tasks/commit/5e9fa79). G1, G3 and G4 are fixed on this
-branch. Closed entries are kept as the record. The other four are open and
+**Status.** Eight gaps, five closed. G2 — the Next period headline — was fixed in
+[#58](https://github.com/LilShaum/my-tasks/commit/5e9fa79). G1, G3, G4 and G5 are fixed on
+this branch. Closed entries are kept as the record. The other three are open and
 verified open against this commit; the line references have been re-resolved,
 not assumed.
 
@@ -227,20 +227,38 @@ It deliberately does not touch `lastBackup`: the CSV cannot restore her, so
 letting it silence the backup prompt would trade a real safeguard for a file
 that only looks like one.
 
-### G5 — Birth control tracking is a checkbox · S3
+### G5 — Birth control tracking was a checkbox · S3 · **CLOSED**
 
-`pillTaken` is a boolean (`model.js:35`) with a daily nudge attached
-(`reminders.js:190`). There's no pack: no 21/7, no 24/4, no continuous regimen,
-no placebo week, and no "you didn't log yesterday" — which is the single moment
-a pill tracker justifies existing. Clue markets contraception tracking as a
-headline feature; Kittycal already knows the method from `BIRTH_CONTROL`
-(`model.js:78`) and does nothing with it.
+`pillTaken` was a boolean (`model.js:35`) with a daily nudge attached
+(`reminders.js:190`) — a tick box with no memory. It could tell her to take one
+today while having no idea whether today was an active pill or the fourth day
+of a break, nor whether yesterday was ever marked. The one moment a pill
+tracker earns its place is the moment she cannot remember about yesterday, and
+that was the moment it had nothing to say.
 
-**Verdict: build the pack, and be honest about the reminder.** A regimen with a
-visible day-in-pack position is real value. But this is also where the
-no-server design hurts most, and the settings copy should say so here
-specifically rather than only in general: a contraception reminder that fires
-when you next open the app is not a contraception reminder.
+`pill.js` adds the pack: five regimen shapes (21/7, 24/4, continuous, extended,
+or off), a start date, and from those a position — which pill of how many,
+which break day, how many left, which pack. Settings shows the rows only for
+methods that come in a pack, so an implant or an IUD never sees a question it
+cannot answer. Today gets a card with the position and the days that have
+nothing on them.
+
+**The wording is the feature.** It says days are **not marked**, never that
+pills were missed, and it does not say what to do about one:
+
+- An unmarked day is a fact about the *record*, not about her body. She may
+  well have taken it and not opened the app. The app already draws exactly this
+  distinction — `checkedIn` exists so "she said nothing happened" and "she never
+  answered" stay different things — and frightening someone about a pill she
+  actually took is a worse failure than saying nothing.
+- What to do after a genuinely missed pill depends on which pill, how late, and
+  where in the pack. That is the leaflet's job and the pharmacist's. The card
+  and the settings note both say so rather than improvising medical advice,
+  which is the line the README already draws for the whole app.
+
+And the reminder limitation is stated where it bites rather than only in
+general: a contraception reminder that fires when you next open the app is not
+a contraception reminder, and the settings note says that in those words.
 
 ### G6 — Two modes are declared in the data model and neither exists · S4
 

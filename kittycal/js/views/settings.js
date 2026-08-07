@@ -17,6 +17,7 @@ import {
 } from '../ui/reminders.js';
 import { BIRTH_CONTROL, HORMONAL_BIRTH_CONTROL } from '../domain/model.js';
 import { measuredLuteal } from '../domain/ovulation.js';
+import { REGIMENS, regimen, packPosition, describePack } from '../domain/pill.js';
 import { describeBackup } from '../domain/backup-check.js';
 import { buildCycles } from '../domain/cycles.js';
 import { themePicker, setPickerSelection } from '../ui/theme-picker.js';
@@ -243,6 +244,92 @@ function lutealHint() {
 }
 
 /** @param {import('../domain/model.js').Settings} settings */
+/**
+ * Methods that arrive as a pack with a break in it. An implant, an injection
+ * or an IUD does not, so the pack rows never appear for those.
+ */
+const PACKED_METHODS = new Set(['pill-combined', 'pill-mini', 'patch', 'ring']);
+
+/**
+ * Which pack, and when this one started.
+ *
+ * The start date is asked for rather than assumed, because there is no way to
+ * derive it: the pack is a schedule she is on, not something visible in her
+ * cycle data. It is one question, asked once per pack shape, and it is what
+ * turns a tick box into a position.
+ *
+ * @param {import('../domain/model.js').Settings} settings
+ */
+function packRows(settings) {
+  const shape = regimen(settings.pillRegimen);
+  const tracking = shape.id !== 'none';
+  const position = packPosition(settings, todayKey());
+
+  return el('div', { style: { marginTop: 'var(--sp-3)' } }, [
+    el('div', { class: 'rows' }, [
+      selectRow({
+        label: 'Pack',
+        value: settings.pillRegimen,
+        options: REGIMENS.map((r) => ({ value: r.id, label: r.label })),
+        onChange: (value) => {
+          /*
+            Turning a pack on with no start date would leave the position
+            permanently null and the row looking broken. Today is the only
+            defensible default — she is holding the packet — and the date row
+            underneath is right there to correct it.
+          */
+          const patch = /** @type {Record<string, string>} */ ({ pillRegimen: value });
+          if (value !== 'none' && !settings.pillPackStart) patch.pillPackStart = todayKey();
+          store.updateSettings(patch);
+          const host = document.getElementById('view-settings');
+          if (host) renderSettings(host);
+        },
+      }),
+      tracking && dateRow({
+        label: 'This pack started',
+        value: settings.pillPackStart,
+        onChange: (value) => {
+          store.updateSettings({ pillPackStart: value });
+          const host = document.getElementById('view-settings');
+          if (host) renderSettings(host);
+        },
+      }),
+    ]),
+
+    tracking && position && el('p', { class: 'hint-sm', style: { marginTop: 'var(--sp-2)' },
+      text: `Today is ${describePack(position)?.toLowerCase()}, pack ${position.pack}.` }),
+
+    tracking && el('div', { class: 'alert alert-info', style: { marginTop: 'var(--sp-3)' } }, [
+      el('span', { class: 'alert-icon', text: 'i', 'aria-hidden': 'true' }),
+      el('div', { text:
+        'Kittycal shows where you are in the pack and which days you have not ' +
+        'marked. It cannot tell whether you actually took one, and it does not ' +
+        'advise on missed pills — that is what the leaflet in the packet and ' +
+        'your pharmacist are for.' }),
+    ]),
+  ]);
+}
+
+/**
+ * A plain date field. Used only by the pack, which is the one setting that is
+ * a date rather than a number or a choice.
+ * @param {{label: string, value: string, onChange: (value: string) => void}} opts
+ */
+function dateRow({ label, value, onChange }) {
+  const input = /** @type {HTMLInputElement} */ (el('input', {
+    type: 'date',
+    class: 'row-input num',
+    value,
+    max: todayKey(),
+    onchange: () => { if (input.value) onChange(input.value); },
+  }));
+
+  return el('label', { class: 'row' }, [
+    el('span', { class: 'row-label', text: label }),
+    input,
+  ]);
+}
+
 function cycleRows(settings) {
   const onHormonal = HORMONAL_BIRTH_CONTROL.has(settings.birthControl);
 
@@ -288,6 +375,16 @@ function cycleRows(settings) {
         }),
       ]),
     ]),
+
+    /*
+      The pack, for the methods that come in one.
+
+      Only shown for the pill, the patch and the ring — an implant or an IUD
+      has no pack, and offering to track one would be a row that can only ever
+      be answered "not applicable". Following the method rather than adding
+      another question is the cheaper daily loop.
+    */
+    PACKED_METHODS.has(settings.birthControl) && packRows(settings),
 
     onHormonal && el('div', { class: 'alert alert-info', style: { marginTop: 'var(--sp-3)' } }, [
       el('span', { class: 'alert-icon', text: 'i', 'aria-hidden': 'true' }),

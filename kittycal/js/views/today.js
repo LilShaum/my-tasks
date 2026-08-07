@@ -36,6 +36,7 @@ import { buildCycles, cycleLengths, periodLengths } from '../domain/cycles.js';
 import { predict, conceptionChance } from '../domain/predict.js';
 import { phaseFor } from '../domain/phases.js';
 import { evaluate } from '../domain/acog.js';
+import { packPosition, describePack, unmarkedDays } from '../domain/pill.js';
 import { cycleRing } from '../ui/ring.js';
 import { spotArt } from '../ui/mascot.js';
 import * as store from '../state/store.js';
@@ -128,6 +129,7 @@ export function renderToday(host) {
           : prediction.withinWindow ? dueCard(prediction)
             : nextPeriodCard(prediction),
       prediction.showFertility && prediction.ovulation ? fertileCard(prediction, today) : null,
+      packCard(settings, logs, today),
       ...acogCards(cycles, today, prediction, logs),
     ]),
 
@@ -1003,6 +1005,58 @@ function fertileCard(prediction, today) {
  * @param {import('../domain/predict.js').Prediction} prediction
  * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
  */
+/**
+ * Where she is in the pack, and which days have nothing on them.
+ *
+ * Absent entirely unless she has told Settings there is a pack — this is not
+ * a question the daily loop should be asking of the two-thirds of users it
+ * does not apply to.
+ *
+ * The wording is the point. It says days are *not marked*, never that pills
+ * were missed: the app knows what is in its own records and nothing about what
+ * she swallowed, and frightening someone about a pill she actually took is a
+ * worse failure than saying nothing. What to do about a genuinely missed one
+ * is the leaflet's job, and the card says so rather than improvising medical
+ * advice.
+ *
+ * @param {import('../domain/model.js').Settings} settings
+ * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
+ * @param {DateKey} today
+ */
+function packCard(settings, logs, today) {
+  const position = packPosition(settings, today);
+  if (!position) return null;
+
+  const unmarked = unmarkedDays(logs, settings, today);
+  const takenToday = logs[today]?.pillTaken === true;
+
+  return el('div', { class: 'card data-zone' }, [
+    el('h3', { text: 'Your pack' }),
+    el('p', { class: 'big-value num', text: describePack(position) ?? '' }),
+    el('p', { class: 'hint-sm', text: position.active
+      ? `${plural(position.left, 'day')} of this pack left, then ` +
+        `${plural(position.breakDays, 'day')} off.`
+      : `${plural(position.total - position.day + 1, 'day')} until the next pack.` }),
+
+    position.active && !takenToday && el('button', {
+      type: 'button',
+      class: 'btn',
+      style: { marginTop: 'var(--sp-3)' },
+      onclick: () => { haptic(); openCheckin(today); },
+    }, ['Mark today']),
+
+    unmarked.length ? el('div', { class: 'alert alert-info',
+      style: { marginTop: 'var(--sp-3)' } }, [
+      el('span', { class: 'alert-icon', text: 'i', 'aria-hidden': 'true' }),
+      el('div', { text:
+        `Nothing marked on ${unmarked.map(fmtDayMonth).join(', ')}. That may just ` +
+        'mean the app was not open — Kittycal only knows what is in its own ' +
+        'records. If you think you did miss one, the leaflet in the packet says ' +
+        'what to do.' }),
+    ]) : null,
+  ]);
+}
+
 function acogCards(cycles, today, prediction, logs) {
   const flags = evaluate({
     cycleLengths: cycleLengths(cycles),

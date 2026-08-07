@@ -49,6 +49,8 @@
  * @property {number} avgPeriodLength  days
  * @property {number} lutealLength     days; 14 unless she knows better
  * @property {string} birthControl     see BIRTH_CONTROL
+ * @property {string} pillRegimen      see REGIMENS in pill.js
+ * @property {string} pillPackStart    DateKey the current pack began, or ''
  * @property {number|null} birthYear
  * @property {string} name             for greetings; optional, local-only
  * @property {0|1} firstDayOfWeek      0 Sunday, 1 Monday
@@ -100,6 +102,8 @@ export function defaultSettings() {
     avgPeriodLength: 5,
     lutealLength: 14,
     birthControl: 'none',
+    pillRegimen: 'none',
+    pillPackStart: '',
     birthYear: null,
     name: '',
     firstDayOfWeek: 1,

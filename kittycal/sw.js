@@ -60,6 +60,7 @@ const PRECACHE = [
   'js/domain/ovulation.js',
   'js/domain/predict.js',
   'js/domain/phases.js',
+  'js/domain/pill.js',
   'js/domain/acog.js',
   'js/domain/stats.js',
   'js/domain/recap.js',
