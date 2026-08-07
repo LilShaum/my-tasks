@@ -32,6 +32,11 @@
   --primary:   oklch(80% 0.135 85);
   --ink:       oklch(31% 0.060 68);
   --accent:    oklch(62% 0.11 38);
+  /* The fried egg's white. `--card` is a hair off the page in light mode and
+     near-black in dark, so an egg painted with it came out as a dark blob the
+     moment the lights went off. The --emb-* tokens are only ever read by this
+     theme's own emblem, so pinning this one near-white costs nothing else. */
+  --emb-hi:    oklch(96% 0.018 85);
 }
 [data-theme='twinstars']   { --h: 285; --c: 0.085;
   --accent:      oklch(84% 0.13 95);
@@ -138,6 +143,7 @@
 :root[data-mode='dark'][data-theme='gudetama'],
 [data-mode='dark'] [data-theme='gudetama'] {
   --accent: oklch(80% 0.13 38);   --accent-soft: oklch(40% 0.07 38);
+  --emb-hi: oklch(93% 0.020 85);
 }
 :root[data-mode='dark'][data-theme='twinstars'],
 [data-mode='dark'] [data-theme='twinstars'] {
