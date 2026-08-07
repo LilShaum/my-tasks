@@ -40,7 +40,16 @@
 /* The three themes below are built on a *dark* primary rather than a pastel
    one. The global --on-primary is a deep ink, which would be unreadable on
    them, so each flips its button label to near-white and keeps its fill at or
-   below L46 — the point where white text still clears 4.5:1. */
+   below L46 — the point where white text still clears 4.5:1.
+
+   They also have to move --line, and two of them were not doing it. The global
+   --line sits at L55 on the assumption that --primary is a pastel above it, so
+   an outline reads as the darker edge of whatever it encloses. Drop --primary
+   to L45 and leave --line where it is and the relationship inverts: every
+   outlined shape becomes a *pale* border round a dark fill. It is most obvious
+   on the emblems, where it turned the paw print and the microphone into
+   light rings with dark holes in them, but it was wrong everywhere those two
+   tokens met. Each of the three now pins --line just under its own primary. */
 [data-theme='badtzmaru']   { --h: 250; --c: 0.035;
   /* Penguin black + beak yellow: near-monochrome with one loud accent. */
   --accent:      oklch(80% 0.15 88);
@@ -56,6 +65,7 @@
   --primary:     oklch(45% 0.075 55);
   --primary-line: oklch(40% 0.07 55);
   --on-primary:  oklch(97% 0.01 55);
+  --line:        oklch(40% 0.06 55);
 }
 [data-theme='pompompurin'] { --h: 101; --c: 0.105;
   --accent:      oklch(52% 0.09 62);
@@ -69,6 +79,7 @@
   --primary:     oklch(46% 0.15 32);
   --primary-line: oklch(41% 0.14 32);
   --on-primary:  oklch(97% 0.01 32);
+  --line:        oklch(41% 0.11 32);
 }
 [data-theme='pochacco']    { --h: 252; --c: 0.110;
   --accent:      oklch(74% 0.14 62);
@@ -87,6 +98,78 @@
   --sh-sticker:       0 1px 2px oklch(50% 0 0 / 0.14);
   --sh-sticker-press: 0 1px 1px oklch(50% 0 0 / 0.14);
   --bw: 1.5px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   The same accents again, for dark mode
+
+   Twelve of the fourteen themes override --accent above, because a character's
+   accent is usually not the complement of its primary — Badtz-Maru's yellow on
+   black, Kuromi's magenta on purple, Keroppi's coral on green. In dark mode
+   every one of them was being thrown away.
+
+   Cascade, not a typo: tokens.css sets the dark palette on
+   `:root[data-mode='dark']`, which is two compound selectors and therefore
+   beats a bare `[data-theme='keroppi']`. So the moment the page went dark, all
+   twelve fell back to the generic hue+150 formula. Keroppi's coral bloom came
+   out lavender, Kuromi's magenta bells came out yellow, and Badtz-Maru's gold
+   lightning went silver — that theme's chroma is 0.035 because it is meant to
+   be near-monochrome with one loud accent, and the derived accent inherits it.
+
+   Each block below is its light-mode accent's own hue and chroma at dark
+   mode's lightness, so the character survives the lights going out. The second
+   selector in each pair is what re-derives the palette for a theme-scoped
+   element sitting inside a dark page, which is how the theme picker and the
+   sticker book preview themselves.
+   ───────────────────────────────────────────────────────────────────────── */
+
+:root[data-mode='dark'][data-theme='kuromi'],
+[data-mode='dark'] [data-theme='kuromi'] {
+  --accent: oklch(80% 0.16 350);  --accent-soft: oklch(40% 0.09 350);
+}
+:root[data-mode='dark'][data-theme='cinnamoroll'],
+[data-mode='dark'] [data-theme='cinnamoroll'] {
+  --accent: oklch(82% 0.10 12);   --accent-soft: oklch(40% 0.06 12);
+}
+:root[data-mode='dark'][data-theme='keroppi'],
+[data-mode='dark'] [data-theme='keroppi'] {
+  --accent: oklch(80% 0.14 22);   --accent-soft: oklch(40% 0.08 22);
+}
+:root[data-mode='dark'][data-theme='gudetama'],
+[data-mode='dark'] [data-theme='gudetama'] {
+  --accent: oklch(80% 0.13 38);   --accent-soft: oklch(40% 0.07 38);
+}
+:root[data-mode='dark'][data-theme='twinstars'],
+[data-mode='dark'] [data-theme='twinstars'] {
+  --accent: oklch(88% 0.12 95);   --accent-soft: oklch(42% 0.07 95);
+}
+:root[data-mode='dark'][data-theme='badtzmaru'],
+[data-mode='dark'] [data-theme='badtzmaru'] {
+  --accent: oklch(85% 0.15 88);   --accent-soft: oklch(42% 0.08 88);
+}
+:root[data-mode='dark'][data-theme='chococat'],
+[data-mode='dark'] [data-theme='chococat'] {
+  --accent: oklch(80% 0.11 190);  --accent-soft: oklch(40% 0.06 190);
+}
+:root[data-mode='dark'][data-theme='pompompurin'],
+[data-mode='dark'] [data-theme='pompompurin'] {
+  --accent: oklch(80% 0.11 62);   --accent-soft: oklch(40% 0.06 62);
+}
+:root[data-mode='dark'][data-theme='aggretsuko'],
+[data-mode='dark'] [data-theme='aggretsuko'] {
+  --accent: oklch(78% 0.05 260);  --accent-soft: oklch(40% 0.03 260);
+}
+:root[data-mode='dark'][data-theme='pochacco'],
+[data-mode='dark'] [data-theme='pochacco'] {
+  --accent: oklch(82% 0.13 62);   --accent-soft: oklch(40% 0.07 62);
+}
+:root[data-mode='dark'][data-theme='hangyodon'],
+[data-mode='dark'] [data-theme='hangyodon'] {
+  --accent: oklch(82% 0.10 350);  --accent-soft: oklch(40% 0.06 350);
+}
+:root[data-mode='dark'][data-theme='plain'],
+[data-mode='dark'] [data-theme='plain'] {
+  --accent: oklch(76% 0.09 250);  --accent-soft: oklch(40% 0.05 250);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────

@@ -36,6 +36,36 @@
  *      contradicted having just removed one from the heart for reading as eyes
  *      and a nose.
  *
+ * ── What the four best ones were doing that the other ten were not
+ *
+ * The bow, the hood, the jester cap and the lily pad were picked out as the
+ * only good ones in the set, so the rest of it was rebuilt to whatever those
+ * four had. Reading them back, it was four things, and three more rules fell
+ * out of trying to give them to everything else:
+ *
+ *   5. **A second colour, on a form that belongs to the motif** — the knot in
+ *      the bow, the hood's ear bows, the cap's brim and bells, the bloom on
+ *      the pad. Every one of those sits at an **edge or a junction**, never as
+ *      an island inside the primary form: an accent shape fully surrounded by
+ *      the fill reads as a hole punched through it, every time.
+ *   6. **Shading only on the one big form.** `lit()` and `shade()` need a form
+ *      wide enough for the boundary to run off both ends of it. On anything
+ *      small the curve closes inside the shape and the plane becomes a lens
+ *      floating in the middle — the same hole again. All four leave their
+ *      bells, bows and droplets flat, and so does everything else now.
+ *   7. **White is for real features, not for glints.** `--card` is a hair off
+ *      the page colour, so a white sliver laid on a mid-tone form reads as a
+ *      chip out of it. Where the four use white it is a whole area that is
+ *      meant to be white — the hood's face opening, the bloom's centre, the
+ *      droplets — and that is the only way it is used now.
+ *
+ * A fourth thing was not the drawings at all. Two themes had `--primary`
+ * pushed below `--line`, which inverts every outlined shape into a pale border
+ * round a dark fill; and in dark mode twelve of the fourteen were losing their
+ * hand-tuned `--accent` to a specificity clash. Both are fixed in themes.css,
+ * and between them they were doing more damage to this set than any of the
+ * geometry was.
+ *
  * The geometry contract from the earlier pass still holds and is still measured
  * by test/mascots.mjs: one optical box, centred, comparable visual weight, and
  * shading planes that stay inside the form they shade.
@@ -215,15 +245,26 @@ export const EMBLEMS = {
     ${shaded('M50 25 C45 22 46 16 51 15 C56 15 58 21 55 24 Z', A, '', SW_MID)}
     ${shaded('M68 30 C64 27 65 22 69 21 C73 21 75 26 72 29 Z', A, '', SW_MID)}`),
 
-  /* Cloud — one body, a curl that leaves its edge, and two puffs drifting off. */
+  /* Cloud with the sun behind it — rays, a puff drifting off, rain starting.
+
+     The cloud on its own was one blue lump: no second colour anywhere, nothing
+     inside the silhouette, and two small puffs that read as smudges. The sun
+     is what the accent hue is for, and putting it *behind* means the cloud's
+     own outline does the occluding — no seam to get wrong. */
   cinnamoroll: ink(`
-    ${shaded('M31 72 C20 72 14 62 20 53 C16 45 24 37 33 40 C35 30 47 26 54 32 '
-             + 'C60 25 71 27 73 37 C82 38 85 48 79 55 C82 64 74 72 65 72 Z', P,
-             lit(38) + shade(68))}
-    ${shaded('M20 27 C17 24 19 19 23 20 C25 16 31 17 32 21 C36 21 37 26 34 28 '
-             + 'C29 30 24 30 20 27 Z', P, '', SW_MID)}
-    ${shaded('M74 82 C71 80 72 76 75 76 C77 73 81 74 81 77 C84 77 85 81 82 82 '
-             + 'C79 84 76 84 74 82 Z', P, '', SW_FINE)}`),
+    <path d="M72 16 V20 M85 27 H81 M83 18 L80 21 M84 36 L81 34"
+          stroke="${A}" stroke-width="${SW_MID}"/>
+    ${shaded('M72 17 C78 17 82 22 82 27 C82 33 78 37 72 37 C66 37 62 33 62 27 '
+             + 'C62 22 66 17 72 17 Z', A, '', SW_MID)}
+    ${shaded('M31 74 C20 74 14 64 20 55 C16 47 24 39 33 42 C35 32 47 28 54 34 '
+             + 'C60 27 71 29 73 39 C82 40 85 50 79 57 C82 66 74 74 65 74 Z', P,
+             lit(38))}
+    ${shaded('M20 29 C17 26 19 21 23 22 C25 18 31 19 32 23 C36 23 37 28 34 30 '
+             + 'C29 32 24 32 20 29 Z', P, '', SW_MID)}
+    <path d="M38 80 C37 83 39 85 41 84 C43 83 42 80 40 78 Z" fill="${A}"
+          stroke-width="${SW_FINE}"/>
+    <path d="M56 82 C55 85 57 87 59 86 C61 85 60 82 58 80 Z" fill="${A}"
+          stroke-width="${SW_FINE}"/>`),
 
   /* Lily pad — wavy rim, veins, a bloom at the edge, droplets on the leaf. */
   keroppi: ink(`
@@ -240,105 +281,172 @@ export const EMBLEMS = {
     ${shaded('M38 60 C40 57 43 61 42 64 C40 67 36 65 37 62 Z', W, '', SW_FINE)}
     ${shaded('M58 66 C60 64 62 67 61 69 C59 71 56 69 57 67 Z', W, '', SW_FINE)}`),
 
-  /* Fried egg — a white that spreads unevenly, the yolk sitting proud of it. */
-  gudetama: ink(`
-    ${shaded('M25 73 C15 72 10 62 17 55 C13 47 21 41 28 45 C27 34 39 29 46 36 '
-             + 'C50 29 60 28 65 34 C73 31 82 37 80 46 C89 49 90 60 82 65 '
-             + 'C84 72 76 76 68 73 Z', W)}
-    ${shaded('M46 43 C57 41 66 49 65 59 C64 69 53 74 45 69 C36 63 36 47 46 43 Z', P,
-             lit(50), SW_MID)}
-    ${spark(80, 31, 4.5)}
-    ${spark(20, 38, 3.5)}`),
+  /* Fried egg on a plate — a white that spreads unevenly, the yolk proud of it.
 
-  /* A little constellation — three stars and two sparkles. */
+     The egg alone had no second colour anywhere: a white shape, a yellow yolk,
+     and two sparkles. The plate is drawn first so the egg's own outline hides
+     where the two meet, and it is the one place the accent can go without
+     turning something edible a colour food is not. */
+  gudetama: ink(`
+    ${shaded('M16 67 C16 77 32 85 50 85 C68 85 84 77 84 67 C84 62 74 59 50 59 '
+             + 'C26 59 16 62 16 67 Z', A, '', SW_MID)}
+    ${shaded('M25 71 C15 70 10 60 17 53 C13 45 21 39 28 43 C27 32 39 27 46 34 '
+             + 'C50 27 60 26 65 32 C73 29 82 35 80 44 C89 47 90 58 82 63 '
+             + 'C84 70 76 74 68 71 Z', W)}
+    ${shaded('M46 41 C57 39 66 47 65 57 C64 67 53 72 45 67 C36 61 36 45 46 41 Z', P,
+             lit(50), SW_MID)}
+    ${spark(80, 27, 4.5)}
+    ${spark(20, 34, 3.5)}`),
+
+  /* A little constellation — three stars and two sparkles.
+
+     The big star carried a `shade()` and no `lit()`, so the whole left side of
+     the drawing sat in shadow with nothing lit to be in shadow *of*, and the
+     emblem read muddy at every size. Both faces fixes it.
+
+     A crescent moon was tried here and could not be made to work: one thin
+     enough to read as a moon is thinner than the outline it needs, so the ink
+     eats the fill and what is left is a gold almond. */
   twinstars: ink(`
     ${shaded('M44 26 Q48 38 51 44.3 Q61 43 70.6 45.4 Q62 52 55.4 57.7 '
              + 'Q58 68 60.5 76.6 Q52 70 44 66 Q36 70 27.6 76.6 Q30 68 32.6 57.7 '
              + 'Q26 52 17.4 45.4 Q27 43 34.9 44.3 Q40 38 44 26 Z', P,
-             shade(44))}
+             lit(38) + shade(52))}
     ${shaded('M72 17 Q74 24 76.6 26 Q81 25 84.4 26 Q80 30 79.6 33.5 '
              + 'Q80 38 79 40.5 Q75 37 72 36 Q69 37 64.4 40.5 Q65 36 64.4 33.5 '
              + 'Q61 30 59.6 26 Q64 25 67.4 26 Q70 24 72 17 Z', A, '', SW_MID)}
-    ${shaded('M76 62 Q77 67 81 68.5 Q77 70 76 75 Q75 70 71 68.5 Q75 67 76 62 Z', P,
+    ${shaded('M76 60 Q78 67 83 69 Q78 71 76 77 Q74 71 69 69 Q74 67 76 60 Z', A,
              '', SW_MID)}
     ${spark(24, 24, 5, P)}
     ${spark(58, 84, 3.5)}`),
 
-  /* Lightning bolt — bent edges, a lit face down its leading edge, a burst. */
+  /* Lightning bolt — bent edges, a lit face down its leading edge, a burst.
+
+     The burst was four ticks at four unrelated angles and lengths, which read
+     as scratches on the artwork rather than as light coming off it. Six rays
+     of matching length, aimed out from the bolt's own centre, are a burst. */
   badtzmaru: ink(`
-    <path d="M27 27 C30 30 33 33 35 36 M75 26 C72 29 69 32 67 35
-             M22 55 C26 55 30 55 33 55 M80 58 C76 57 72 56 69 56"
+    <path d="M31 24 L36 30 M69 22 L64 28 M21 47 L28 48
+             M79 52 L72 53 M29 72 L34 68 M74 76 L68 71"
           stroke-width="${SW_FINE}"/>
     ${shaded('M63 15 C53 29 41 43 28 55 C34 57 41 57 47 56 C45 66 43 76 42 85 '
              + 'C53 71 65 57 75 44 C69 46 62 46 56 45 C59 35 61 25 63 15 Z', A,
-             lit(46, HI_A) + shade(56, LO_A))}`),
+             lit(46, HI_A) + shade(56, LO_A))}
+    ${spark(24, 33, 4.5, P)}
+    ${spark(77, 66, 3.5, P)}`),
 
-  /* Paw print — four toes, none the same size, each catching the light. */
+  /* Paw print — the pad in one colour, the four toes in the other.
+
+     This was the emptiest drawing in the set: five brown blobs in one colour,
+     nothing inside any of them, and a shadow across the main pad that landed
+     as a hard vertical edge, because a single `lit()` boundary through a wide
+     low form is very nearly a straight line. Slivers down both sides leave the
+     form's own colour through the middle, which is what the good ones do.
+
+     The accent went inside the pad first and read as a hole punched through
+     it — which turns out to be the rule the four best emblems were already
+     following: the cap's brim, the hood's bows, the pad's bloom and the bow's
+     knot all sit at an *edge* or a junction, never as an island surrounded by
+     the primary form.
+
+     The second attempt put it on the toes, and those are too small to hold a
+     fill at silhouette weight: six units of outline on a seventeen-unit form
+     leaves a ring with a dot in it, which is the same hole by another route.
+
+     The third put a band along the bottom of the pad, where kuromi's brim
+     goes, and it read as an open mouth — two toes above it immediately became
+     eyes. That is the real constraint here and it rules out the whole family:
+     a paw is four small forms above one large one, which is a face waiting to
+     happen, and *any* mark low on the pad completes it. So the second colour
+     leaves the paw entirely and becomes a thing beside it, the way keroppi's
+     bloom sits beside the lily pad. */
   chococat: ink(`
     ${shaded('M50 85 C38 85 28 77 29 67 C30 57 40 51 52 51 C64 51 73 58 73 68 '
              + 'C73 78 62 85 50 85 Z', P,
-             lit(48))}
+             lit(38) + shade(64))}
     ${shaded('M24 51 C18 48 17 39 22 35 C27 32 33 36 34 43 C35 49 30 54 24 51 Z', P)}
-    ${shaded('M42 38 C36 34 36 24 42 21 C48 19 53 24 52 31 C52 37 47 41 42 38 Z', P,
-             lit(44))}
-    ${shaded('M61 39 C56 35 57 26 63 24 C69 22 73 28 71 34 C70 40 65 43 61 39 Z', P,
-             lit(63))}
-    ${shaded('M79 53 C74 51 72 43 76 39 C81 36 87 40 87 46 C87 52 83 55 79 53 Z', P,
-             lit(80))}`),
+    ${shaded('M42 38 C36 34 36 24 42 21 C48 19 53 24 52 31 C52 37 47 41 42 38 Z', P)}
+    ${shaded('M61 39 C56 35 57 26 63 24 C69 22 73 28 71 34 C70 40 65 43 61 39 Z', P)}
+    ${shaded('M79 53 C74 51 72 43 76 39 C81 36 87 40 87 46 C87 52 83 55 79 53 Z', P)}
+    ${shaded('M25 31 C21 27 17 24 18 21 C19 18 23 18 25 21 C27 17 31 17 32 20 '
+             + 'C33 24 29 27 25 31 Z', A, '', SW_FINE)}
+    ${spark(80, 68, 4)}`),
 
-  /* Beret — a slouched crown, a band in front of it, a stalk behind. */
+  /* Beret — a slouched crown, a band in front of it, a stalk behind.
+
+     The crown is yellow in its own theme, and `--emb-lo` on a yellow turns
+     olive: the shaded half read as dirt rather than as shadow. A narrower
+     shadow and a proper highlight down the lit side fixes it without touching
+     the token, which every other emblem depends on. */
   pompompurin: ink(`
     ${shaded('M48 33 C45 29 47 22 51 22 C56 22 58 29 55 33 Z', A, '', SW_MID)}
     ${shaded('M21 55 C21 41 35 33 51 33 C68 33 81 42 80 55 C79 65 66 71 50 71 '
              + 'C33 71 22 65 21 55 Z', P,
-             lit(38) + shade(66))}
+             lit(40) + shade(70))}
     <path d="M34 45 C43 40 58 40 67 45" stroke-width="${SW_FINE}"/>
     ${shaded('M28 64 C42 72 58 72 72 64 C75 70 73 77 66 79 C55 83 40 82 32 78 '
              + 'C26 75 25 69 28 64 Z', A)}
     <path d="M37 74 C45 77 56 77 64 74" stroke-width="${SW_FINE}"/>`),
 
-  /* Microphone — grille, stand, base, and two shards of noise. */
+  /* Microphone — grille, stand, base, and the sound coming off it.
+
+     The noise was four unmatched ticks that read as scratches. Sound leaving a
+     microphone is arcs, and drawing them as arcs at two radii says "loud"
+     where four straight strokes said "somebody scribbled on this". */
   aggretsuko: ink(`
-    <path d="M22 24 C26 28 29 31 32 34 M79 23 C75 27 72 30 69 33
-             M17 45 C21 45 25 45 28 45 M84 47 C80 47 76 47 73 47"
-          stroke-width="${SW_FINE}"/>
+    <path d="M30 26 C25 32 24 41 27 48 M22 22 C16 30 15 42 19 53
+             M70 24 C75 30 77 40 74 47 M79 21 C85 29 86 41 82 50"
+          stroke="${A}" stroke-width="${SW_FINE}"/>
     <path d="M51 57 C51 63 51 68 51 72" stroke-width="${SW_MID}"/>
     ${shaded('M35 72 C44 69 57 69 66 72 C68 77 66 82 60 83 C51 85 42 84 37 81 '
              + 'C34 79 33 75 35 72 Z', A)}
     ${shaded('M41 19 C49 14 58 17 61 25 C64 34 62 45 58 53 C54 59 46 59 43 53 '
              + 'C38 45 36 28 41 19 Z', P,
-             lit(47))}
+             lit(44) + shade(58))}
     <path d="M43 27 C49 25 55 25 60 27 M43 35 C49 33 55 33 60 35
              M44 43 C49 41 55 41 59 43" stroke-width="${SW_FINE}"/>`),
 
-  /* Football — a hand-drawn ball, a centre panel, and the panels its seams
-     run to, none of them quite regular. */
+  /* Football — a hand-drawn ball, a centre panel, and two more panels the
+     seams run to, none of them quite regular.
+
+     It used to be white with blue seams and one blue panel, which made it the
+     only emblem in the set with no second colour in it at all — and four stray
+     fine arcs near the rim that read as scuffs rather than as seams. Two more
+     filled panels is what a ball actually looks like and what gives the accent
+     somewhere to live. */
   pochacco: ink(`
     ${shaded('M50 19 C68 19 81 33 81 50 C81 68 67 81 50 81 C32 81 19 67 19 50 '
              + 'C19 32 33 19 50 19 Z', W)}
+    ${shaded('M53 34 C53 30 53 27 54 24 C60 23 66 26 70 31 C73 35 75 38 76 41 '
+             + 'C72 43 68 45 65 46 C62 42 58 38 53 34 Z', A, '', SW_MID)}
+    ${shaded('M37 50 C33 48 29 46 26 44 C22 50 21 57 22 62 C26 66 31 68 36 69 '
+             + 'C36 62 36 56 37 50 Z', A, '', SW_MID)}
     <path d="M50 36 C50 28 50 23 50 20 M63 46 C70 43 75 41 78 39
              M58 61 C61 68 64 73 66 76 M42 61 C39 68 36 73 34 76
              M37 46 C30 44 25 42 22 40" stroke-width="${SW_MID}"/>
     ${shaded('M50 36 C56 38 61 42 63 47 C60 53 56 58 50 60 C44 58 39 53 37 47 '
              + 'C40 41 44 38 50 36 Z', P,
-             lit(50), SW_MID)}
-    <path d="M45 22 C51 21 57 22 61 25 M76 44 C78 50 78 56 76 61
-             M58 78 C52 80 46 80 41 78 M23 60 C21 54 21 48 23 43"
-          stroke-width="${SW_FINE}"/>`),
+             lit(50), SW_MID)}`),
 
-  /* Dorsal fin — a lit leading edge, a ridge, bubbles rising past it. */
+  /* Dorsal fin — a lit leading edge, a ridge, bubbles rising past it.
+
+     The bubbles were hollow outlines, which put the only accent in the drawing
+     at a fraction of the weight of everything around it — four thin rings
+     beside a solid fin. Filled, with a glint in the two biggest, they read as
+     water rather than as leftover construction lines. */
   hangyodon: ink(`
     ${shaded('M29 75 C33 47 47 25 66 15 C61 39 65 58 81 73 C64 78 45 78 29 75 Z', P,
-             lit(46))}
-    <path d="M63 24 C60 43 63 59 70 70" stroke-width="${SW_FINE}"/>
-    <path d="M27 33 C31 30 36 33 35 38 C34 43 28 44 25 40 C23 37 24 34 27 33 Z"
-          fill="none" stroke="${A}" stroke-width="${SW_MID}"/>
-    <path d="M18 53 C21 51 25 53 24 57 C23 60 19 61 17 58 C16 56 16 54 18 53 Z"
-          fill="none" stroke="${A}" stroke-width="${SW_MID}"/>
-    <path d="M26 64 C28 63 31 64 30 67 C29 69 26 69 25 67 Z"
-          fill="none" stroke="${A}" stroke-width="${SW_FINE}"/>
-    <path d="M34 22 C36 21 38 22 38 24 C37 26 34 26 33 24 Z"
-          fill="none" stroke="${A}" stroke-width="${SW_FINE}"/>`),
+             lit(46) + shade(66))}
+    <path d="M63 24 C60 43 63 59 70 70 M52 40 C50 52 51 62 54 71"
+          stroke-width="${SW_FINE}"/>
+    ${shaded('M27 33 C31 30 36 33 35 38 C34 43 28 44 25 40 C23 37 24 34 27 33 Z', A,
+             '', SW_MID)}
+    ${shaded('M29 35 C31 33 33 34 33 36 C32 38 29 37 29 35 Z', W, '', SW_FINE)}
+    ${shaded('M18 53 C21 51 25 53 24 57 C23 60 19 61 17 58 C16 56 16 54 18 53 Z', A,
+             '', SW_MID)}
+    ${shaded('M20 55 C21 54 23 54 23 56 C22 57 20 56 20 55 Z', W, '', SW_FINE)}
+    ${shaded('M26 64 C28 63 31 64 30 67 C29 69 26 69 25 67 Z', A, '', SW_FINE)}
+    ${shaded('M34 22 C36 21 38 22 38 24 C37 26 34 26 33 24 Z', A, '', SW_FINE)}`),
 
   /* Deliberately plain: a ring. */
   plain: ink(`
