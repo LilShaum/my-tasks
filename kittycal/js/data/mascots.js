@@ -387,16 +387,24 @@ export const EMBLEMS = {
 
      Pompompurin means pudding. A crème caramel is two colours by nature, it
      has real structure to draw instead of one plain dome, and the caramel
-     running down the side is the interior detail the beret never had. */
+     running down the side is the interior detail the beret never had.
+
+     Three things make it read as one rather than as a lampshade, and the first
+     attempt had none of them. The top is an ellipse, not a straight edge — you
+     are looking slightly down at it, so its back arc shows above the front and
+     the caramel sits *in* that dish before it spills over the near edge. The
+     drips are rounded and four different lengths; even, pointed ones read as a
+     zigzag border. And the pool is drawn first and wider than the base, so the
+     pudding sits in it instead of wearing it as a band. */
   pompompurin: ink(`
-    ${shaded('M37 29 C44 26 56 26 63 29 C68 42 72 57 75 71 C63 76 37 76 25 71 '
-             + 'C28 57 32 42 37 29 Z', P,
+    ${shaded('M23 71 C36 77 64 77 77 71 C81 73 82 79 77 81 C62 85 38 85 23 81 '
+             + 'C18 79 19 73 23 71 Z', A, '', SW_MID)}
+    ${shaded('M38 30 C41 34 59 34 62 30 C66 34 69 44 72 54 C74 62 76 68 77 72 '
+             + 'C64 77 36 77 23 72 C24 68 26 62 28 54 C31 44 34 34 38 30 Z', P,
              lit(38) + shade(66))}
-    ${shaded('M37 29 C44 26 56 26 63 29 C64 36 65 43 65 48 C62 52 59 49 57 45 '
-             + 'C55 51 51 53 48 48 C46 53 42 54 39 49 C37 44 36 36 37 29 Z', A,
-             '', SW_MID)}
-    ${shaded('M25 70 C37 76 63 76 75 70 C79 74 77 80 72 81 C60 84 40 84 28 81 '
-             + 'C23 80 21 74 25 70 Z', A, '', SW_MID)}
+    ${shaded('M38 30 C40 26 60 26 62 30 C65 34 67 40 67 46 C64 50 62 46 60 41 '
+             + 'C58 48 54 49 52 43 C50 50 46 50 44 44 C42 49 38 48 36 42 '
+             + 'C33 39 34 34 38 30 Z', A, '', SW_MID)}
     ${spark(79, 24, 4.5)}`),
 
   /* Microphone — grille, stand, base, and the sound coming off it.

@@ -72,10 +72,20 @@
   --on-primary:  oklch(97% 0.01 55);
   --line:        oklch(40% 0.06 55);
 }
+/* Hue 101 is where this theme's surfaces and patterns live, and it is the
+   right pale wash for them. It is the wrong yellow for anything solid: in
+   OKLCH 101 is already leaning green, so a filled shape came out olive and the
+   outline derived from the same hue came out olive too — a theme whose own
+   blurb says "custard yellow" reading as army surplus. Primary and line are
+   pulled to a warm custard and a warm brown, which is what the name promised
+   and what makes the emblem look like food rather than like camouflage. */
 [data-theme='pompompurin'] { --h: 101; --c: 0.105;
-  --accent:      oklch(52% 0.09 62);
+  /* Caramel, and it has to clear the outline: at L52 against a L46 line the
+     two read as one brown mass and the drips vanished into the silhouette. */
+  --accent:      oklch(61% 0.105 58);
   --accent-soft: oklch(88% 0.05 62);
-  --primary:     oklch(80% 0.115 101);
+  --primary:     oklch(83% 0.135 92);
+  --line:        oklch(46% 0.075 78);
   --ink:         oklch(31% 0.055 80);
 }
 [data-theme='aggretsuko']  { --h: 38;  --c: 0.135;
@@ -160,6 +170,9 @@
 :root[data-mode='dark'][data-theme='pompompurin'],
 [data-mode='dark'] [data-theme='pompompurin'] {
   --accent: oklch(80% 0.11 62);   --accent-soft: oklch(40% 0.06 62);
+  /* Same reason as light: the derived dark primary is hue 101 and comes out
+     olive, so it is pulled to the same warm custard. */
+  --primary: oklch(84% 0.125 92); --line: oklch(64% 0.09 86);
 }
 :root[data-mode='dark'][data-theme='aggretsuko'],
 [data-mode='dark'] [data-theme='aggretsuko'] {
