@@ -12,7 +12,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { confirmedOvulations, measuredLuteal, detectThermalShift } from '../js/domain/ovulation.js';
+import {
+  confirmedOvulations, measuredLuteal, detectThermalShift, cycleSignals,
+} from '../js/domain/ovulation.js';
 import { buildCycles } from '../js/domain/cycles.js';
 import { emptyLog } from '../js/domain/model.js';
 import { addDays } from '../js/utils/date.js';
@@ -157,4 +159,49 @@ test('a one-day spike is not a shift', () => {
     date: addDays('2026-01-01', i), bbt: i === 8 ? 36.9 : 36.4,
   }));
   assert.equal(detectThermalShift(readings), null, 'it has to hold for three days');
+});
+
+/* ── The running cycle, for trying to conceive ───────────────────────────── */
+
+test('cycleSignals dates ovulation from a peak test in the cycle she is in', () => {
+  const cycles = buildCycles(['2026-03-01', '2026-03-02', '2026-03-03']);
+  const logs = {
+    '2026-03-14': { ...emptyLog('2026-03-14'), testOvulation: 'peak' },
+  };
+  const signals = cycleSignals(logs, cycles[cycles.length - 1], '2026-03-20');
+  assert.equal(signals?.peakTest, '2026-03-14');
+  assert.equal(signals?.source, 'test');
+  assert.ok(signals?.confirmed, 'a date is produced without waiting for the cycle to end');
+  assert.equal(signals?.corroborated, false, 'one signal is not corroboration');
+});
+
+test('cycleSignals says so when the test and the temperature agree', () => {
+  const cycles = buildCycles(['2026-03-01', '2026-03-02', '2026-03-03']);
+  /** @type {Record<string, any>} */
+  const logs = { '2026-03-14': { ...emptyLog('2026-03-14'), testOvulation: 'peak' } };
+
+  // Six low readings, then three sustained high ones from the 15th.
+  const temps = [36.3, 36.3, 36.35, 36.3, 36.25, 36.3, 36.6, 36.65, 36.6];
+  temps.forEach((bbt, i) => {
+    const date = `2026-03-${String(9 + i).padStart(2, '0')}`;
+    logs[date] = { ...(logs[date] ?? emptyLog(date)), bbt };
+  });
+
+  const signals = cycleSignals(logs, cycles[cycles.length - 1], '2026-03-20');
+  assert.ok(signals?.shift, 'a shift is found');
+  assert.equal(signals?.corroborated, true, 'both land within two days');
+});
+
+test('cycleSignals reports egg-white without letting it date anything', () => {
+  const cycles = buildCycles(['2026-03-01', '2026-03-02']);
+  const logs = {
+    '2026-03-12': { ...emptyLog('2026-03-12'), discharge: ['egg-white'] },
+  };
+  const signals = cycleSignals(logs, cycles[cycles.length - 1], '2026-03-20');
+  assert.equal(signals?.eggWhite, '2026-03-12');
+  assert.equal(signals?.confirmed, null, 'mucus marks the stretch, not the event');
+});
+
+test('cycleSignals is null without a cycle to be in', () => {
+  assert.equal(cycleSignals({}, null, '2026-03-20'), null);
 });

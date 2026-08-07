@@ -335,6 +335,30 @@ function cycleRows(settings) {
 
   return el('div', {}, [
     el('div', { class: 'rows' }, [
+      /*
+        What she is here for.
+
+        Two values, not three. A pregnancy mode is a second application rather
+        than a setting, and the union used to promise one that nothing
+        implemented — see the note in model.js.
+
+        Hidden on a hormonal method, where the fertility output it reorders is
+        hidden anyway and the choice would be offering something the app has
+        already, correctly, refused to show.
+      */
+      !onHormonal && selectRow({
+        label: 'Using Kittycal for',
+        value: settings.mode,
+        options: [
+          { value: 'cycle', label: 'Tracking my cycle' },
+          { value: 'conceive', label: 'Trying to conceive' },
+        ],
+        onChange: (value) => {
+          store.updateSettings({ mode: /** @type {'cycle'|'conceive'} */ (value) });
+          const host = document.getElementById('view-settings');
+          if (host) renderSettings(host);
+        },
+      }),
       numberRow({
         label: 'Typical cycle length',
         value: settings.avgCycleLength,

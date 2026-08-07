@@ -42,7 +42,15 @@
 
 /**
  * @typedef {Object} Settings
- * @property {'cycle'|'conceive'|'pregnancy'} mode
+ * @property {'cycle'|'conceive'} mode
+ *
+ *   `pregnancy` used to be the third member of this union. It was declared
+ *   here, defaulted below, normalised on every read and written into every
+ *   export, and read by nothing — and a pregnancy mode is a second
+ *   application, not a setting: week-by-week gestation, a different symptom
+ *   set, different alarms. Promising it in the data model and never building
+ *   it was the one option that could not be defended, so the promise is gone
+ *   rather than the feature half-built.
  * @property {string} theme
  * @property {'light'|'dark'|'auto'} colorMode
  * @property {number} avgCycleLength   user's stated prior, in days
@@ -340,6 +348,17 @@ export function normalizeSettings(raw) {
     && year > 1900 && year <= new Date().getFullYear()
     ? Math.round(year)
     : null;
+
+  /*
+    The mode has to be one of the two that exist.
+
+    The loop above accepts any string, so an export written while `pregnancy`
+    was still in the union — or a hand-edited file — would put the app into a
+    mode nothing implements, and every `mode === 'cycle'` branch would silently
+    take the wrong side. Anything unrecognised falls back to plain cycle
+    tracking, which is the mode that works for everybody.
+  */
+  if (out.mode !== 'cycle' && out.mode !== 'conceive') out.mode = 'cycle';
 
   // Clamp the numeric priors into physiologically sane ranges so a corrupted
   // or hand-edited value can't produce nonsense predictions.

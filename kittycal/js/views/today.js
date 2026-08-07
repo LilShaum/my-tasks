@@ -37,6 +37,7 @@ import { predict, conceptionChance } from '../domain/predict.js';
 import { phaseFor } from '../domain/phases.js';
 import { evaluate } from '../domain/acog.js';
 import { packPosition, describePack, unmarkedDays } from '../domain/pill.js';
+import { cycleSignals } from '../domain/ovulation.js';
 import { cycleRing } from '../ui/ring.js';
 import { spotArt } from '../ui/mascot.js';
 import * as store from '../state/store.js';
@@ -123,12 +124,35 @@ export function renderToday(host) {
     */
     showRecap ? recapCard(/** @type {NonNullable<typeof recap>} */ (recap)) : null,
 
+    /*
+      Trying to conceive reorders this stack rather than replacing it.
+
+      The two cards are the same two cards; what changes is which one is
+      answering her question. In plain cycle tracking the first thing she wants
+      is when the next period is. Trying to conceive, it is the fertile window
+      and whether ovulation has happened yet — and burying that under a period
+      countdown makes her scroll past the answer every single day. That is the
+      whole of the mode: no separate screen, no second app, no daily question
+      the other mode does not ask.
+    */
     el('div', { class: 'section stagger' }, [
-      prediction.stale ? staleCard(prediction)
-        : prediction.isLate ? lateCard(prediction)
-          : prediction.withinWindow ? dueCard(prediction)
-            : nextPeriodCard(prediction),
-      prediction.showFertility && prediction.ovulation ? fertileCard(prediction, today) : null,
+      ...(settings.mode === 'conceive' && prediction.showFertility
+        ? [
+            prediction.ovulation ? fertileCard(prediction, today) : null,
+            ovulationSignalCard(logs, cycles, today),
+            prediction.stale ? staleCard(prediction)
+              : prediction.isLate ? lateCard(prediction)
+                : prediction.withinWindow ? dueCard(prediction)
+                  : nextPeriodCard(prediction),
+          ]
+        : [
+            prediction.stale ? staleCard(prediction)
+              : prediction.isLate ? lateCard(prediction)
+                : prediction.withinWindow ? dueCard(prediction)
+                  : nextPeriodCard(prediction),
+            prediction.showFertility && prediction.ovulation
+              ? fertileCard(prediction, today) : null,
+          ]),
       packCard(settings, logs, today),
       ...acogCards(cycles, today, prediction, logs),
     ]),
@@ -1005,6 +1029,83 @@ function fertileCard(prediction, today) {
  * @param {import('../domain/predict.js').Prediction} prediction
  * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
  */
+/**
+ * What her own observations say about ovulation this cycle — the double check.
+ *
+ * Only in conceive mode, because it is the one question that mode exists to
+ * answer and it is noise in the other. Every fertile window elsewhere in the
+ * app is arithmetic: next period minus luteal length. This card is the
+ * opposite — nothing here is predicted, all of it is something she recorded.
+ *
+ * It reports both signals rather than just the winner. A peak test says the
+ * surge happened; a thermal shift says the progesterone rise did. Either alone
+ * is weaker than both agreeing, which is why sympto-thermal methods use two,
+ * and when they disagree the honest output is to show both rather than quietly
+ * pick one and present it as settled.
+ *
+ * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
+ * @param {import('../domain/cycles.js').Cycle[]} cycles
+ * @param {DateKey} today
+ */
+function ovulationSignalCard(logs, cycles, today) {
+  const signals = cycleSignals(logs, cycles[cycles.length - 1] ?? null, today);
+  if (!signals) return null;
+
+  const { confirmed, source, peakTest, shift, eggWhite, corroborated } = signals;
+
+  // Nothing recorded yet this cycle. Say what would answer it rather than
+  // showing an empty card.
+  if (!confirmed && !eggWhite) {
+    return el('div', { class: 'card data-zone' }, [
+      el('h3', { text: 'Has ovulation happened?' }),
+      el('p', { class: 'hint-sm', text:
+        'Nothing recorded this cycle that can date it yet. A positive ovulation ' +
+        'test, or a temperature taken each morning, is what turns the estimate ' +
+        'above into an observation.' }),
+    ]);
+  }
+
+  return el('div', { class: 'card data-zone' }, [
+    el('h3', { text: 'Has ovulation happened?' }),
+    el('p', { class: 'big-value num', text: confirmed
+      ? `Around ${fmtDayMonth(confirmed)}`
+      : 'Not yet dated' }),
+
+    /*
+      Four states, not two.
+
+      The card originally had a branch for each signal on its own and one for
+      the two agreeing, which read correctly right up until both were present
+      and disagreed — it then said "a temperature taken each morning would
+      corroborate it" directly above a temperature rise it had just listed.
+      Suggesting she do the thing she has already done, while quietly ignoring
+      that it points somewhere else, is the failure this card exists to avoid.
+    */
+    confirmed && el('p', { class: 'hint-sm', text: corroborated
+      ? 'Your test and your temperature both point at that day, within two days ' +
+        'of each other. That is the strongest this can get from your own data.'
+      : (peakTest && shift)
+        ? 'Your test and your temperature point at days more than two apart, so ' +
+          'this is the test’s answer — it observes the surge directly, where a ' +
+          'temperature rise is an inference. Both are listed below.'
+        : source === 'test'
+          ? 'From a positive ovulation test. A temperature taken each morning ' +
+            'would corroborate it.'
+          : 'From a sustained temperature rise. A bad night’s sleep or a fever ' +
+            'can produce one, so an ovulation test would corroborate it.' }),
+
+    el('ul', { class: 'flag-list' }, [
+      peakTest && el('li', { text: `Peak test on ${fmtDayMonth(peakTest)}` }),
+      shift && el('li', { text: `Temperature rise from ${fmtDayMonth(shift)}` }),
+      // Mucus is shown and never used to date anything: it marks the fertile
+      // stretch approaching ovulation, not the event.
+      eggWhite && el('li', { text:
+        `Egg-white discharge on ${fmtDayMonth(eggWhite)} — the fertile stretch, ` +
+        'not the day itself' }),
+    ].filter(Boolean)),
+  ]);
+}
+
 /**
  * Where she is in the pack, and which days have nothing on them.
  *

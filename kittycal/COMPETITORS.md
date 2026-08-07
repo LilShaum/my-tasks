@@ -4,9 +4,9 @@ A competitive audit. `AUDIT.md` asks whether the app does what it says correctly
 this asks whether what it says is the right list, measured against the apps
 people actually use.
 
-**Status.** Eight gaps, five closed. G2 — the Next period headline — was fixed in
-[#58](https://github.com/LilShaum/my-tasks/commit/5e9fa79). G1, G3, G4 and G5 are fixed on
-this branch. Closed entries are kept as the record. The other three are open and
+**Status.** Eight gaps, six closed. G2 — the Next period headline — was fixed in
+[#58](https://github.com/LilShaum/my-tasks/commit/5e9fa79). G1, G3, G4, G5 and G6 are
+fixed on this branch. Closed entries are kept as the record. The other two are open and
 verified open against this commit; the line references have been re-resolved,
 not assumed.
 
@@ -260,29 +260,44 @@ And the reminder limitation is stated where it bites rather than only in
 general: a contraception reminder that fires when you next open the app is not
 a contraception reminder, and the settings note says that in those words.
 
-### G6 — Two modes are declared in the data model and neither exists · S4
+### G6 — Two modes were declared in the data model and neither existed · S4 · **CLOSED**
 
-`mode: 'cycle'|'conceive'|'pregnancy'` is defined at `model.js:45`, defaulted at
-`model.js:96`, normalised on every settings read, and written into every backup
-file. It is read by nothing. A grep across `js/` returns the declaration and the
-default and no consumer.
+`mode: 'cycle'|'conceive'|'pregnancy'` was defined at `model.js:45`, defaulted,
+normalised on every settings read, written into every backup file, and read by
+nothing. A grep across `js/` returned the declaration, the default, and no
+consumer.
 
-Trying-to-conceive is the largest feature axis in the market — Flo, Ovia, Glow
-and Premom all organise around it — and Kittycal is closer to it than the empty
-field suggests. It already logs ovulation tests (`taxonomy.js:217`), charts BBT
-with thermal-shift detection, records egg-white discharge and unprotected sex,
-and bands conception chance into tiers rather than fake percentages
-(`predict.js:522`). What's missing is arrangement, not data: a mode that puts
-the fertile-window countdown and today's tier at the top, surfaces the LH-test
-row daily during the window, and applies a sympto-thermal double check — a
-temperature shift *confirmed by* mucus, the way Drip does — instead of calendar
-arithmetic alone.
+**`pregnancy` is gone rather than half-built.** It is a second application —
+week-by-week gestation, a different symptom set, different alarms — and
+promising it in a data model that ships in every export was the one option that
+could not be defended. `normalizeSettings` now also rejects any unrecognised
+mode, because exports written while it was still in the union exist and would
+otherwise put the app into a mode nothing implements.
 
-Pregnancy mode is a second application: week-by-week gestation, a different
-symptom set, different alarms. It should not be built here.
+**`conceive` reorders Today rather than replacing it.** The cards are the same
+cards; what changes is which one answers her question first. Tracking a cycle,
+that is the next period. Trying to conceive, it is the fertile window and
+whether ovulation has happened — and burying that under a period countdown
+means scrolling past the answer every day. No separate screen, no second app,
+no extra daily question. The row is hidden on hormonal contraception, where the
+fertility output it promotes is correctly hidden anyway.
 
-**Verdict: build `conceive`, drop `pregnancy` from the union.** Until then the
-field is a promise the code doesn't keep, and it ships in every export.
+**The double check is the new part** (`ovulation.js cycleSignals`). Everything
+else the app says about ovulation is arithmetic — next period minus luteal
+length. This is the opposite: nothing predicted, all of it recorded. It reads
+the cycle she is *in*, which `confirmedOvulations` deliberately does not, since
+that exists to measure luteal length and needs a next period to measure to.
+
+It reports both signals rather than the winner. A peak test observes the surge;
+a thermal shift infers the progesterone rise, and a fever or a bad night can
+fake one. Sympto-thermal methods use two because either alone is weaker, so
+where both land within two days the card says so, and where they disagree it
+says *that* and shows both. Egg-white mucus is displayed and never used to date
+anything — it marks the stretch approaching ovulation, not the event.
+
+That last branch was a bug found by running it: with both signals present and
+three days apart, the card said "a temperature taken each morning would
+corroborate it" directly above the temperature rise it had just listed.
 
 ### G7 — No cycle-by-cycle comparison · S4
 
