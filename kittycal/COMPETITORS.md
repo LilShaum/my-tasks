@@ -4,10 +4,14 @@ A competitive audit. `AUDIT.md` asks whether the app does what it says correctly
 this asks whether what it says is the right list, measured against the apps
 people actually use.
 
-**Status.** Eight gaps, seven closed. G2 — the Next period headline — was fixed in
-[#58](https://github.com/LilShaum/my-tasks/commit/5e9fa79). G1 and G3 to G7 are fixed on
-this branch. Closed entries are kept as the record. G8 is discussed below and deliberately not built. the line references have been re-resolved,
-not assumed.
+**Status.** Eight gaps, seven closed. G2 — the Next period headline — was fixed
+in [#58](https://github.com/LilShaum/my-tasks/commit/5e9fa79). G1 and G3 to G7
+are fixed on this branch. Closed entries are kept as the record of what was
+wrong. **G8 is the one deliberately not built**, and §G8 says exactly why and
+what building it would take. References here name a file and a symbol rather than a line
+number: over this session the same citations rotted three times — once from
+#58's changes and twice from this branch's own — and a confidently wrong line
+number is worse than no citation at all.
 
 ## 0. What counts as a gap
 
@@ -49,26 +53,26 @@ Recorded so these don't get traded away while closing a gap.
   off-origin, and the app still renders with the network cut. Euki and Drip make
   the same promise; neither ships the test.
 - **Predictions state their own confidence, and stop.** Confidence is on the
-  screen next to every forecast, never hidden (`today.js:773`). Fertile windows
-  widen instead of narrowing when the data is thin (`predict.js:414`). Fertility
-  output disappears entirely on hormonal contraception (`predict.js:400`), which
+  screen next to every forecast, never hidden (`today.js confidenceLine`). Fertile windows
+  widen instead of narrowing when the data is thin (`predict.js, the widened window`). Fertility
+  output disappears entirely on hormonal contraception (`predict.js showFertility`), which
   is correct and which Flo does not do. Past 90 days the app says the history
-  has gone stale rather than inventing "402 days late" (`predict.js:65`). Since
+  has gone stale rather than inventing "402 days late" (`predict.js STALE_AFTER_DAYS`). Since
   G2, the next-period headline is an interval derived from her own observed
-  variation (`predict.js:223`) — which, on this list, only Flo's perimenopause
+  variation (`predict.js startWindow`) — which, on this list, only Flo's perimenopause
   product also does.
 - **It scores its own past predictions.** The "How close Kittycal has been" card
-  (`insights.js:343`) re-forecasts each past cycle from only what was known
+  (`insights.js accuracyCard`) re-forecasts each past cycle from only what was known
   before it started and reports the typical miss in days. No major competitor
   shows you its own error.
 - **Luteal length is measured, not assumed.** `ovulation.js` derives it from her
   own confirmed thermal shifts and falls back to the population 14 only when it
-  can't (`predict.js:286`). A fixed 14 is a permanent two-day error in the one
+  can't (`predict.js, the measuredLuteal call`). A fixed 14 is a permanent two-day error in the one
   number offered for planning.
 - **The doctor report is free.** Flo paywalls the equivalent at $49.99/year;
   Apple gives you a 12-month PDF only. Kittycal's is six months of plain tables,
   and it separates moods from physical symptoms so a clinician doesn't read
-  "Happy — 3 of 3 cycles" as a presenting complaint (`taxonomy.js:383`).
+  "Happy — 3 of 3 cycles" as a presenting complaint (`taxonomy.js CATEGORY_BY_ID`).
 - **Accessibility is structural.** Every colour derives from two numbers in
   OKLCH at pinned lightness, so all 14 themes hit the same contrast ratios by
   construction, verified across 196 colour pairs.
@@ -82,9 +86,9 @@ Ranked by what they cost her, not by effort.
 The most serious finding here, because it isn't a missing feature — it's the app
 being confidently wrong at a real user.
 
-`birthYear` is asked for during onboarding (`onboarding.js:237`), normalised on
+`birthYear` is asked for during onboarding (`onboarding.js, the year-of-birth field`), normalised on
 every read, carried in every backup, and used in exactly one place: a line of
-text in the doctor report (`report.js:82`). Nothing else consults it.
+text in the doctor report (`report.js, the year-of-birth line`). Nothing else consults it.
 
 Meanwhile the prediction engine treated every overdue cycle as lateness with a
 day count, and everything past 90 days as stale. For a 47-year-old whose cycles
@@ -105,14 +109,14 @@ optional besides, so an age gate would have missed the people it was aimed at
 and helped nobody else. All three changes below are driven by her own data.
 
 **Lateness is measured from the far edge of the start window, not the estimate**
-(`predict.js:385`). #58 already drew the window; late now means past the point
+(`predict.js, the lateness block`). #58 already drew the window; late now means past the point
 where her own observed variation stops explaining it. A new `withinWindow` state
 sits between the two — past the estimate, still inside her spread — and Today
-calls it *due* rather than late (`today.js:867`). On a 26-to-48-day history the
+calls it *due* rather than late (`today.js dueCard`). On a 26-to-48-day history the
 app used to say "late" for most of every month; now it says so only when it is
 true. Below two cycles there is no window and the old behaviour stands.
 
-**A long gap is no longer blamed on her records** (`predict.js:365`). Staleness
+**A long gap is no longer blamed on her records** (`predict.js staleReason`). Staleness
 now asks *why* the forecast stopped: `staleReason` is `'dormant'` when she has
 not logged in a month, and `'absent'` when she is still logging and simply has
 not bled. Both suppress the forecast, because neither supports one, but the
@@ -146,7 +150,7 @@ length in both cases. Meanwhile `stats.spread` — her longest observed cycle
 minus her shortest — was computed on every prediction and spent entirely on
 choosing between the words "regular", "variable" and "irregular".
 
-The fix is `startWindow()` (`predict.js:223`), consumed at `today.js:736`: half
+The fix is `startWindow()` (`predict.js startWindow`), consumed at `today.js nextPeriodCard`: half
 the observed spread either side of the estimate, so the headline widens when she
 is irregular and narrows when she is not. Three bounds beyond what this document
 asked for, all of them right — nothing below two cycles, since a window invented
@@ -159,7 +163,7 @@ down, stated as a fact about the period rather than a claim about the forecast.
 
 ### G3 — Nothing could get in except Kittycal's own export · S3 · **CLOSED**
 
-`parseImport` accepted one shape: Kittycal's own (`backup.js:112`). For anyone
+`parseImport` accepted one shape: Kittycal's own (`backup.js parseImport`). For anyone
 with three years of history in Flo or Clue, the cost of switching was retyping
 it or losing it — and losing it is what actually happens. The largest adoption
 barrier in this document, and nothing to do with features.
@@ -228,8 +232,8 @@ that only looks like one.
 
 ### G5 — Birth control tracking was a checkbox · S3 · **CLOSED**
 
-`pillTaken` was a boolean (`model.js:35`) with a daily nudge attached
-(`reminders.js:190`) — a tick box with no memory. It could tell her to take one
+`pillTaken` was a boolean (`model.js DayLog.pillTaken`) with a daily nudge attached
+(`reminders.js, the pill nudge`) — a tick box with no memory. It could tell her to take one
 today while having no idea whether today was an active pill or the fourth day
 of a break, nor whether yesterday was ever marked. The one moment a pill
 tracker earns its place is the moment she cannot remember about yesterday, and
@@ -261,7 +265,7 @@ a contraception reminder, and the settings note says that in those words.
 
 ### G6 — Two modes were declared in the data model and neither existed · S4 · **CLOSED**
 
-`mode: 'cycle'|'conceive'|'pregnancy'` was defined at `model.js:45`, defaulted,
+`mode: 'cycle'|'conceive'|'pregnancy'` was defined at `model.js Settings.mode`, defaulted,
 normalised on every settings read, written into every backup file, and read by
 nothing. A grep across `js/` returned the declaration, the default, and no
 consumer.
@@ -300,7 +304,7 @@ corroborate it" directly above the temperature rise it had just listed.
 
 ### G7 — No cycle-by-cycle comparison · S4 · **CLOSED**
 
-Insights plotted cycle length as a row of dots (`insights.js:226`), which
+Insights plotted cycle length as a row of dots (`insights.js cycleLengthCard`), which
 answers "are my cycles consistent" and gives no route to "what was that bad one
 in March actually like". A dot on a chart is not a thing you can open, and Clue
 made Cycle View the centre of its relaunch for exactly this reason.
@@ -318,18 +322,38 @@ since the diary already shows any single day and thirty of those in a sheet is
 not something anyone reads. Moods stay separate from physical symptoms for the
 same reason the doctor report separates them.
 
-### G8 — No duress PIN · S4, and genuinely optional
+### G8 — No duress PIN · S4 · **NOT BUILT, on purpose**
 
 Euki ships one: a second PIN that opens a false screen. Kittycal's lock is
-already reasoning in this threat model — `lock.js:179` deliberately has no
+already reasoning in the same threat model — `lock.js, the no-lockout note` deliberately has no
 lockout after N failed attempts, because the threat is a person physically
-holding the phone, and that is exactly the argument that leads to a decoy.
+holding the phone, and that is the argument that leads to a decoy.
 
-**Verdict: consider, don't rush.** A decoy that is discoverable — wrong data
-volume, a suspicious second database, an app that behaves differently under
-inspection — is worse than none, because it converts "I have nothing" into "she
-is hiding something". This is a feature that must be either done properly or
-left alone, and it should not be built in the same pass as anything else.
+Everything else in this document is now built. This one is not, and the reason
+is specific rather than a shortage of time.
+
+**What the implementation would be.** `DB_NAME` in `db.js` is a single constant
+and every read goes through `db.open()`, so a second profile is a contained
+change: two databases, two PINs, one opening each. The lock config, though,
+lives in the meta store *inside* that database — so the main database must be
+opened to check any PIN at all, including the decoy's. The decoy therefore
+cannot hide that the real profile exists. It defends against someone watching
+the screen; it does nothing against anyone who opens the browser's storage
+inspector.
+
+**Why that is a reason to stop rather than to ship it carefully worded.** A
+narrow guarantee is fine — the passcode's is narrow too, and `lock.js` says so.
+The problem is the failure mode. A lock that is weaker than believed loses
+privacy. A decoy that is weaker than believed is *handed over*: it is used at
+the moment someone is standing over her, and its whole value is her confidence
+that the screen she is showing is all there is. If that confidence is wrong,
+the feature has put her in a worse position than owning no decoy at all, which
+is the one outcome none of the other seven gaps can produce.
+
+That is a judgement about someone's safety rather than about code quality, and
+it should be made deliberately and on its own, not as the seventh item in a
+batch. The design above is ready; what it needs is a decision about what the
+app is willing to promise, and a pass of its own to build against it.
 
 ## 4. Deliberately not built
 
@@ -355,18 +379,16 @@ Checked, and the answer is still no. Written down so it stays no.
 ## 5. Order
 
 ~~**G2** — the prediction interval.~~ Closed in #58.
-~~**G1** — the lateness model.~~ Closed on this branch.
+~~**G1** — the lateness model.~~
+~~**G3 + G4** — import and CSV export.~~
+~~**G5** — the pill pack.~~
+~~**G6** — `conceive` mode, and `pregnancy` deleted.~~
+~~**G7** — cycle by cycle.~~
 
-1. **G3 + G4** — import and CSV export together, since they're the same seam.
-   G3 is the largest adoption barrier in this document and the only item here
-   that is purely a matter of parsing someone else's file.
-2. **G5** — the pill pack.
-3. **G6** — `conceive` mode, or delete the field. It ships in every backup
-   either way, so leaving it declared and unread is the one option that isn't
-   defensible.
-4. **G7**, then **G8** on its own.
+**G8** — the duress PIN — is the only item left, and §G8 argues it should be a
+decision before it is a commit.
 
-Nothing above requires a network request, an account, or a subscription. That
-constraint has not cost Kittycal a single feature on this list — the two things
-it genuinely cannot do (background push, live wearable sync) are in §4, and both
-are limits of the browser rather than of the design.
+Nothing built here required a network request, an account, or a subscription.
+That constraint did not cost a single feature on this list: the two things
+Kittycal genuinely cannot do — background push and live wearable sync — are in
+§4, and both are limits of the browser rather than of the design.
