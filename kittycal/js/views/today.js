@@ -124,7 +124,9 @@ export function renderToday(host) {
 
     el('div', { class: 'section stagger' }, [
       prediction.stale ? staleCard(prediction)
-        : prediction.isLate ? lateCard(prediction) : nextPeriodCard(prediction),
+        : prediction.isLate ? lateCard(prediction)
+          : prediction.withinWindow ? dueCard(prediction)
+            : nextPeriodCard(prediction),
       prediction.showFertility && prediction.ovulation ? fertileCard(prediction, today) : null,
       ...acogCards(cycles, today, prediction, logs),
     ]),
@@ -613,15 +615,45 @@ function greeting(name, today) {
  * @param {import('../domain/predict.js').Prediction} prediction
  */
 function ringHeadline(prediction) {
-  // Nothing to count down to, and nothing honest to put in the middle of a
-  // ring that is meant to show where you are in a cycle.
-  if (prediction.stale) return { value: '—', caption: 'no recent period logged' };
+  /*
+    Nothing to count down to. What goes in the middle depends on why.
+
+    A dormant record supports no number at all. An absent period does: she has
+    been logging, so "128 days since your period" is a measurement she made,
+    and it is the single most relevant thing on the screen. Blanking it to a
+    dash threw away her own observation and told her the app had lost the
+    thread.
+  */
+  if (prediction.stale) {
+    if (prediction.staleReason === 'absent' && prediction.daysSinceStart != null) {
+      return {
+        value: String(prediction.daysSinceStart),
+        caption: 'days since your period',
+      };
+    }
+    return { value: '—', caption: 'no recent period logged' };
+  }
 
   if (prediction.isLate && prediction.daysLate != null) {
     return {
       value: String(prediction.daysLate),
       caption: prediction.daysLate === 1 ? 'day late' : 'days late',
     };
+  }
+
+  /*
+    Past the estimate and still inside her own spread. Before lateness was
+    measured from the window this state could not happen, and the countdown
+    below would render it as "−2 days to your period".
+
+    The estimate day itself keeps its own line. "Today, period expected" is
+    more use than "due, any day now", and it is the message this ring has
+    always shown on that day.
+  */
+  if (prediction.withinWindow) {
+    return prediction.daysUntilPeriod === 0
+      ? { value: 'Today', caption: 'period expected' }
+      : { value: 'Due', caption: 'any day now' };
   }
 
   const today = todayKey();
@@ -781,7 +813,35 @@ function confidenceLine(prediction) {
  * @param {import('../domain/predict.js').Prediction} prediction
  */
 function staleCard(prediction) {
-  const months = Math.round((prediction.daysSinceStart ?? 0) / 30);
+  const days = prediction.daysSinceStart ?? 0;
+  const months = Math.round(days / 30);
+
+  /*
+    Two situations, one of which this card used to get badly wrong.
+
+    "Too far back to predict from \u2014 mark your most recent period" is the right
+    thing to say to someone who put the app down in March. Said to someone who
+    checked in this morning it is false and it is rude: she has marked every
+    period she has had, and there simply has not been one. The app was blaming
+    her records for its own inability to forecast, at the point in her life when
+    a period stopping is the observation that matters most.
+
+    So the ask changes with the reason. Dormant gets a way back in. Absent gets
+    the plain fact, and a pointer at a clinician rather than at the calendar \u2014
+    the ACOG flag below this card is already saying the same thing, and this one
+    no longer contradicts it.
+  */
+  if (prediction.staleReason === 'absent') {
+    return el('div', { class: 'card data-zone' }, [
+      el('h3', { text: 'No period logged for a while' }),
+      el('p', { class: 'big-value num', text: plural(days, 'day') }),
+      el('p', { class: 'hint-sm', text:
+        'Since your last one started. Your records are fine \u2014 there is just ' +
+        'nothing to predict from until the next one, so the forecast is paused ' +
+        'rather than guessing. Keep logging as usual and it picks straight ' +
+        'back up.' }),
+    ]);
+  }
 
   return el('div', { class: 'card data-zone' }, [
     el('h3', { text: 'Let\u2019s pick this back up' }),
@@ -802,6 +862,41 @@ function staleCard(prediction) {
 }
 
 /**
+ * Past the estimate, still inside her own variation.
+ *
+ * This state had no card because it had no existence: anything past the
+ * predicted date was late. For a cycle that runs 26 to 48 days that meant the
+ * app called her late for most of the month, every month. Here the window it
+ * already drew is doing the talking, and the offer to log is the same one the
+ * late card makes, because the useful action is identical.
+ *
+ * @param {import('../domain/predict.js').Prediction} prediction
+ */
+function dueCard(prediction) {
+  const window = prediction.startWindow;
+
+  return el('div', { class: 'card data-zone' }, [
+    el('h3', { text: 'Your period is due' }),
+    el('p', { class: 'big-value num', text: window
+      ? `${fmtDayMonth(window.from)} \u2013 ${fmtDayMonth(window.to)}`
+      : 'Any day now' }),
+    el('p', { class: 'hint-sm', text: window
+      ? 'You are inside the window your own cycles point at, so this is on ' +
+        'time rather than late.'
+      : 'Around now, going by your average.' }),
+
+    el('button', {
+      type: 'button',
+      class: 'btn',
+      style: { marginTop: 'var(--sp-3)' },
+      onclick: () => { haptic(); openCheckin(todayKey()); },
+    }, ['It started today']),
+
+    confidenceLine(prediction),
+  ]);
+}
+
+/**
  * Lateness is a first-class state, not a silently redrawn prediction. The copy
  * stays factual and explicitly avoids speculating about why.
  * @param {import('../domain/predict.js').Prediction} prediction
@@ -811,8 +906,16 @@ function lateCard(prediction) {
   return el('div', { class: 'card data-zone' }, [
     el('h3', { text: 'Your period is late' }),
     el('p', { class: 'big-value num', text: plural(days, 'day') }),
+    /*
+      The count is days past the *window*, not past the estimate, so the
+      sentence has to name the window or the number looks wrong against the
+      date sitting above it.
+    */
     el('p', { class: 'hint-sm', text:
-      `Expected around ${prediction.nextStart ? fmtDayMonth(prediction.nextStart) : '—'}. ` +
+      (prediction.startWindow
+        ? `Past the ${fmtDayMonth(prediction.startWindow.from)} – ` +
+          `${fmtDayMonth(prediction.startWindow.to)} window your cycles point at. `
+        : `Expected around ${prediction.nextStart ? fmtDayMonth(prediction.nextStart) : '—'}. `) +
       'Cycles shift for all sorts of ordinary reasons — stress, travel, illness, ' +
       'a change in sleep. Kittycal will update once you log your next period.' }),
 

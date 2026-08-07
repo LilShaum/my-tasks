@@ -105,6 +105,7 @@ export const CATEGORIES = [
       { id: 'restless-sleep', label: 'Restless sleep', emoji: '🛏' },
       { id: 'night-sweats', label: 'Night sweats', emoji: '💧' },
       { id: 'hot-flashes', label: 'Hot flushes', emoji: '🔥' },
+      { id: 'vaginal-dryness', label: 'Vaginal dryness', emoji: '🌵' },
       { id: 'chills', label: 'Chills', emoji: '🥶' },
       { id: 'fever', label: 'Fever', emoji: '🌡' },
       { id: 'acne', label: 'Acne', emoji: '🔴' },
@@ -199,6 +200,9 @@ export const CATEGORIES = [
       { id: 'alcohol', label: 'Alcohol', emoji: '🍷' },
       { id: 'illness', label: 'Illness or injury', emoji: '🤒' },
       { id: 'new-medication', label: 'New medication', emoji: '💊' },
+      // Sits with the other things that change a cycle from outside it, beside
+      // medication and illness, rather than being filed as a symptom.
+      { id: 'hrt', label: 'HRT', emoji: '🩹' },
       { id: 'doctor-visit', label: 'Doctor visit', emoji: '🩺' },
       { id: 'poor-diet', label: 'Ate badly', emoji: '🍟' },
       { id: 'big-day', label: 'Big day', emoji: '⭐' },
@@ -443,6 +447,8 @@ export function optionCount() {
 const SYNONYMS = {
   diarrhea: ['diarrhea', 'the runs', 'loose'],
   'hot-flashes': ['hot flashes', 'flashes', 'overheating'],
+  'vaginal-dryness': ['dryness', 'dry'],
+  hrt: ['hormone replacement', 'oestrogen', 'estrogen', 'patch'],
   'tender-breasts': ['sore boobs', 'sore breasts', 'breast pain', 'boobs', 'chest'],
   'breast-lumps': ['lump', 'boobs'],
   acne: ['spots', 'pimples', 'breakout', 'skin'],

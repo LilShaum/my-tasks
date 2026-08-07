@@ -4,10 +4,11 @@ A competitive audit. `AUDIT.md` asks whether the app does what it says correctly
 this asks whether what it says is the right list, measured against the apps
 people actually use.
 
-**Status.** Eight gaps, one closed. G2 — the Next period headline — was fixed in
-[#58](https://github.com/LilShaum/my-tasks/commit/5e9fa79) and its entry below is
-kept as the record. The other seven are open and verified open against this
-commit; the line references have been re-resolved, not assumed.
+**Status.** Eight gaps, two closed. G2 — the Next period headline — was fixed in
+[#58](https://github.com/LilShaum/my-tasks/commit/5e9fa79). G1 — the lateness
+model — is fixed in this branch. Both entries are kept as the record. The other
+six are open and verified open against this commit; the line references have
+been re-resolved, not assumed.
 
 ## 0. What counts as a gap
 
@@ -49,13 +50,13 @@ Recorded so these don't get traded away while closing a gap.
   off-origin, and the app still renders with the network cut. Euki and Drip make
   the same promise; neither ships the test.
 - **Predictions state their own confidence, and stop.** Confidence is on the
-  screen next to every forecast, never hidden (`today.js:749`). Fertile windows
-  widen instead of narrowing when the data is thin (`predict.js:328`). Fertility
-  output disappears entirely on hormonal contraception (`predict.js:314`), which
+  screen next to every forecast, never hidden (`today.js:773`). Fertile windows
+  widen instead of narrowing when the data is thin (`predict.js:414`). Fertility
+  output disappears entirely on hormonal contraception (`predict.js:400`), which
   is correct and which Flo does not do. Past 90 days the app says the history
   has gone stale rather than inventing "402 days late" (`predict.js:65`). Since
   G2, the next-period headline is an interval derived from her own observed
-  variation (`predict.js:184`) — which, on this list, only Flo's perimenopause
+  variation (`predict.js:223`) — which, on this list, only Flo's perimenopause
   product also does.
 - **It scores its own past predictions.** The "How close Kittycal has been" card
   (`insights.js:343`) re-forecasts each past cycle from only what was known
@@ -63,12 +64,12 @@ Recorded so these don't get traded away while closing a gap.
   shows you its own error.
 - **Luteal length is measured, not assumed.** `ovulation.js` derives it from her
   own confirmed thermal shifts and falls back to the population 14 only when it
-  can't (`predict.js:247`). A fixed 14 is a permanent two-day error in the one
+  can't (`predict.js:286`). A fixed 14 is a permanent two-day error in the one
   number offered for planning.
 - **The doctor report is free.** Flo paywalls the equivalent at $49.99/year;
   Apple gives you a 12-month PDF only. Kittycal's is six months of plain tables,
   and it separates moods from physical symptoms so a clinician doesn't read
-  "Happy — 3 of 3 cycles" as a presenting complaint (`taxonomy.js:379`).
+  "Happy — 3 of 3 cycles" as a presenting complaint (`taxonomy.js:383`).
 - **Accessibility is structural.** Every colour derives from two numbers in
   OKLCH at pinned lightness, so all 14 themes hit the same contrast ratios by
   construction, verified across 196 colour pairs.
@@ -77,7 +78,7 @@ Recorded so these don't get traded away while closing a gap.
 
 Ranked by what they cost her, not by effort.
 
-### G1 — The lateness model is wrong for anyone in perimenopause · S2
+### G1 — The lateness model was wrong for anyone whose cycles vary · S2 · **CLOSED**
 
 The most serious finding here, because it isn't a missing feature — it's the app
 being confidently wrong at a real user.
@@ -86,10 +87,9 @@ being confidently wrong at a real user.
 every read, carried in every backup, and used in exactly one place: a line of
 text in the doctor report (`report.js:82`). Nothing else consults it.
 
-Meanwhile the prediction engine treats every overdue cycle as lateness with a
-day count (`predict.js:308`) and everything past 90 days as stale
-(`predict.js:65`). For a 47-year-old whose cycles are lengthening and skipping,
-that is the wrong sentence every single month — "17 days late", then "43 days
+Meanwhile the prediction engine treated every overdue cycle as lateness with a
+day count, and everything past 90 days as stale. For a 47-year-old whose cycles
+are lengthening and skipping, that was the wrong sentence every single month — "17 days late", then "43 days
 late", then the data has "gone stale" and she's asked for a fresh period date.
 Cycles becoming irregular *is the signal*, and the app reads it as failure to
 log.
@@ -98,13 +98,39 @@ Both leaders fixed exactly this. Clue's perimenopause mode replaced "your period
 is X days late" with a cycle-comparison view. Flo's shows a window of time
 rather than a date, for the same reason.
 
-**Verdict: build, and it does not need a new mode.** When cycle spread is high
-and `birthYear` implies mid-40s or older, change the framing from lateness to
-variation. The taxonomy already has hot flushes and night sweats
-(`taxonomy.js:106-107`); it's missing vaginal dryness and HRT. The 90-day
-staleness cutoff should not fire on someone whose logged history is dense and
-whose cycles are simply long — those are distinguishable states, and the code
-currently conflates them.
+**Fixed, and without a mode or an age gate.** The plan here was to key the
+change off `birthYear`, and that turned out to be the wrong instinct: the
+signal is in the cycles, not the birth certificate. Someone of 26 with PCOS gets
+told she is late on day 45 for exactly the same bad reason, and `birthYear` is
+optional besides, so an age gate would have missed the people it was aimed at
+and helped nobody else. All three changes below are driven by her own data.
+
+**Lateness is measured from the far edge of the start window, not the estimate**
+(`predict.js:385`). #58 already drew the window; late now means past the point
+where her own observed variation stops explaining it. A new `withinWindow` state
+sits between the two — past the estimate, still inside her spread — and Today
+calls it *due* rather than late (`today.js:867`). On a 26-to-48-day history the
+app used to say "late" for most of every month; now it says so only when it is
+true. Below two cycles there is no window and the old behaviour stands.
+
+**A long gap is no longer blamed on her records** (`predict.js:365`). Staleness
+now asks *why* the forecast stopped: `staleReason` is `'dormant'` when she has
+not logged in a month, and `'absent'` when she is still logging and simply has
+not bled. Both suppress the forecast, because neither supports one, but the
+absent case keeps her day count in the ring, states the plain fact, and leaves
+the ACOG prompt to point at a clinician — instead of "too far back to predict
+from, mark your most recent period", which was false and which asked her to
+re-enter something she had already entered. `phases.js` follows: the absent case
+resolves to the existing `overdue` phase rather than to `unknown`, whose "log a
+period and Kittycal can start working out where you are" is the brand-new-user
+line and an insult to someone with five cycles behind her.
+
+**The missing chips**: vaginal dryness beside the hot flushes and night sweats
+already there, and HRT filed under Life with the other things that change a
+cycle from outside it, rather than as a symptom.
+
+Nine tests cover the new states, including the one that keeps the old behaviour
+when `logs` is not passed at all.
 
 ### G2 — The next-period date was a point estimate wearing a range's clothing · S2 · **CLOSED**
 
@@ -121,7 +147,7 @@ length in both cases. Meanwhile `stats.spread` — her longest observed cycle
 minus her shortest — was computed on every prediction and spent entirely on
 choosing between the words "regular", "variable" and "irregular".
 
-The fix is `startWindow()` (`predict.js:184`), consumed at `today.js:712`: half
+The fix is `startWindow()` (`predict.js:223`), consumed at `today.js:736`: half
 the observed spread either side of the estimate, so the headline widens when she
 is irregular and narrows when she is not. Three bounds beyond what this document
 asked for, all of them right — nothing below two cycles, since a window invented
@@ -183,10 +209,10 @@ default and no consumer.
 
 Trying-to-conceive is the largest feature axis in the market — Flo, Ovia, Glow
 and Premom all organise around it — and Kittycal is closer to it than the empty
-field suggests. It already logs ovulation tests (`taxonomy.js:213`), charts BBT
+field suggests. It already logs ovulation tests (`taxonomy.js:217`), charts BBT
 with thermal-shift detection, records egg-white discharge and unprotected sex,
 and bands conception chance into tiers rather than fake percentages
-(`predict.js:434`). What's missing is arrangement, not data: a mode that puts
+(`predict.js:522`). What's missing is arrangement, not data: a mode that puts
 the fertile-window countdown and today's tier at the top, surfaces the LH-test
 row daily during the window, and applies a sympto-thermal double check — a
 temperature shift *confirmed by* mucus, the way Drip does — instead of calendar
@@ -245,20 +271,16 @@ Checked, and the answer is still no. Written down so it stays no.
 ## 5. Order
 
 ~~**G2** — the prediction interval.~~ Closed in #58.
+~~**G1** — the lateness model.~~ Closed on this branch.
 
-1. **G1** — perimenopause framing. Highest severity of what's left, and the only
-   open item where the app is actively wrong rather than merely incomplete. It
-   needs no new mode and no new data: the age is already collected, the symptom
-   chips are half there, and the change is to stop reading a lengthening cycle
-   as a failure to log.
-2. **G3 + G4** — import and CSV export together, since they're the same seam.
+1. **G3 + G4** — import and CSV export together, since they're the same seam.
    G3 is the largest adoption barrier in this document and the only item here
    that is purely a matter of parsing someone else's file.
-3. **G5** — the pill pack.
-4. **G6** — `conceive` mode, or delete the field. It ships in every backup
+2. **G5** — the pill pack.
+3. **G6** — `conceive` mode, or delete the field. It ships in every backup
    either way, so leaving it declared and unread is the one option that isn't
    defensible.
-5. **G7**, then **G8** on its own.
+4. **G7**, then **G8** on its own.
 
 Nothing above requires a network request, an account, or a subscription. That
 constraint has not cost Kittycal a single feature on this list — the two things

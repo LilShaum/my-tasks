@@ -13,12 +13,12 @@ import assert from 'node:assert/strict';
 import {
   predict, weightedAverage, detectRecalibration, rateConfidence,
   upcomingPeriods, upcomingFertile, conceptionChance,
-  CYCLE_MIN_CLAMP, CYCLE_MAX_CLAMP, STALE_AFTER_DAYS, startWindow,
+  CYCLE_MIN_CLAMP, CYCLE_MAX_CLAMP, STALE_AFTER_DAYS, startWindow, lastActivity,
 } from '../js/domain/predict.js';
 // Moved to its own module so that a prediction can depend on measured
 // ovulation without ovulation depending on predictions.
 import { detectThermalShift } from '../js/domain/ovulation.js';
-import { defaultSettings } from '../js/domain/model.js';
+import { defaultSettings, emptyLog } from '../js/domain/model.js';
 import { phaseFor, PHASES } from '../js/domain/phases.js';
 import { buildCycles } from '../js/domain/cycles.js';
 import { range, addDays, daysBetween } from '../js/utils/date.js';
@@ -238,7 +238,7 @@ test('predicted cycle length is clamped to a physiological range', () => {
 
 /* ── predict: lateness ───────────────────────────────────────────────────── */
 
-test('a period past its predicted date reports as late', () => {
+test('lateness is counted from the far edge of the start window, not the estimate', () => {
   const days = history('2026-01-05', 28, 4);
   const lastStart = addDays('2026-01-05', 28 * 3);
   const expected = addDays(lastStart, 28);
@@ -246,8 +246,86 @@ test('a period past its predicted date reports as late', () => {
 
   const p = predict({ periodDays: days, settings: settings(), today });
   assert.equal(p.isLate, true);
-  assert.equal(p.daysLate, 4);
+  // Metronome-regular history, so the window is the floor of a day either
+  // side. Four days past the estimate is three past the window it drew.
+  assert.equal(p.startWindow?.days, 1);
+  assert.equal(p.daysLate, 3);
   assert.equal(p.daysUntilPeriod, -4);
+});
+
+test('a variable cycle is not late while it is still inside its own spread', () => {
+  // 26, 34, 27, 33 — a spread of 8, so a window of four days either side.
+  const starts = ['2026-01-05'];
+  for (const length of [26, 34, 27, 33]) {
+    starts.push(addDays(starts[starts.length - 1], length));
+  }
+  const days = starts.flatMap((s) => [0, 1, 2, 3].map((i) => addDays(s, i)));
+
+  const p0 = predict({ periodDays: days, settings: settings(), today: starts[4] });
+  assert.ok(p0.startWindow, 'a window is drawn');
+  const expected = p0.nextStart;
+  assert.ok(expected);
+
+  // Three days past the estimate, still well inside her observed variation.
+  const p = predict({ periodDays: days, settings: settings(), today: addDays(expected, 3) });
+  assert.equal(p.isLate, false, 'not late — day is inside her own range');
+  assert.equal(p.withinWindow, true, 'but it is due');
+  assert.equal(p.daysLate, null);
+
+  // Past the far edge, and now it is worth saying.
+  const past = predict({
+    periodDays: days, settings: settings(), today: addDays(expected, p.startWindow.days + 2),
+  });
+  assert.equal(past.isLate, true);
+  assert.equal(past.daysLate, 2);
+  assert.equal(past.withinWindow, false);
+});
+
+test('still logging through a long gap is absent, not stale records', () => {
+  const days = history('2026-01-05', 28, 4);
+  const lastStart = addDays('2026-01-05', 28 * 3);
+  const today = addDays(lastStart, 140);
+
+  // She has kept checking in — there is nothing wrong with her records.
+  const logs = {};
+  for (let i = 0; i < 6; i += 1) {
+    const date = addDays(today, -i);
+    logs[date] = { ...emptyLog(date), checkedIn: true };
+  }
+
+  const p = predict({ periodDays: days, settings: settings(), today, logs });
+  assert.equal(p.stale, true, 'no forecast is supportable either way');
+  assert.equal(p.staleReason, 'absent');
+  assert.equal(p.daysSinceStart, 140, 'the observation itself survives');
+});
+
+test('a long gap with no logging at all is dormant records', () => {
+  const days = history('2026-01-05', 28, 4);
+  const lastStart = addDays('2026-01-05', 28 * 3);
+  const today = addDays(lastStart, 140);
+
+  const p = predict({ periodDays: days, settings: settings(), today, logs: {} });
+  assert.equal(p.stale, true);
+  assert.equal(p.staleReason, 'dormant');
+});
+
+test('omitting logs entirely keeps the old staleness behaviour', () => {
+  const days = history('2026-01-05', 28, 4);
+  const today = addDays(addDays('2026-01-05', 28 * 3), 140);
+
+  const p = predict({ periodDays: days, settings: settings(), today });
+  assert.equal(p.stale, true);
+  assert.equal(p.staleReason, 'dormant');
+});
+
+test('lastActivity ignores days that have not happened yet', () => {
+  const logs = {
+    '2026-03-01': emptyLog('2026-03-01'),
+    '2026-09-01': emptyLog('2026-09-01'),
+  };
+  assert.equal(lastActivity(logs, '2026-03-11'), 10, 'a future log cannot count as use');
+  assert.equal(lastActivity({}, '2026-03-11'), null);
+  assert.equal(lastActivity(undefined, '2026-03-11'), null);
 });
 
 test('the day the period is due is not yet late', () => {
