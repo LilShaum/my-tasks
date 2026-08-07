@@ -4,10 +4,9 @@ A competitive audit. `AUDIT.md` asks whether the app does what it says correctly
 this asks whether what it says is the right list, measured against the apps
 people actually use.
 
-**Status.** Eight gaps, six closed. G2 — the Next period headline — was fixed in
-[#58](https://github.com/LilShaum/my-tasks/commit/5e9fa79). G1, G3, G4, G5 and G6 are
-fixed on this branch. Closed entries are kept as the record. The other two are open and
-verified open against this commit; the line references have been re-resolved,
+**Status.** Eight gaps, seven closed. G2 — the Next period headline — was fixed in
+[#58](https://github.com/LilShaum/my-tasks/commit/5e9fa79). G1 and G3 to G7 are fixed on
+this branch. Closed entries are kept as the record. G8 is discussed below and deliberately not built. the line references have been re-resolved,
 not assumed.
 
 ## 0. What counts as a gap
@@ -299,15 +298,25 @@ That last branch was a bug found by running it: with both signals present and
 three days apart, the card said "a temperature taken each morning would
 corroborate it" directly above the temperature rise it had just listed.
 
-### G7 — No cycle-by-cycle comparison · S4
+### G7 — No cycle-by-cycle comparison · S4 · **CLOSED**
 
-Insights plots cycle length as a row of dots (`insights.js:226`), which answers
-"are my cycles consistent" and not "what was that bad one in March like".
-There's no route from a point on that chart to the cycle behind it. Clue made
-Cycle View the centre of its relaunch for this reason, and it's the natural home
-for the symptom severity the app already stores and barely analyses.
+Insights plotted cycle length as a row of dots (`insights.js:226`), which
+answers "are my cycles consistent" and gives no route to "what was that bad one
+in March actually like". A dot on a chart is not a thing you can open, and Clue
+made Cycle View the centre of its relaunch for exactly this reason.
 
-**Verdict: build, after the above.**
+`cycleListCard` is a comparison rather than a list: each row carries how that
+cycle differed from her own average, because "31 days" means nothing alone and
+"three days longer than usual" is the sentence she is looking for. Nothing is
+printed in that column for a cycle within a day of average — a sign on every
+row would make a normal month look like a finding. The running cycle is
+included and marked, since "where am I against the last few" is the same
+question asked about now.
+
+Tapping one opens what she logged in it: counts rather than a day-by-day dump,
+since the diary already shows any single day and thirty of those in a sheet is
+not something anyone reads. Moods stay separate from physical symptoms for the
+same reason the doctor report separates them.
 
 ### G8 — No duress PIN · S4, and genuinely optional
 
