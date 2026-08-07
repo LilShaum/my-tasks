@@ -281,20 +281,35 @@ export const EMBLEMS = {
     ${shaded('M38 60 C40 57 43 61 42 64 C40 67 36 65 37 62 Z', W, '', SW_FINE)}
     ${shaded('M58 66 C60 64 62 67 61 69 C59 71 56 69 57 67 Z', W, '', SW_FINE)}`),
 
-  /* Fried egg on a plate — a white that spreads unevenly, the yolk proud of it.
+  /* Fried egg — a white that spreads unevenly, the yolk sitting proud of it.
 
-     The egg alone had no second colour anywhere: a white shape, a yellow yolk,
-     and two sparkles. The plate is drawn first so the egg's own outline hides
-     where the two meet, and it is the one place the accent can go without
-     turning something edible a colour food is not. */
+     The accent was a plate under it for one release and it never read as one:
+     the egg is nearly as wide as the box, so all a plate can do is show as a
+     band below the egg, and a band below an egg is a brown bar. The yolk is
+     the accent instead, which is the one island in this whole set that cannot
+     be misread as a hole — everybody knows what a fried egg looks like.
+
+     This one carries its accent in the sparkles and nothing else, which is the
+     right answer rather than a shortfall. Three attempts to give it a second
+     coloured form all made it worse: a plate came out as a brown bar under the
+     egg, the yolk in the accent read as a tomato, and swapping the white to
+     `--emb-hi` turned it to cardboard, because a 0.065-chroma tint at hue 85
+     is a khaki rather than a cream. A fried egg is two tones. Forcing a third
+     into it is how the last three versions got worse than the first.
+
+     No shading on either form: white does not take a hue-tinted plane without
+     looking grubby, and the yolk is small enough that a plane closes inside it
+     rather than running across it.
+
+     The white is `--emb-hi`, which themes.css pins near-white for gudetama
+     specifically. `--card` would be the obvious token and it is a hair off the
+     page colour, so on a dark page the egg came out as a black blob. */
   gudetama: ink(`
-    ${shaded('M16 67 C16 77 32 85 50 85 C68 85 84 77 84 67 C84 62 74 59 50 59 '
-             + 'C26 59 16 62 16 67 Z', A, '', SW_MID)}
     ${shaded('M25 71 C15 70 10 60 17 53 C13 45 21 39 28 43 C27 32 39 27 46 34 '
              + 'C50 27 60 26 65 32 C73 29 82 35 80 44 C89 47 90 58 82 63 '
-             + 'C84 70 76 74 68 71 Z', W)}
+             + 'C84 70 76 74 68 71 Z', HI)}
     ${shaded('M46 41 C57 39 66 47 65 57 C64 67 53 72 45 67 C36 61 36 45 46 41 Z', P,
-             lit(50), SW_MID)}
+             '', SW_MID)}
     ${spark(80, 27, 4.5)}
     ${spark(20, 34, 3.5)}`),
 
@@ -361,21 +376,28 @@ export const EMBLEMS = {
              + 'C28 65 27 60 26 54 Z', A)}
     ${shaded('M24 34 C31 26 63 26 70 34 C64 44 30 44 24 34 Z', W, '', SW_MID)}`),
 
-  /* Beret — a slouched crown, a band in front of it, a stalk behind.
+  /* Crème caramel — custard, a caramel top that runs down it, a pool at the base.
 
-     The crown is yellow in its own theme, and `--emb-lo` on a yellow turns
-     olive: the shaded half read as dirt rather than as shadow. A narrower
-     shadow and a proper highlight down the lit side fixes it without touching
-     the token, which every other emblem depends on. */
+     This was a beret, and it was the worst drawing in the set. Everything
+     about it fought the palette: this theme's primary is a yellow at hue 101,
+     which is already halfway to green, and the outline derived from the same
+     hue is a dark olive — so a large plain dome of it read as mud with a
+     muddier line round it. Worse, the band across the front sat under a wide
+     dome and turned into a mouth, the same way the paw print's band did.
+
+     Pompompurin means pudding. A crème caramel is two colours by nature, it
+     has real structure to draw instead of one plain dome, and the caramel
+     running down the side is the interior detail the beret never had. */
   pompompurin: ink(`
-    ${shaded('M48 33 C45 29 47 22 51 22 C56 22 58 29 55 33 Z', A, '', SW_MID)}
-    ${shaded('M21 55 C21 41 35 33 51 33 C68 33 81 42 80 55 C79 65 66 71 50 71 '
-             + 'C33 71 22 65 21 55 Z', P,
-             lit(40) + shade(70))}
-    <path d="M34 45 C43 40 58 40 67 45" stroke-width="${SW_FINE}"/>
-    ${shaded('M28 64 C42 72 58 72 72 64 C75 70 73 77 66 79 C55 83 40 82 32 78 '
-             + 'C26 75 25 69 28 64 Z', A)}
-    <path d="M37 74 C45 77 56 77 64 74" stroke-width="${SW_FINE}"/>`),
+    ${shaded('M37 29 C44 26 56 26 63 29 C68 42 72 57 75 71 C63 76 37 76 25 71 '
+             + 'C28 57 32 42 37 29 Z', P,
+             lit(38) + shade(66))}
+    ${shaded('M37 29 C44 26 56 26 63 29 C64 36 65 43 65 48 C62 52 59 49 57 45 '
+             + 'C55 51 51 53 48 48 C46 53 42 54 39 49 C37 44 36 36 37 29 Z', A,
+             '', SW_MID)}
+    ${shaded('M25 70 C37 76 63 76 75 70 C79 74 77 80 72 81 C60 84 40 84 28 81 '
+             + 'C23 80 21 74 25 70 Z', A, '', SW_MID)}
+    ${spark(79, 24, 4.5)}`),
 
   /* Microphone — grille, stand, base, and the sound coming off it.
 
@@ -405,12 +427,18 @@ export const EMBLEMS = {
      were hand-typed rather than derived.
 
      A beach ball's panels are four curves between the same two poles. They
-     cannot be misaligned, because they all start and end at the same place. */
+     cannot be misaligned, because they all start and end at the same place.
+
+     No `--card` anywhere in it. The ball was white for one release and card is
+     a hair off the page colour, so on a dark page the ball turned near-black
+     and the panels became stripes on a hole. Base, pale panel and accent panel
+     are all derived from the theme, so all three stay light whichever way the
+     page goes. */
   pochacco: ink(`
     ${shaded('M50 19 C68 19 81 33 81 50 C81 68 67 81 50 81 C32 81 19 67 19 50 '
-             + 'C19 32 33 19 50 19 Z', W,
-             lit(36))}
-    ${shaded('M50 19 C29 30 29 70 50 81 C53 70 53 30 50 19 Z', P, '', SW_MID)}
+             + 'C19 32 33 19 50 19 Z', P,
+             shade(64))}
+    ${shaded('M50 19 C29 30 29 70 50 81 C53 70 53 30 50 19 Z', HI, '', SW_MID)}
     ${shaded('M50 19 C53 30 53 70 50 81 C75 70 75 30 50 19 Z', A, '', SW_MID)}
     ${spark(78, 24, 5)}`),
 
