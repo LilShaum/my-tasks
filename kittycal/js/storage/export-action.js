@@ -15,6 +15,7 @@
 import { todayKey } from '../utils/date.js';
 import { toast } from '../ui/toast.js';
 import * as backup from './backup.js';
+import * as csv from './csv.js';
 import * as store from '../state/store.js';
 
 /**
@@ -49,4 +50,31 @@ export async function exportEverything() {
 
   const days = Object.keys(state.logs).length;
   toast(`Exported ${days} logged ${days === 1 ? 'day' : 'days'}`);
+}
+
+/**
+ * The same data as a spreadsheet.
+ *
+ * Deliberately does *not* touch `lastBackup`. The CSV is lossy by design —
+ * labels rather than ids, no settings, no round trip — so treating it as a
+ * backup would mean the app stopped asking for a real one on the strength of a
+ * file that cannot restore her. It is an export for reading, and the backup
+ * prompt is about surviving a dead phone.
+ *
+ * @returns {Promise<void>}
+ */
+export async function exportCSV() {
+  await store.flushNow();
+  const state = store.getState();
+
+  const text = csv.toCSV({
+    settings: state.settings,
+    logs: state.logs,
+    periodDays: state.periodDays,
+  });
+
+  backup.downloadFile(text, csv.csvFilename(), 'text/csv');
+
+  const days = Object.keys(state.logs).length;
+  toast(`${days} ${days === 1 ? 'day' : 'days'} as a spreadsheet`);
 }

@@ -180,3 +180,68 @@ export function measuredLuteal(logs, cycles) {
 
   return { days: median, samples: observations.length, observations };
 }
+
+/**
+ * @typedef {Object} CycleSignals
+ * @property {DateKey|null} peakTest   day a peak ovulation test was logged
+ * @property {DateKey|null} shift      first day of a sustained temperature rise
+ * @property {DateKey|null} eggWhite   most recent egg-white discharge
+ * @property {DateKey|null} confirmed  the ovulation date, if it can be dated
+ * @property {'test'|'temperature'|null} source
+ * @property {boolean} corroborated    both signals agree, within two days
+ */
+
+/**
+ * What her own data says about the cycle she is *in*.
+ *
+ * `confirmedOvulations` above deliberately only looks at completed cycles,
+ * because it exists to measure luteal length and that needs a next period to
+ * measure to. But "has it happened yet, this month" is the question someone
+ * trying to conceive is actually asking, and it is answerable from the same two
+ * observations without waiting for the cycle to end.
+ *
+ * The double check is the point, and it is why this reports both signals rather
+ * than only the winner. A positive test says the surge happened, which is not
+ * quite the same as the egg being released; a thermal shift says the
+ * progesterone rise happened, which is good evidence it was, but a fever or a
+ * bad night's sleep can fake one. Sensiplan-style rules exist because either
+ * alone is weaker than both agreeing — so where both are present and land
+ * within two days of each other, say so, and where they disagree, do not
+ * quietly prefer one and present it as settled.
+ *
+ * Mucus is reported but never used to date anything: egg-white discharge marks
+ * the fertile stretch approaching ovulation rather than the event, so it
+ * belongs on the screen and not in the arithmetic.
+ *
+ * @param {Record<DateKey, DayLog>} logs
+ * @param {Cycle|null} cycle the running cycle
+ * @param {DateKey} today
+ * @returns {CycleSignals|null}
+ */
+export function cycleSignals(logs, cycle, today) {
+  if (!cycle) return null;
+
+  const days = range(cycle.start, today);
+
+  const peak = days.find((d) => logs[d]?.testOvulation === 'peak') ?? null;
+
+  const readings = days
+    .map((d) => ({ date: d, bbt: logs[d]?.bbt }))
+    .filter((r) => typeof r.bbt === 'number')
+    .map((r) => ({ date: r.date, bbt: /** @type {number} */ (r.bbt) }));
+  const shift = detectThermalShift(readings);
+
+  const eggWhite = [...days].reverse()
+    .find((d) => logs[d]?.discharge.includes('egg-white')) ?? null;
+
+  const fromTest = peak ? ovulationFromPeak(peak) : null;
+  const fromShift = shift ? ovulationFromShift(shift) : null;
+
+  const confirmed = fromTest ?? fromShift;
+  const source = fromTest ? 'test' : fromShift ? 'temperature' : null;
+
+  const corroborated = fromTest != null && fromShift != null
+    && Math.abs(daysBetween(fromTest, fromShift)) <= 2;
+
+  return { peakTest: peak, shift, eggWhite, confirmed, source, corroborated };
+}

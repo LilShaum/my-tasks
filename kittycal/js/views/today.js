@@ -36,6 +36,8 @@ import { buildCycles, cycleLengths, periodLengths } from '../domain/cycles.js';
 import { predict, conceptionChance } from '../domain/predict.js';
 import { phaseFor } from '../domain/phases.js';
 import { evaluate } from '../domain/acog.js';
+import { packPosition, describePack, unmarkedDays } from '../domain/pill.js';
+import { cycleSignals } from '../domain/ovulation.js';
 import { cycleRing } from '../ui/ring.js';
 import { spotArt } from '../ui/mascot.js';
 import * as store from '../state/store.js';
@@ -122,10 +124,36 @@ export function renderToday(host) {
     */
     showRecap ? recapCard(/** @type {NonNullable<typeof recap>} */ (recap)) : null,
 
+    /*
+      Trying to conceive reorders this stack rather than replacing it.
+
+      The two cards are the same two cards; what changes is which one is
+      answering her question. In plain cycle tracking the first thing she wants
+      is when the next period is. Trying to conceive, it is the fertile window
+      and whether ovulation has happened yet — and burying that under a period
+      countdown makes her scroll past the answer every single day. That is the
+      whole of the mode: no separate screen, no second app, no daily question
+      the other mode does not ask.
+    */
     el('div', { class: 'section stagger' }, [
-      prediction.stale ? staleCard(prediction)
-        : prediction.isLate ? lateCard(prediction) : nextPeriodCard(prediction),
-      prediction.showFertility && prediction.ovulation ? fertileCard(prediction, today) : null,
+      ...(settings.mode === 'conceive' && prediction.showFertility
+        ? [
+            prediction.ovulation ? fertileCard(prediction, today) : null,
+            ovulationSignalCard(logs, cycles, today),
+            prediction.stale ? staleCard(prediction)
+              : prediction.isLate ? lateCard(prediction)
+                : prediction.withinWindow ? dueCard(prediction)
+                  : nextPeriodCard(prediction),
+          ]
+        : [
+            prediction.stale ? staleCard(prediction)
+              : prediction.isLate ? lateCard(prediction)
+                : prediction.withinWindow ? dueCard(prediction)
+                  : nextPeriodCard(prediction),
+            prediction.showFertility && prediction.ovulation
+              ? fertileCard(prediction, today) : null,
+          ]),
+      packCard(settings, logs, today),
       ...acogCards(cycles, today, prediction, logs),
     ]),
 
@@ -613,15 +641,45 @@ function greeting(name, today) {
  * @param {import('../domain/predict.js').Prediction} prediction
  */
 function ringHeadline(prediction) {
-  // Nothing to count down to, and nothing honest to put in the middle of a
-  // ring that is meant to show where you are in a cycle.
-  if (prediction.stale) return { value: '—', caption: 'no recent period logged' };
+  /*
+    Nothing to count down to. What goes in the middle depends on why.
+
+    A dormant record supports no number at all. An absent period does: she has
+    been logging, so "128 days since your period" is a measurement she made,
+    and it is the single most relevant thing on the screen. Blanking it to a
+    dash threw away her own observation and told her the app had lost the
+    thread.
+  */
+  if (prediction.stale) {
+    if (prediction.staleReason === 'absent' && prediction.daysSinceStart != null) {
+      return {
+        value: String(prediction.daysSinceStart),
+        caption: 'days since your period',
+      };
+    }
+    return { value: '—', caption: 'no recent period logged' };
+  }
 
   if (prediction.isLate && prediction.daysLate != null) {
     return {
       value: String(prediction.daysLate),
       caption: prediction.daysLate === 1 ? 'day late' : 'days late',
     };
+  }
+
+  /*
+    Past the estimate and still inside her own spread. Before lateness was
+    measured from the window this state could not happen, and the countdown
+    below would render it as "−2 days to your period".
+
+    The estimate day itself keeps its own line. "Today, period expected" is
+    more use than "due, any day now", and it is the message this ring has
+    always shown on that day.
+  */
+  if (prediction.withinWindow) {
+    return prediction.daysUntilPeriod === 0
+      ? { value: 'Today', caption: 'period expected' }
+      : { value: 'Due', caption: 'any day now' };
   }
 
   const today = todayKey();
@@ -781,7 +839,35 @@ function confidenceLine(prediction) {
  * @param {import('../domain/predict.js').Prediction} prediction
  */
 function staleCard(prediction) {
-  const months = Math.round((prediction.daysSinceStart ?? 0) / 30);
+  const days = prediction.daysSinceStart ?? 0;
+  const months = Math.round(days / 30);
+
+  /*
+    Two situations, one of which this card used to get badly wrong.
+
+    "Too far back to predict from \u2014 mark your most recent period" is the right
+    thing to say to someone who put the app down in March. Said to someone who
+    checked in this morning it is false and it is rude: she has marked every
+    period she has had, and there simply has not been one. The app was blaming
+    her records for its own inability to forecast, at the point in her life when
+    a period stopping is the observation that matters most.
+
+    So the ask changes with the reason. Dormant gets a way back in. Absent gets
+    the plain fact, and a pointer at a clinician rather than at the calendar \u2014
+    the ACOG flag below this card is already saying the same thing, and this one
+    no longer contradicts it.
+  */
+  if (prediction.staleReason === 'absent') {
+    return el('div', { class: 'card data-zone' }, [
+      el('h3', { text: 'No period logged for a while' }),
+      el('p', { class: 'big-value num', text: plural(days, 'day') }),
+      el('p', { class: 'hint-sm', text:
+        'Since your last one started. Your records are fine \u2014 there is just ' +
+        'nothing to predict from until the next one, so the forecast is paused ' +
+        'rather than guessing. Keep logging as usual and it picks straight ' +
+        'back up.' }),
+    ]);
+  }
 
   return el('div', { class: 'card data-zone' }, [
     el('h3', { text: 'Let\u2019s pick this back up' }),
@@ -802,6 +888,41 @@ function staleCard(prediction) {
 }
 
 /**
+ * Past the estimate, still inside her own variation.
+ *
+ * This state had no card because it had no existence: anything past the
+ * predicted date was late. For a cycle that runs 26 to 48 days that meant the
+ * app called her late for most of the month, every month. Here the window it
+ * already drew is doing the talking, and the offer to log is the same one the
+ * late card makes, because the useful action is identical.
+ *
+ * @param {import('../domain/predict.js').Prediction} prediction
+ */
+function dueCard(prediction) {
+  const window = prediction.startWindow;
+
+  return el('div', { class: 'card data-zone' }, [
+    el('h3', { text: 'Your period is due' }),
+    el('p', { class: 'big-value num', text: window
+      ? `${fmtDayMonth(window.from)} \u2013 ${fmtDayMonth(window.to)}`
+      : 'Any day now' }),
+    el('p', { class: 'hint-sm', text: window
+      ? 'You are inside the window your own cycles point at, so this is on ' +
+        'time rather than late.'
+      : 'Around now, going by your average.' }),
+
+    el('button', {
+      type: 'button',
+      class: 'btn',
+      style: { marginTop: 'var(--sp-3)' },
+      onclick: () => { haptic(); openCheckin(todayKey()); },
+    }, ['It started today']),
+
+    confidenceLine(prediction),
+  ]);
+}
+
+/**
  * Lateness is a first-class state, not a silently redrawn prediction. The copy
  * stays factual and explicitly avoids speculating about why.
  * @param {import('../domain/predict.js').Prediction} prediction
@@ -811,8 +932,16 @@ function lateCard(prediction) {
   return el('div', { class: 'card data-zone' }, [
     el('h3', { text: 'Your period is late' }),
     el('p', { class: 'big-value num', text: plural(days, 'day') }),
+    /*
+      The count is days past the *window*, not past the estimate, so the
+      sentence has to name the window or the number looks wrong against the
+      date sitting above it.
+    */
     el('p', { class: 'hint-sm', text:
-      `Expected around ${prediction.nextStart ? fmtDayMonth(prediction.nextStart) : '—'}. ` +
+      (prediction.startWindow
+        ? `Past the ${fmtDayMonth(prediction.startWindow.from)} – ` +
+          `${fmtDayMonth(prediction.startWindow.to)} window your cycles point at. `
+        : `Expected around ${prediction.nextStart ? fmtDayMonth(prediction.nextStart) : '—'}. `) +
       'Cycles shift for all sorts of ordinary reasons — stress, travel, illness, ' +
       'a change in sleep. Kittycal will update once you log your next period.' }),
 
@@ -900,6 +1029,135 @@ function fertileCard(prediction, today) {
  * @param {import('../domain/predict.js').Prediction} prediction
  * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
  */
+/**
+ * What her own observations say about ovulation this cycle — the double check.
+ *
+ * Only in conceive mode, because it is the one question that mode exists to
+ * answer and it is noise in the other. Every fertile window elsewhere in the
+ * app is arithmetic: next period minus luteal length. This card is the
+ * opposite — nothing here is predicted, all of it is something she recorded.
+ *
+ * It reports both signals rather than just the winner. A peak test says the
+ * surge happened; a thermal shift says the progesterone rise did. Either alone
+ * is weaker than both agreeing, which is why sympto-thermal methods use two,
+ * and when they disagree the honest output is to show both rather than quietly
+ * pick one and present it as settled.
+ *
+ * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
+ * @param {import('../domain/cycles.js').Cycle[]} cycles
+ * @param {DateKey} today
+ */
+function ovulationSignalCard(logs, cycles, today) {
+  const signals = cycleSignals(logs, cycles[cycles.length - 1] ?? null, today);
+  if (!signals) return null;
+
+  const { confirmed, source, peakTest, shift, eggWhite, corroborated } = signals;
+
+  // Nothing recorded yet this cycle. Say what would answer it rather than
+  // showing an empty card.
+  if (!confirmed && !eggWhite) {
+    return el('div', { class: 'card data-zone' }, [
+      el('h3', { text: 'Has ovulation happened?' }),
+      el('p', { class: 'hint-sm', text:
+        'Nothing recorded this cycle that can date it yet. A positive ovulation ' +
+        'test, or a temperature taken each morning, is what turns the estimate ' +
+        'above into an observation.' }),
+    ]);
+  }
+
+  return el('div', { class: 'card data-zone' }, [
+    el('h3', { text: 'Has ovulation happened?' }),
+    el('p', { class: 'big-value num', text: confirmed
+      ? `Around ${fmtDayMonth(confirmed)}`
+      : 'Not yet dated' }),
+
+    /*
+      Four states, not two.
+
+      The card originally had a branch for each signal on its own and one for
+      the two agreeing, which read correctly right up until both were present
+      and disagreed — it then said "a temperature taken each morning would
+      corroborate it" directly above a temperature rise it had just listed.
+      Suggesting she do the thing she has already done, while quietly ignoring
+      that it points somewhere else, is the failure this card exists to avoid.
+    */
+    confirmed && el('p', { class: 'hint-sm', text: corroborated
+      ? 'Your test and your temperature both point at that day, within two days ' +
+        'of each other. That is the strongest this can get from your own data.'
+      : (peakTest && shift)
+        ? 'Your test and your temperature point at days more than two apart, so ' +
+          'this is the test’s answer — it observes the surge directly, where a ' +
+          'temperature rise is an inference. Both are listed below.'
+        : source === 'test'
+          ? 'From a positive ovulation test. A temperature taken each morning ' +
+            'would corroborate it.'
+          : 'From a sustained temperature rise. A bad night’s sleep or a fever ' +
+            'can produce one, so an ovulation test would corroborate it.' }),
+
+    el('ul', { class: 'flag-list' }, [
+      peakTest && el('li', { text: `Peak test on ${fmtDayMonth(peakTest)}` }),
+      shift && el('li', { text: `Temperature rise from ${fmtDayMonth(shift)}` }),
+      // Mucus is shown and never used to date anything: it marks the fertile
+      // stretch approaching ovulation, not the event.
+      eggWhite && el('li', { text:
+        `Egg-white discharge on ${fmtDayMonth(eggWhite)} — the fertile stretch, ` +
+        'not the day itself' }),
+    ].filter(Boolean)),
+  ]);
+}
+
+/**
+ * Where she is in the pack, and which days have nothing on them.
+ *
+ * Absent entirely unless she has told Settings there is a pack — this is not
+ * a question the daily loop should be asking of the two-thirds of users it
+ * does not apply to.
+ *
+ * The wording is the point. It says days are *not marked*, never that pills
+ * were missed: the app knows what is in its own records and nothing about what
+ * she swallowed, and frightening someone about a pill she actually took is a
+ * worse failure than saying nothing. What to do about a genuinely missed one
+ * is the leaflet's job, and the card says so rather than improvising medical
+ * advice.
+ *
+ * @param {import('../domain/model.js').Settings} settings
+ * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
+ * @param {DateKey} today
+ */
+function packCard(settings, logs, today) {
+  const position = packPosition(settings, today);
+  if (!position) return null;
+
+  const unmarked = unmarkedDays(logs, settings, today);
+  const takenToday = logs[today]?.pillTaken === true;
+
+  return el('div', { class: 'card data-zone' }, [
+    el('h3', { text: 'Your pack' }),
+    el('p', { class: 'big-value num', text: describePack(position) ?? '' }),
+    el('p', { class: 'hint-sm', text: position.active
+      ? `${plural(position.left, 'day')} of this pack left, then ` +
+        `${plural(position.breakDays, 'day')} off.`
+      : `${plural(position.total - position.day + 1, 'day')} until the next pack.` }),
+
+    position.active && !takenToday && el('button', {
+      type: 'button',
+      class: 'btn',
+      style: { marginTop: 'var(--sp-3)' },
+      onclick: () => { haptic(); openCheckin(today); },
+    }, ['Mark today']),
+
+    unmarked.length ? el('div', { class: 'alert alert-info',
+      style: { marginTop: 'var(--sp-3)' } }, [
+      el('span', { class: 'alert-icon', text: 'i', 'aria-hidden': 'true' }),
+      el('div', { text:
+        `Nothing marked on ${unmarked.map(fmtDayMonth).join(', ')}. That may just ` +
+        'mean the app was not open — Kittycal only knows what is in its own ' +
+        'records. If you think you did miss one, the leaflet in the packet says ' +
+        'what to do.' }),
+    ]) : null,
+  ]);
+}
+
 function acogCards(cycles, today, prediction, logs) {
   const flags = evaluate({
     cycleLengths: cycleLengths(cycles),

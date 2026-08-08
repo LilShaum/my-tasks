@@ -166,9 +166,11 @@ export function parseImport(text) {
  * only approach that works across mobile browsers without a server.
  * @param {string} text
  * @param {string} filename
+ * @param {string} [type] mime type; the CSV export needs its own, or a
+ *   spreadsheet asked to open the file has to guess from the extension
  */
-export function downloadFile(text, filename) {
-  const blob = new Blob([text], { type: 'application/json' });
+export function downloadFile(text, filename, type = 'application/json') {
+  const blob = new Blob([text], { type });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
