@@ -79,7 +79,8 @@ const path = await download.path();
 const fs = await import('node:fs/promises');
 const text = await fs.readFile(path, 'utf8');
 const lines = text.trim().split('\r\n');
-check(lines[0].startsWith('date,cycle,cycle day,period day,flow'), 'header is the day table');
+check(lines[0].startsWith('date,cycle,cycle day,cycle length,period day,flow'),
+  'header is the day table', lines[0].slice(0, 60));
 check(lines.length === 17, 'a row per period day plus the logged day', `${lines.length - 1} rows`);
 check(text.includes('"a note, with a comma"'), 'a note with a comma is quoted');
 check(text.includes('Cramps: Severe'), 'severity is written beside its symptom');

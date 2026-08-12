@@ -42,6 +42,9 @@ const PRECACHE = [
   'assets/fonts/nunito.woff2',
   'assets/fonts/fredoka.woff2',
   'assets/icons/icon.svg',
+  // The one iOS actually puts on the Home Screen. index.html links it and
+  // PRECACHE did not have it, which test/precache.test.js is here to notice.
+  'assets/icons/icon-180.png',
   'assets/mascots/manifest.json',
 
   'js/main.js',

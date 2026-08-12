@@ -328,21 +328,6 @@ function periodLengthCard(points) {
 }
 
 /**
- * How often the app has been right.
- *
- * Everywhere else the app describes *her*. This is the one card that describes
- * the app, scored against her, and it is the only number on the screen that
- * Kittycal has an incentive to hide. A confidence badge asks to be believed; a
- * hit rate can be checked.
- *
- * Silent until there are enough scored cycles to mean anything — three — and
- * silent about anything it cannot support: the bias line only appears when the
- * app is consistently out in one direction, because "runs a day late" is
- * actionable and "sometimes early, sometimes late" is just the error bar again.
- *
- * @param {import('../domain/cycles.js').Cycle[]} cycles
- */
-/**
  * One row per cycle, newest first, each openable.
  *
  * The cycle-length chart above answers "are my cycles consistent" and gives no
@@ -465,6 +450,21 @@ function openCycleDetail(logs, cycle, average) {
   });
 }
 
+/**
+ * How often the app has been right.
+ *
+ * Everywhere else the app describes *her*. This is the one card that describes
+ * the app, scored against her, and it is the only number on the screen that
+ * Kittycal has an incentive to hide. A confidence badge asks to be believed; a
+ * hit rate can be checked.
+ *
+ * Silent until there are enough scored cycles to mean anything — three — and
+ * silent about anything it cannot support: the bias line only appears when the
+ * app is consistently out in one direction, because "runs a day late" is
+ * actionable and "sometimes early, sometimes late" is just the error bar again.
+ *
+ * @param {import('../domain/cycles.js').Cycle[]} cycles
+ */
 function accuracyCard(cycles) {
   const record = predictionAccuracy(cycles);
   if (record.total < MIN_SCORED) return null;

@@ -474,14 +474,6 @@ function phaseLine(phase) {
 }
 
 /**
- * The primary action, directly under the ring rather than at the bottom of the
- * screen. Shows what's already recorded so tapping it isn't a leap of faith.
- * @param {import('../domain/model.js').DayLog|undefined} log
- * @param {DateKey} today
- * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
- * @param {import('../domain/cycles.js').Cycle[]} cycles
- */
-/**
  * The daily log area.
  *
  * Two states, and only two.
@@ -1022,14 +1014,6 @@ function fertileCard(prediction, today) {
 
 
 /**
- * ACOG-based prompts. Framed as things worth raising with a doctor, never as
- * findings — this is not a screening tool and doesn't pretend to be.
- * @param {import('../domain/cycles.js').Cycle[]} cycles
- * @param {DateKey} today
- * @param {import('../domain/predict.js').Prediction} prediction
- * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
- */
-/**
  * What her own observations say about ovulation this cycle — the double check.
  *
  * Only in conceive mode, because it is the one question that mode exists to
@@ -1135,8 +1119,13 @@ function packCard(settings, logs, today) {
     el('h3', { text: 'Your pack' }),
     el('p', { class: 'big-value num', text: describePack(position) ?? '' }),
     el('p', { class: 'hint-sm', text: position.active
-      ? `${plural(position.left, 'day')} of this pack left, then ` +
-        `${plural(position.breakDays, 'day')} off.`
+      // A continuous pack has no break, and "then 0 days off" under a regimen
+      // labelled "Every day, no break" is the card contradicting the setting
+      // that drew it.
+      ? `${plural(position.left, 'day')} of this pack left` +
+        (position.breakDays
+          ? `, then ${plural(position.breakDays, 'day')} off.`
+          : ', then straight on to the next.')
       : `${plural(position.total - position.day + 1, 'day')} until the next pack.` }),
 
     position.active && !takenToday && el('button', {
@@ -1158,6 +1147,14 @@ function packCard(settings, logs, today) {
   ]);
 }
 
+/**
+ * ACOG-based prompts. Framed as things worth raising with a doctor, never as
+ * findings — this is not a screening tool and doesn't pretend to be.
+ * @param {import('../domain/cycles.js').Cycle[]} cycles
+ * @param {DateKey} today
+ * @param {import('../domain/predict.js').Prediction} prediction
+ * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
+ */
 function acogCards(cycles, today, prediction, logs) {
   const flags = evaluate({
     cycleLengths: cycleLengths(cycles),

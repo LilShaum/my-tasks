@@ -23,7 +23,26 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # The suite has to pass before anything reaches a phone. This deploy used to
+  # be unconditional, so a push that broke the app shipped it — and because the
+  # service worker is cache-first, an installed copy would then hold the broken
+  # version until the next deploy. `.github/workflows/test.yml` runs the same
+  # two commands on pull requests.
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: kittycal
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm test
+      - run: npm run typecheck
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     environment:
       name: github-pages

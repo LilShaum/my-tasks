@@ -11,7 +11,8 @@ import assert from 'node:assert/strict';
 import {
   toCSV, csvField, parseCSV, parseDate, sniffDateOrder, parseFlow, parseCSVImport,
 } from '../js/storage/csv.js';
-import { emptyLog, defaultSettings } from '../js/domain/model.js';
+import { emptyLog, defaultSettings, isLogEmpty } from '../js/domain/model.js';
+import { addDays } from '../js/utils/date.js';
 
 const state = (logs = {}, periodDays = []) => ({
   settings: defaultSettings(),
@@ -40,10 +41,39 @@ test('a note that looks like a formula is defused, not executed', () => {
 /* ── Export ──────────────────────────────────────────────────────────────── */
 
 test('a period day with nothing else logged still gets a row', () => {
-  const text = toCSV(state({}, ['2026-03-01', '2026-03-02']));
-  const lines = text.trim().split('\r\n');
-  assert.equal(lines.length, 3, 'header plus two days');
-  assert.ok(lines[1].startsWith('2026-03-01,1,1,yes'), lines[1]);
+  // Read by column name rather than by position: this assertion used to pin a
+  // literal row prefix, so adding a column two places along failed a test that
+  // had nothing to do with the change.
+  const rows = parseCSV(toCSV(state({}, ['2026-03-01', '2026-03-02'])));
+  const at = (/** @type {string} */ name) => rows[0].indexOf(name);
+
+  assert.equal(rows.length, 3, 'header plus two days');
+  assert.equal(rows[1][at('date')], '2026-03-01');
+  assert.equal(rows[1][at('period day')], 'yes');
+  assert.equal(rows[1][at('cycle day')], '1');
+});
+
+test('cycle length is on every row of the cycle, and blank while it runs', () => {
+  /*
+    Without this column the only way to get a cycle's length out of the file is
+    to lag successive cycle starts, because a sparse logger's rows stop well
+    short of her cycle: the obvious pivot — max of `cycle day`, or a count of
+    rows — returns the length of her *logging*, not of her cycle. One
+    denormalised column makes the obvious thing correct.
+  */
+  const days = [];
+  for (const start of [0, 29]) for (let d = 0; d < 3; d += 1) days.push(addDays('2026-01-01', start + d));
+  const rows = parseCSV(toCSV(state({}, days)));
+  const at = (/** @type {string} */ name) => rows[0].indexOf(name);
+
+  const first = rows.filter((r) => r[at('cycle')] === '1');
+  assert.ok(first.length > 1);
+  assert.ok(first.every((r) => r[at('cycle length')] === '29'),
+    'every row of a closed cycle carries its length');
+
+  const running = rows.filter((r) => r[at('cycle')] === '2');
+  assert.ok(running.every((r) => r[at('cycle length')] === ''),
+    'the running cycle has no length yet and must not claim one');
 });
 
 test('the export carries cycle number and cycle day', () => {
@@ -139,6 +169,37 @@ test('a plain date and flow file imports, and sets period days', () => {
   assert.deepEqual([...(result.periodDays ?? [])].sort(), ['2026-03-01', '2026-03-02']);
   assert.equal(result.logs?.['2026-03-01'].notes, 'rough one');
   assert.equal(result.logs?.['2026-03-15'].flow, 'none', 'a stated no-bleed is a real answer');
+});
+
+test('every day the import promises survives being saved', () => {
+  /*
+    The bug this exists for: `parseCSVImport` counted a row as understood
+    whenever the flow cell parsed, including to `none` — and a log carrying
+    nothing but `flow: 'none'` is one `repo.saveLogs` deletes on the way to
+    disk, because `isLogEmpty` is `!checkedIn && nothingRecorded`. Most rows in
+    a real export say "no period today", so a seven-row file reported seven
+    days, wrote seven days, and kept two.
+
+    The test above already asserted that a stated no-bleed parses to `none`,
+    and that was true the whole time. What nothing asked was whether the day
+    then *survived*, which is the only question the promise on the confirm
+    sheet actually depends on. So this one crosses the boundary the other tests
+    stop at: it takes what the importer hands back and applies the same rule
+    the storage layer will.
+  */
+  const result = parseCSVImport(
+    'date,period\n2026-01-01,no\n2026-01-02,no\n2026-01-03,heavy\n2026-01-04,no\n',
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.understood, 4);
+
+  const days = Object.values(result.logs ?? {});
+  const dropped = days.filter(isLogEmpty).map((l) => l.date);
+  assert.deepEqual(dropped, [],
+    'the importer promised days that storage would have thrown away');
+  assert.equal(days.length, result.understood,
+    'understood must be the number of days that actually persist');
 });
 
 test('unreadable rows are counted and reported, not silently dropped', () => {

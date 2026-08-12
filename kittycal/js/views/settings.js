@@ -243,7 +243,6 @@ function lutealHint() {
       + 'is using; this box is the fallback.';
 }
 
-/** @param {import('../domain/model.js').Settings} settings */
 /**
  * Methods that arrive as a pack with a break in it. An implant, an injection
  * or an IUD does not, so the pack rows never appear for those.

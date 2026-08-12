@@ -13,8 +13,9 @@ promising it.
 
 Flo is the obvious choice and the wrong one to hand this data to. In 2021 the
 FTC charged Flo Health with promising privacy while sending menstruation and
-pregnancy status to Facebook's and Google's analytics SDKs; a 2025 class action
-alleges the data kept reaching Meta, and a $3.5M settlement followed. On top of
+pregnancy status to Facebook's and Google's analytics SDKs; in a 2025 class
+action Google and Flo settled for a combined $56M, and a jury found Meta liable
+under California's wiretap statute. On top of
 that, the genuinely useful parts — cycle reports, symptom pattern analysis, a
 health report you can hand a doctor — sit behind a $49.99/year paywall.
 
@@ -95,7 +96,7 @@ server first:
 
 ```sh
 npm run serve &
-npm run test:contrast   # 196 colour pairs, 14 themes x 2 modes
+npm run test:contrast   # every colour pair, 14 themes x 2 modes
 npm run test:network    # asserts zero off-origin requests, and offline works
 ```
 

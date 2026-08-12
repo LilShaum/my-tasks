@@ -40,7 +40,7 @@ import { daysBetween } from '../utils/date.js';
 /* ── Writing ─────────────────────────────────────────────────────────────── */
 
 const COLUMNS = [
-  'date', 'cycle', 'cycle day', 'period day', 'flow',
+  'date', 'cycle', 'cycle day', 'cycle length', 'period day', 'flow',
   'symptoms', 'severity', 'moods', 'discharge', 'sex', 'sex drive',
   'activity', 'life', 'custom',
   'bbt (C)', 'weight (kg)', 'water (ml)', 'sleep (hours)', 'steps',
@@ -100,6 +100,7 @@ export function toCSV({ logs, periodDays }) {
       date,
       index,
       cycle ? daysBetween(cycle.start, date) + 1 : '',
+      cycle?.length ?? '',
       period.has(date) ? 'yes' : 'no',
       log.flow === 'none' ? '' : labelFor('flow', log.flow),
       log.symptoms.map(labelOf).join('; '),
@@ -361,6 +362,21 @@ export function parseCSVImport(text) {
       if (flow) {
         log.flow = flow;
         if (isBleeding(flow)) periodDays.add(date);
+        /*
+          A row with a flow value in it is her having answered the question,
+          in whatever app wrote the file — which is exactly what `checkedIn`
+          means here, and it has to be set or the day does not survive being
+          saved.
+
+          Most rows in a real export say "no period today". Those parse to
+          `none`, which leaves a log that `nothingRecorded` calls empty; with
+          `checkedIn` false as well, `isLogEmpty` is true and `repo.saveLogs`
+          deletes the row on the way to disk. The import counted it, the
+          confirm sheet promised it, and it was gone by the next read — seven
+          rows in, two days kept. That is the failure this file's own header
+          forbids: she would believe she had moved history she had not.
+        */
+        log.checkedIn = true;
         touched = true;
       }
     }

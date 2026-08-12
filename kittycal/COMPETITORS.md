@@ -35,7 +35,7 @@ and latent risk.
 
 | App | Why it's here |
 |---|---|
-| **Flo** | 380M+ downloads, the largest by a wide margin, and the app the README already benchmarks against. Also the cautionary tale: FTC action in 2021, a $56M class-action settlement in 2025. |
+| **Flo** | 380M+ downloads, the largest by a wide margin, and the app the README already benchmarks against. Also the cautionary tale: FTC action in 2021; in a 2025 class action Google and Flo settled for a combined $56M, and a jury found Meta liable under California’s wiretap statute. The $3.5M sometimes cited was Flurry, a different defendant. |
 | **Clue** | The credibility leader. 100+ tracking options, a dedicated perimenopause mode, wearable sync, 300+ expert-written guides. |
 | **Apple Health Cycle Tracking** | The default on every iPhone, so it's the real competitor for anyone who never installs anything. Retrospective ovulation estimates from wrist temperature, cycle-deviation notifications, 12-month history as a PDF. |
 | **Natural Cycles** | The only FDA-cleared contraceptive app — six clearances now, plus Oura, Apple Watch and Garmin integrations. Defines the ceiling Kittycal explicitly declines to reach for. |
@@ -49,8 +49,11 @@ Recorded so these don't get traded away while closing a gap.
 
 - **The privacy claim is falsifiable.** Every competitor's privacy position is a
   policy document. Kittycal's is a CSP plus `test/network.mjs`, which walks the
-  app and fails on a single off-origin request. Current run: 204 same-origin, 0
-  off-origin, and the app still renders with the network cut. Euki and Drip make
+  app and fails on a single off-origin request. It reports the counts rather
+  than having them written down here, for the same reason the citations below
+  name symbols rather than lines: a number copied into prose is a number that
+  rots. Latest run was zero off-origin, with the app still rendering on a cut
+  network. Euki and Drip make
   the same promise; neither ships the test.
 - **Predictions state their own confidence, and stop.** Confidence is on the
   screen next to every forecast, never hidden (`today.js confidenceLine`). Fertile windows
@@ -75,7 +78,7 @@ Recorded so these don't get traded away while closing a gap.
   "Happy — 3 of 3 cycles" as a presenting complaint (`taxonomy.js CATEGORY_BY_ID`).
 - **Accessibility is structural.** Every colour derives from two numbers in
   OKLCH at pinned lightness, so all 14 themes hit the same contrast ratios by
-  construction, verified across 196 colour pairs.
+  construction, verified across every colour pair the app draws.
 
 ## 3. Gaps worth closing
 

@@ -166,12 +166,6 @@ export function detectRecalibration(lengths) {
 }
 
 /**
- * Rate how much to trust the forecast.
- * @param {number} cyclesLogged
- * @param {number|null} spread
- * @returns {Confidence}
- */
-/**
  * The window the next period could plausibly start in.
  *
  * The "Next period" card headlined a date range that was the predicted *bleed*
@@ -196,6 +190,18 @@ export function detectRecalibration(lengths) {
  * @param {number} cyclesLogged
  * @returns {{from: DateKey, to: DateKey, days: number}|null}
  */
+export function startWindow(nextStart, spread, cyclesLogged) {
+  if (!nextStart || spread == null || cyclesLogged < 2) return null;
+
+  // Half the spread, rounded up so a 1-day spread still reads as a day either
+  // side rather than vanishing. Capped: past a week the honest message is the
+  // confidence line saying the history is too variable to narrow down, not a
+  // fortnight-wide band presented as a forecast.
+  const days = Math.min(Math.max(Math.ceil(spread / 2), 1), 7);
+
+  return { from: addDays(nextStart, -days), to: addDays(nextStart, days), days };
+}
+
 /**
  * Days since she last recorded anything, or null if she never has.
  *
@@ -220,18 +226,12 @@ export function lastActivity(logs, today) {
   return latest == null ? null : daysBetween(latest, today);
 }
 
-export function startWindow(nextStart, spread, cyclesLogged) {
-  if (!nextStart || spread == null || cyclesLogged < 2) return null;
-
-  // Half the spread, rounded up so a 1-day spread still reads as a day either
-  // side rather than vanishing. Capped: past a week the honest message is the
-  // confidence line saying the history is too variable to narrow down, not a
-  // fortnight-wide band presented as a forecast.
-  const days = Math.min(Math.max(Math.ceil(spread / 2), 1), 7);
-
-  return { from: addDays(nextStart, -days), to: addDays(nextStart, days), days };
-}
-
+/**
+ * Rate how much to trust the forecast.
+ * @param {number} cyclesLogged
+ * @param {number|null} spread
+ * @returns {Confidence}
+ */
 export function rateConfidence(cyclesLogged, spread) {
   if (cyclesLogged === 0) return 'none';
   if (cyclesLogged < 2) return 'low';
