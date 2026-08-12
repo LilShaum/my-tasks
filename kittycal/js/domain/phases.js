@@ -186,10 +186,22 @@ export function phaseFor({ date, cycles, prediction }) {
 
   if (!prediction.lastStart || date < prediction.lastStart) return PHASES.unknown;
 
-  // Once the history has gone stale there is no cycle to be at a point in.
-  // Naming a phase here asserted things like "luteal phase" 431 days after the
-  // last logged period, which is not a claim any data supports.
-  if (prediction.stale) return PHASES.unknown;
+  /*
+    Once the history has gone stale there is no cycle to be at a point in.
+    Naming a phase here asserted things like "luteal phase" 431 days after the
+    last logged period, which is not a claim any data supports.
+
+    But `unknown` is the brand-new-user state, and it says "log a period and
+    Kittycal can start working out where you are". That is true of someone who
+    stopped using the app; it is the same insult `overdue` exists to avoid when
+    said to someone with five cycles behind her who has been checking in every
+    morning and simply has not bled since April. She has logged a period. The
+    honest line is the one `overdue` already carries — the model has run past
+    its own prediction and no longer knows.
+  */
+  if (prediction.stale) {
+    return prediction.staleReason === 'absent' ? PHASES.overdue : PHASES.unknown;
+  }
 
   /*
     Past the expected start, every extra day is a day the model did not

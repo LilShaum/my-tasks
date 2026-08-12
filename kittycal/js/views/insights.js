@@ -13,7 +13,7 @@
  */
 
 import { el, replace, haptic } from '../utils/dom.js';
-import { todayKey, fmtDayMonth, fmtMonth, addDays } from '../utils/date.js';
+import { todayKey, fmtDayMonth, fmtMonth, addDays, range } from '../utils/date.js';
 import { plural, listJoin, fmtTemp, fmtWeight } from '../utils/fmt.js';
 import {
   buildCycles, cycleLengths, cycleLengthPoints, periodLengthPoints, summarize, currentCycle,
@@ -24,9 +24,10 @@ import { predictionAccuracy, CLOSE_ENOUGH, MIN_SCORED } from '../domain/accuracy
 import { phaseFor, PHASES } from '../domain/phases.js';
 import {
   detectPatterns, symptomPattern, symptomFrequency, series, bbtForCycle, daysLogged,
-  loggingConsistency, moodByPhase, severitySummary, cycleSummary, MIN_CYCLES_FOR_PATTERN,
+  loggingConsistency, moodByPhase, severitySummary, cycleSummary, loggedIds,
+  MIN_CYCLES_FOR_PATTERN,
 } from '../domain/stats.js';
-import { labelOf, severityLabel } from '../data/taxonomy.js';
+import { labelOf, severityLabel, isMood } from '../data/taxonomy.js';
 import * as acog from '../domain/acog.js';
 import { trendChart, lineChart, dayHeatmap } from '../ui/chart.js';
 import { openSheet } from '../ui/sheet.js';
@@ -92,6 +93,7 @@ export function renderInsights(host) {
     ['Your cycle', [
       cycleLengthCard(lengthPoints, prediction),
       periodLengthCard(periodPoints),
+      cycleListCard(logs, cycles, prediction),
       accuracyCard(cycles),
     ]],
     ['How you feel', [
@@ -323,6 +325,129 @@ function periodLengthCard(points) {
         `to ${stats.max} days.`,
     }),
   ]);
+}
+
+/**
+ * One row per cycle, newest first, each openable.
+ *
+ * The cycle-length chart above answers "are my cycles consistent" and gives no
+ * route to "what was that bad one in March actually like" — a dot on a chart
+ * is not a thing you can open. This is the missing direction: from the shape
+ * back to the month.
+ *
+ * Deliberately a comparison rather than a list. Each row carries how it
+ * differed from her own average, because "31 days" means nothing on its own and
+ * "three days longer than usual" is the sentence she is actually looking for.
+ * The running cycle is included and marked, since "where am I against the last
+ * few" is the same question asked about now.
+ *
+ * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
+ * @param {import('../domain/cycles.js').Cycle[]} cycles
+ * @param {import('../domain/predict.js').Prediction} prediction
+ */
+function cycleListCard(logs, cycles, prediction) {
+  if (cycles.length < 2) return null;
+
+  const recent = [...cycles].reverse().slice(0, 12);
+  const average = prediction.avgCycleLength;
+
+  return el('div', { class: 'card data-zone' }, [
+    el('h3', { text: 'Cycle by cycle' }),
+    el('p', { class: 'hint-sm', text:
+      `Newest first, against your average of ${plural(average, 'day')}. Tap one ` +
+      'to see what you logged in it.' }),
+
+    el('ul', { class: 'cycle-list' }, recent.map((cycle) => {
+      const running = !cycle.complete || cycle.length == null;
+      const delta = running || cycle.length == null ? null : cycle.length - average;
+
+      return el('li', {}, [
+        el('button', {
+          type: 'button',
+          class: 'cycle-row',
+          onclick: () => { haptic(); openCycleDetail(logs, cycle, average); },
+        }, [
+          el('span', { class: 'cycle-row-date', text: fmtDayMonth(cycle.start) }),
+          el('span', { class: 'cycle-row-len num', text: running
+            ? 'running' : `${cycle.length}d` }),
+          /*
+            The difference is the column that makes this a comparison. Nothing
+            is printed for a cycle within a day of her average — "0 days
+            longer" is noise, and a sign in front of every row would turn a
+            normal month into something that looks like a finding.
+          */
+          el('span', { class: 'cycle-row-delta num', text: delta == null || Math.abs(delta) <= 1
+            ? '' : delta > 0 ? `+${delta}` : String(delta) }),
+          el('span', { class: 'cycle-row-period num', text: `${cycle.periodLength}d bleed` }),
+          el('span', { class: 'row-value', 'aria-hidden': 'true', text: '›' }),
+        ]),
+      ]);
+    })),
+  ]);
+}
+
+/**
+ * What one cycle held.
+ *
+ * Counts of what was logged rather than a day-by-day dump: the diary already
+ * shows any single day, and thirty of those in a sheet is not something anyone
+ * reads. Moods are kept apart from physical symptoms for the same reason the
+ * doctor report separates them — reading "Happy, 4 days" as a complaint is the
+ * exact confusion that separation exists to prevent.
+ *
+ * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
+ * @param {import('../domain/cycles.js').Cycle} cycle
+ * @param {number} average
+ */
+function openCycleDetail(logs, cycle, average) {
+  const end = cycle.nextStart ? addDays(cycle.nextStart, -1) : todayKey();
+  const days = range(cycle.start, end);
+
+  /** @type {Map<string, number>} */
+  const counts = new Map();
+  let logged = 0;
+
+  for (const date of days) {
+    const log = logs[date];
+    if (!log) continue;
+    logged += 1;
+    for (const id of loggedIds(log)) counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+
+  const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  const symptoms = ranked.filter(([id]) => !isMood(id));
+  const moods = ranked.filter(([id]) => isMood(id));
+
+  /** @param {string} title @param {[string, number][]} rows */
+  const section = (title, rows) => (rows.length ? el('div', { class: 'guide-entry' }, [
+    el('h3', { text: title }),
+    el('ul', { class: 'flag-list' }, rows.slice(0, 8).map(([id, n]) =>
+      el('li', { text: `${labelOf(id)} — ${plural(n, 'day')}` }))),
+  ]) : null);
+
+  const delta = cycle.length == null ? null : cycle.length - average;
+
+  openSheet({
+    title: `Cycle from ${fmtDayMonth(cycle.start)}`,
+    body: [
+      el('p', { class: 'hint-sm', text: [
+        cycle.length == null
+          ? 'Still running.'
+          : `${plural(cycle.length, 'day')} long` +
+            (delta != null && Math.abs(delta) > 1
+              ? `, ${plural(Math.abs(delta), 'day')} ${delta > 0 ? 'longer' : 'shorter'} than your average.`
+              : ', about your average.'),
+        `${plural(cycle.periodLength, 'day')} of bleeding.`,
+        `${plural(logged, 'day')} logged.`,
+      ].join(' ') }),
+
+      section('Symptoms', symptoms),
+      section('Mood', moods),
+
+      !ranked.length ? el('p', { class: 'hint', text:
+        'Nothing was logged in this cycle beyond the period itself.' }) : null,
+    ].filter(Boolean),
+  });
 }
 
 /**

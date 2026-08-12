@@ -64,6 +64,18 @@ const UNCERTAIN_WINDOW = 14;
  */
 export const STALE_AFTER_DAYS = 90;
 
+/**
+ * A log this recent means she is still using the app, so an absent period is
+ * an observation rather than a gap in the record.
+ *
+ * Thirty days because it has to survive the way this app is actually used: the
+ * README says marking your period and nothing else is a perfectly good way to
+ * use it, and someone doing that during a four-month gap has, by definition,
+ * nothing to mark. A month of silence is ordinary; a quarter of it is someone
+ * who has stopped.
+ */
+export const ACTIVE_WITHIN_DAYS = 30;
+
 export const CYCLE_MIN_CLAMP = 21;
 export const CYCLE_MAX_CLAMP = 45;
 
@@ -87,9 +99,12 @@ export const CYCLE_MAX_CLAMP = 45;
  * @property {boolean} showFertility
  * @property {number|null} daysUntilPeriod  negative once late
  * @property {number|null} daysLate
- * @property {boolean} isLate
+ * @property {boolean} isLate       past the far edge of the start window
+ * @property {boolean} withinWindow past the estimate, still inside her spread
  * @property {boolean} onHormonal   a method that suppresses ovulation
- * @property {boolean} stale        history too old to predict from
+ * @property {boolean} stale        no forecast is supportable
+ * @property {'dormant'|'absent'|null} staleReason  she stopped logging, or she
+ *   is still logging and simply has not bled
  * @property {number|null} daysSinceStart
  * @property {number|null} cycleDay
  * @property {number|null} spread
@@ -151,12 +166,6 @@ export function detectRecalibration(lengths) {
 }
 
 /**
- * Rate how much to trust the forecast.
- * @param {number} cyclesLogged
- * @param {number|null} spread
- * @returns {Confidence}
- */
-/**
  * The window the next period could plausibly start in.
  *
  * The "Next period" card headlined a date range that was the predicted *bleed*
@@ -193,6 +202,36 @@ export function startWindow(nextStart, spread, cyclesLogged) {
   return { from: addDays(nextStart, -days), to: addDays(nextStart, days), days };
 }
 
+/**
+ * Days since she last recorded anything, or null if she never has.
+ *
+ * Storage prunes empty records (`isLogEmpty`), so the presence of a log is
+ * already evidence of use and this can just take the latest key. Days in the
+ * future are ignored for the same reason `predict` ignores future period days:
+ * a wrong clock or a hand-edited file must not be able to make the app think
+ * it was opened tomorrow.
+ *
+ * @param {Record<DateKey, import('./model.js').DayLog>|undefined} logs
+ * @param {DateKey} today
+ * @returns {number|null}
+ */
+export function lastActivity(logs, today) {
+  if (!logs) return null;
+
+  /** @type {DateKey|null} */
+  let latest = null;
+  for (const date of /** @type {DateKey[]} */ (Object.keys(logs))) {
+    if (date <= today && (latest == null || date > latest)) latest = date;
+  }
+  return latest == null ? null : daysBetween(latest, today);
+}
+
+/**
+ * Rate how much to trust the forecast.
+ * @param {number} cyclesLogged
+ * @param {number|null} spread
+ * @returns {Confidence}
+ */
 export function rateConfidence(cyclesLogged, spread) {
   if (cyclesLogged === 0) return 'none';
   if (cyclesLogged < 2) return 'low';
@@ -299,16 +338,63 @@ export function predict({ periodDays, settings, today, logs }) {
 
     Every one of those is asserted from a single fact: the last period she
     bothered to log. Nobody's period is 402 days late; nobody is 431 days into
-    a luteal phase. The honest output is to stop, say the data has gone stale,
-    and ask for a fresh period date.
+    a luteal phase. The honest output is to stop and say so.
+
+    But *why* it stopped matters, and the app used to have only one answer.
+    Three months without a period is two completely different situations
+    depending on whether she has been using the app: someone who put it down in
+    March has stale records, and someone who checked in this morning and simply
+    has not bled since March has excellent records and a body that is doing
+    something. Telling the second one her data is "too far back to predict
+    from" and asking her to go and mark her most recent period is wrong twice —
+    she already did, and the app is blaming her records for what it is actually
+    observing. That is the reading a woman in perimenopause gets, every time,
+    at the exact point the observation starts to matter.
+
+    Both suppress the forecast, because neither supports one. They differ in
+    what the app says and what it asks for, so the reason is carried out.
   */
   const daysSinceStart = lastStart ? daysBetween(lastStart, today) : null;
-  const stale = daysSinceStart != null && daysSinceStart > STALE_AFTER_DAYS;
+  const noRecentPeriod = daysSinceStart != null && daysSinceStart > STALE_AFTER_DAYS;
 
-  if (!stale && nextStart && daysUntilPeriod != null && daysUntilPeriod < 0) {
-    isLate = true;
-    daysLate = -daysUntilPeriod;
+  const sinceLogged = lastActivity(logs, today);
+  const dormant = sinceLogged == null || sinceLogged > ACTIVE_WITHIN_DAYS;
+
+  const stale = noRecentPeriod;
+  /** @type {'dormant'|'absent'|null} */
+  const staleReason = !noRecentPeriod ? null : (dormant ? 'dormant' : 'absent');
+
+  const startWin = stale ? null : startWindow(nextStart, stats.spread, lengths.length);
+
+  /*
+    Late relative to what?
+
+    Lateness was measured from the point estimate: one day past the predicted
+    date and the app said so, in a headline, with a running count. For a cycle
+    that has run anywhere from 26 to 48 days that is a false statement — day 45
+    is not late, it is Tuesday. The number was a deviation from a mean that does
+    not describe her, presented as a fact about her body, and the more variable
+    her cycles the more confidently wrong it got.
+
+    #58 gave every prediction a window she could plausibly start in. Lateness
+    belongs at the far edge of that window rather than at its centre: past the
+    point where her own observed variation stops explaining it. Below two
+    cycles there is no window, so this falls back to the estimate and behaves
+    as it always did.
+  */
+  const dueBy = startWin ? startWin.to : nextStart;
+
+  if (!stale && dueBy) {
+    const past = daysBetween(dueBy, today);
+    if (past > 0) {
+      isLate = true;
+      daysLate = past;
+    }
   }
+
+  // Past the estimate but still inside her own spread: due, not late.
+  const withinWindow = !stale && !isLate
+    && daysUntilPeriod != null && daysUntilPeriod <= 0;
 
   /* ── Ovulation and the fertile window ────────────────────────────────── */
   const showFertility = !onHormonal && settings.showFertility && !stale;
@@ -353,7 +439,7 @@ export function predict({ periodDays, settings, today, logs }) {
     lastStart,
     nextStart: stale ? null : nextStart,
     nextPeriod: !stale && nextStart ? periodSpan(nextStart, avgPeriod) : null,
-    startWindow: stale ? null : startWindow(nextStart, stats.spread, lengths.length),
+    startWindow: startWin,
     ovulation,
     fertileWindow,
     fertileWidened,
@@ -362,7 +448,9 @@ export function predict({ periodDays, settings, today, logs }) {
     daysUntilPeriod: stale ? null : daysUntilPeriod,
     daysLate,
     isLate,
+    withinWindow,
     stale,
+    staleReason,
     daysSinceStart,
     cycleDay: stale || daysSinceStart == null ? null : daysSinceStart + 1,
     spread: stats.spread,

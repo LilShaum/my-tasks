@@ -15,7 +15,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { emptyLog, normalizeLog, isLogEmpty, nothingRecorded } from '../js/domain/model.js';
+import {
+  emptyLog, normalizeLog, isLogEmpty, nothingRecorded, normalizeSettings,
+} from '../js/domain/model.js';
 
 test('a blank day is both empty and unrecorded', () => {
   const log = emptyLog('2026-08-01');
@@ -71,4 +73,13 @@ test('a junk value for checkedIn does not become truthy', () => {
   );
   assert.equal(log.checkedIn, false);
   assert.equal(isLogEmpty(log), true, 'a hand-edited export cannot resurrect a blank day');
+});
+
+test('an unknown mode falls back to plain cycle tracking', () => {
+  // `pregnancy` was in the union once and shipped in every export written
+  // while it was, so a real file can still carry it.
+  assert.equal(normalizeSettings({ mode: 'pregnancy' }).mode, 'cycle');
+  assert.equal(normalizeSettings({ mode: 'nonsense' }).mode, 'cycle');
+  assert.equal(normalizeSettings({ mode: 'conceive' }).mode, 'conceive');
+  assert.equal(normalizeSettings({}).mode, 'cycle');
 });

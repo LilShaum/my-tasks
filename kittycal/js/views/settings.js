@@ -17,6 +17,7 @@ import {
 } from '../ui/reminders.js';
 import { BIRTH_CONTROL, HORMONAL_BIRTH_CONTROL } from '../domain/model.js';
 import { measuredLuteal } from '../domain/ovulation.js';
+import { REGIMENS, regimen, packPosition, describePack } from '../domain/pill.js';
 import { describeBackup } from '../domain/backup-check.js';
 import { buildCycles } from '../domain/cycles.js';
 import { themePicker, setPickerSelection } from '../ui/theme-picker.js';
@@ -29,10 +30,11 @@ import { releaseMascotUrls, mascot } from '../ui/mascot.js';
 import { openMascotPicker } from '../ui/image-picker.js';
 import { openHelp } from './help.js';
 import { openStickerBook, stickerCounts } from './stickers.js';
-import { exportEverything } from '../storage/export-action.js';
+import { exportEverything, exportCSV } from '../storage/export-action.js';
 import * as store from '../state/store.js';
 import * as repo from '../storage/repo.js';
 import * as backup from '../storage/backup.js';
+import * as csv from '../storage/csv.js';
 
 /** @param {HTMLElement} host */
 export function renderSettings(host) {
@@ -241,12 +243,121 @@ function lutealHint() {
       + 'is using; this box is the fallback.';
 }
 
-/** @param {import('../domain/model.js').Settings} settings */
+/**
+ * Methods that arrive as a pack with a break in it. An implant, an injection
+ * or an IUD does not, so the pack rows never appear for those.
+ */
+const PACKED_METHODS = new Set(['pill-combined', 'pill-mini', 'patch', 'ring']);
+
+/**
+ * Which pack, and when this one started.
+ *
+ * The start date is asked for rather than assumed, because there is no way to
+ * derive it: the pack is a schedule she is on, not something visible in her
+ * cycle data. It is one question, asked once per pack shape, and it is what
+ * turns a tick box into a position.
+ *
+ * @param {import('../domain/model.js').Settings} settings
+ */
+function packRows(settings) {
+  const shape = regimen(settings.pillRegimen);
+  const tracking = shape.id !== 'none';
+  const position = packPosition(settings, todayKey());
+
+  return el('div', { style: { marginTop: 'var(--sp-3)' } }, [
+    el('div', { class: 'rows' }, [
+      selectRow({
+        label: 'Pack',
+        value: settings.pillRegimen,
+        options: REGIMENS.map((r) => ({ value: r.id, label: r.label })),
+        onChange: (value) => {
+          /*
+            Turning a pack on with no start date would leave the position
+            permanently null and the row looking broken. Today is the only
+            defensible default — she is holding the packet — and the date row
+            underneath is right there to correct it.
+          */
+          const patch = /** @type {Record<string, string>} */ ({ pillRegimen: value });
+          if (value !== 'none' && !settings.pillPackStart) patch.pillPackStart = todayKey();
+          store.updateSettings(patch);
+          const host = document.getElementById('view-settings');
+          if (host) renderSettings(host);
+        },
+      }),
+      tracking && dateRow({
+        label: 'This pack started',
+        value: settings.pillPackStart,
+        onChange: (value) => {
+          store.updateSettings({ pillPackStart: value });
+          const host = document.getElementById('view-settings');
+          if (host) renderSettings(host);
+        },
+      }),
+    ]),
+
+    tracking && position && el('p', { class: 'hint-sm', style: { marginTop: 'var(--sp-2)' },
+      text: `Today is ${describePack(position)?.toLowerCase()}, pack ${position.pack}.` }),
+
+    tracking && el('div', { class: 'alert alert-info', style: { marginTop: 'var(--sp-3)' } }, [
+      el('span', { class: 'alert-icon', text: 'i', 'aria-hidden': 'true' }),
+      el('div', { text:
+        'Kittycal shows where you are in the pack and which days you have not ' +
+        'marked. It cannot tell whether you actually took one, and it does not ' +
+        'advise on missed pills — that is what the leaflet in the packet and ' +
+        'your pharmacist are for.' }),
+    ]),
+  ]);
+}
+
+/**
+ * A plain date field. Used only by the pack, which is the one setting that is
+ * a date rather than a number or a choice.
+ * @param {{label: string, value: string, onChange: (value: string) => void}} opts
+ */
+function dateRow({ label, value, onChange }) {
+  const input = /** @type {HTMLInputElement} */ (el('input', {
+    type: 'date',
+    class: 'row-input num',
+    value,
+    max: todayKey(),
+    onchange: () => { if (input.value) onChange(input.value); },
+  }));
+
+  return el('label', { class: 'row' }, [
+    el('span', { class: 'row-label', text: label }),
+    input,
+  ]);
+}
+
 function cycleRows(settings) {
   const onHormonal = HORMONAL_BIRTH_CONTROL.has(settings.birthControl);
 
   return el('div', {}, [
     el('div', { class: 'rows' }, [
+      /*
+        What she is here for.
+
+        Two values, not three. A pregnancy mode is a second application rather
+        than a setting, and the union used to promise one that nothing
+        implemented — see the note in model.js.
+
+        Hidden on a hormonal method, where the fertility output it reorders is
+        hidden anyway and the choice would be offering something the app has
+        already, correctly, refused to show.
+      */
+      !onHormonal && selectRow({
+        label: 'Using Kittycal for',
+        value: settings.mode,
+        options: [
+          { value: 'cycle', label: 'Tracking my cycle' },
+          { value: 'conceive', label: 'Trying to conceive' },
+        ],
+        onChange: (value) => {
+          store.updateSettings({ mode: /** @type {'cycle'|'conceive'} */ (value) });
+          const host = document.getElementById('view-settings');
+          if (host) renderSettings(host);
+        },
+      }),
       numberRow({
         label: 'Typical cycle length',
         value: settings.avgCycleLength,
@@ -287,6 +398,16 @@ function cycleRows(settings) {
         }),
       ]),
     ]),
+
+    /*
+      The pack, for the methods that come in one.
+
+      Only shown for the pill, the patch and the ring — an implant or an IUD
+      has no pack, and offering to track one would be a row that can only ever
+      be answered "not applicable". Following the method rather than adding
+      another question is the cheaper daily loop.
+    */
+    PACKED_METHODS.has(settings.birthControl) && packRows(settings),
 
     onHormonal && el('div', { class: 'alert alert-info', style: { marginTop: 'var(--sp-3)' } }, [
       el('span', { class: 'alert-icon', text: 'i', 'aria-hidden': 'true' }),
@@ -574,13 +695,47 @@ function dataRows() {
   const importInput = picker(doImport);
   const checkInput = picker(doCheck);
 
+  /* The CSV picker takes a different set of extensions, so it cannot reuse
+     `picker` above — that one is scoped to JSON on purpose, to stop a
+     spreadsheet being offered to the importer that will reject it. */
+  const csvInput = /** @type {HTMLInputElement} */ (el('input', {
+    type: 'file',
+    accept: 'text/csv,.csv,.tsv,.txt',
+    style: { display: 'none' },
+    onchange: async (/** @type {Event} */ e) => {
+      const input = /** @type {HTMLInputElement} */ (e.target);
+      const file = input.files?.[0];
+      input.value = '';
+      if (file) await doCsvImport(file);
+    },
+  }));
+
   return el('div', { class: 'rows' }, [
     importInput,
     checkInput,
+    csvInput,
     buttonRow({
       label: 'Export everything',
       value: 'JSON file',
       onClick: exportEverything,
+    }),
+    buttonRow({
+      label: 'Export as a spreadsheet',
+      value: 'CSV file',
+      onClick: exportCSV,
+    }),
+    /*
+      Bringing history in from somewhere else.
+
+      Separate from "Import from a backup" because the two do genuinely
+      different things: a backup replaces everything, and this merges into what
+      is already here. Putting them on one row and switching on the file
+      extension would make the destructive one reachable by accident.
+    */
+    buttonRow({
+      label: 'Bring in data from another app',
+      value: 'CSV file, merged',
+      onClick: () => csvInput.click(),
     }),
     /*
       Checking a backup sits above importing one deliberately.
@@ -647,6 +802,53 @@ async function doImport(file) {
   const settings = store.getState().settings;
   applyTheme(settings.theme, settings.colorMode);
   toast(`Imported ${result.logCount} logged days`);
+}
+
+/**
+ * Bring days in from another app's CSV.
+ *
+ * The confirm sheet lists what the parser actually understood — which column
+ * it read as dates, which as flow, how many rows it could not read — before
+ * anything is written. An importer that says "imported 412 days" without
+ * saying it silently dropped 90 of them is how someone believes she has moved
+ * her history when she has not.
+ *
+ * @param {File} file
+ */
+async function doCsvImport(file) {
+  let text;
+  try {
+    text = await backup.readFile(file);
+  } catch {
+    toast('Could not read that file');
+    return;
+  }
+
+  const result = csv.parseCSVImport(text);
+  if (!result.ok) {
+    toast(result.error ?? 'That file could not be read');
+    return;
+  }
+
+  const confirmed = await confirmSheet({
+    title: `Bring in ${plural(result.understood ?? 0, 'day')}?`,
+    body: [
+      ...(result.notes ?? []),
+      'Days you have already logged in Kittycal are kept as they are — this ' +
+      'only fills the gaps.',
+    ],
+    confirmLabel: 'Bring them in',
+  });
+  if (!confirmed) return;
+
+  const { added, kept } = store.mergeIn({
+    logs: result.logs ?? {},
+    periodDays: result.periodDays ?? new Set(),
+  });
+
+  toast(kept
+    ? `Added ${added} days, kept ${kept} of your own`
+    : `Added ${plural(added, 'day')}`);
 }
 
 /**

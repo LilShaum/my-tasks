@@ -42,6 +42,9 @@ const PRECACHE = [
   'assets/fonts/nunito.woff2',
   'assets/fonts/fredoka.woff2',
   'assets/icons/icon.svg',
+  // The one iOS actually puts on the Home Screen. index.html links it and
+  // PRECACHE did not have it, which test/precache.test.js is here to notice.
+  'assets/icons/icon-180.png',
   'assets/mascots/manifest.json',
 
   'js/main.js',
@@ -49,6 +52,7 @@ const PRECACHE = [
   'js/storage/db.js',
   'js/storage/repo.js',
   'js/storage/backup.js',
+  'js/storage/csv.js',
   'js/storage/export-action.js',
   'js/storage/persist.js',
   'js/domain/model.js',
@@ -59,6 +63,7 @@ const PRECACHE = [
   'js/domain/ovulation.js',
   'js/domain/predict.js',
   'js/domain/phases.js',
+  'js/domain/pill.js',
   'js/domain/acog.js',
   'js/domain/stats.js',
   'js/domain/recap.js',

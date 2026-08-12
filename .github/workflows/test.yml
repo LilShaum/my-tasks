@@ -1,0 +1,51 @@
+# Runs Kittycal's test suite on pull requests and on main.
+#
+# Until this existed, nothing had ever run the suite automatically. The only
+# other workflow deploys to Pages on a push to main, and it deploys
+# unconditionally — so a failing suite still shipped, and a pull request could
+# be merged on the strength of somebody having remembered to run `npm test`
+# on their own machine. For an app whose whole job is holding one person's
+# health data on one phone with no server to roll back from, that is the wrong
+# way round.
+#
+# What runs here is the part that needs nothing installed: `node --test` is
+# built into Node, and the project has no dependencies to fetch. The browser
+# probes under test/*.mjs drive real Chromium through Playwright and are
+# deliberately left out — pulling a browser binary into CI would add the one
+# thing this project has gone to some trouble not to have. They stay a local
+# step, and the README says so.
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A second push to the same branch makes the first run irrelevant.
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: kittycal
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # No `npm ci`: package.json has no dependencies and no lockfile, which is
+      # the point. Adding an install step here would quietly make that untrue.
+      - name: Unit tests
+        run: npm test
+
+      - name: Type check
+        run: npm run typecheck
