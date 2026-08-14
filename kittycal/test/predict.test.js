@@ -422,6 +422,32 @@ test('upcomingFertile windows match the primary prediction', () => {
   assert.equal(windows[0].end, p.fertileWindow?.end);
 });
 
+test('a late cycle stops the calendar projecting past the one it is waiting on', () => {
+  const days = history('2026-01-05', 28, 5);
+  // Five cycles of 28 days, then thirteen days past when the sixth was due.
+  const p = predict({
+    periodDays: days, settings: settings(), today: addDays('2026-01-05', 28 * 4 + 41),
+  });
+  assert.equal(p.isLate, true);
+
+  // The current cycle's own window survives — it was worked out before she was
+  // late, and the days it names have already passed.
+  assert.equal(upcomingPeriods(p, 4).length, 1);
+  assert.equal(upcomingPeriods(p, 4)[0].start, p.nextStart);
+  assert.equal(upcomingFertile(p, 4).length, 1);
+  assert.equal(upcomingFertile(p, 4)[0].ovulation, p.ovulation);
+});
+
+test('an on-time cycle still projects the full count', () => {
+  const days = history('2026-01-05', 28, 5);
+  const p = predict({
+    periodDays: days, settings: settings(), today: addDays('2026-01-05', 28 * 4 + 10),
+  });
+  assert.equal(p.isLate, false);
+  assert.equal(upcomingPeriods(p, 4).length, 4);
+  assert.equal(upcomingFertile(p, 4).length, 4);
+});
+
 /* ── conception chance ───────────────────────────────────────────────────── */
 
 test('conception chance peaks on ovulation day and the day before', () => {
