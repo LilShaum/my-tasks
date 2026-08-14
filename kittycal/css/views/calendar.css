@@ -34,6 +34,41 @@
   margin-bottom: var(--sp-4);
 }
 
+/*
+  While editing, the bar becomes a panel that says which mode she is in.
+
+  This is the quiet tier deliberately: the loud thing on this screen should be
+  the day circles she is tapping, not the way out of the mode. The panel is
+  what carries the state — a tinted, titled block is unmistakable in a way that
+  a differently-coloured button is not, and it lets "Done" be the size of the
+  word rather than a full-width bar with a sticker shadow.
+*/
+.cal-editbar.is-editing {
+  gap: var(--sp-1);
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  background: var(--surface-2);
+  border: var(--bw-data) solid var(--line-soft);
+  border-radius: var(--r-lg);
+}
+
+.cal-editbar-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.cal-editbar-title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-md);
+}
+
+/* Sized to its label, and never squeezed by a long title. */
+.cal-editbar-head .btn {
+  flex: none;
+  padding-inline: var(--sp-5);
+}
+
 /* ── Grid ─────────────────────────────────────────────────────────────── */
 .cal-grid {
   display: grid;

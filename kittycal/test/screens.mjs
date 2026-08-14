@@ -158,8 +158,29 @@ console.log('\nedit mode does not offer a tap that does nothing');
     check(false, 'expected at least one future day in this month');
   }
 
+  /*
+    The mode is carried by a titled panel, not by a full-width filled button.
+    The work on this screen is tapping the day circles, so the way *out* of the
+    mode must not be the biggest thing on it — but it still has to be a real
+    target, or quietening it has just made it hard to leave.
+  */
+  check(await page.locator('.cal-editbar.is-editing').count() === 1,
+    'the panel says which mode she is in');
+  check(await page.locator('.cal-editbar-title').innerText() === 'Editing period dates',
+    'and says so in words, before the instructions');
+
+  const done = await page.locator('.cal-editbar button').boundingBox();
+  const cell = await page.locator('.cal-cell:not(.cal-cell-empty)').first().boundingBox();
+  check(done != null && cell != null && done.width < cell.width * 3,
+    'the exit is sized to its label rather than the screen',
+    JSON.stringify(done));
+  check(done != null && done.height >= 44 && done.width >= 64,
+    'and is still comfortably tappable', JSON.stringify(done));
+
   await page.locator('.cal-editbar button').click();
   await page.waitForTimeout(400);
+  check(await page.locator('.cal-editbar.is-editing').count() === 0,
+    'and leaving the mode takes the panel with it');
 }
 
 /* ── 3. The month she paged to can say what happened in it ────────────── */

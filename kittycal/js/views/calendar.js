@@ -330,21 +330,42 @@ function monthHeader(year, month) {
 
 /** @param {boolean} active */
 function editModeBar(active) {
-  return el('div', { class: 'cal-editbar' }, [
-    el('button', {
-      type: 'button',
-      class: active ? 'btn' : 'btn btn-secondary',
-      'aria-pressed': String(active),
-      text: active ? 'Done editing' : 'Edit period dates',
-      onclick: () => {
-        store.setUi({ periodEditMode: !active });
-        haptic(10);
-        announce(active
-          ? 'Finished editing period dates'
-          : 'Editing period dates. Tap days to mark or unmark bleeding.');
-      },
-    }),
-    active && el('p', { class: 'hint-sm', text:
+  const toggle = el('button', {
+    type: 'button',
+    class: active ? 'btn' : 'btn btn-secondary',
+    'aria-pressed': String(active),
+    text: active ? 'Done' : 'Edit period dates',
+    onclick: () => {
+      store.setUi({ periodEditMode: !active });
+      haptic(10);
+      announce(active
+        ? 'Finished editing period dates'
+        : 'Editing period dates. Tap days to mark or unmark bleeding.');
+    },
+  });
+
+  if (!active) return el('div', { class: 'cal-editbar' }, [toggle]);
+
+  /*
+    The mode is worn by a panel, not shouted by the button.
+
+    "Done editing" was a full-width filled button with the sticker shadow —
+    the loudest thing on a screen whose actual work is tapping the days below
+    it, and an exit given more weight than the task. It also came before the
+    sentence explaining what to do, so the screen read backwards.
+
+    A tinted, titled panel says "you are in a mode" more plainly than any
+    button styling can, and it lets the exit shrink to the size of the word
+    "Done" without becoming hard to find. The panel keeps the button in the
+    same corner of the screen it was already in, so nothing moves under a
+    finger already on its way there.
+  */
+  return el('div', { class: 'cal-editbar is-editing' }, [
+    el('div', { class: 'cal-editbar-head' }, [
+      el('h3', { class: 'cal-editbar-title', text: 'Editing period dates' }),
+      toggle,
+    ]),
+    el('p', { class: 'hint-sm', text:
       // "Any day" was not true: days after today are disabled in this mode,
       // because a tap here means "I bled on this day". Saying so beats a tap
       // that quietly does nothing.
