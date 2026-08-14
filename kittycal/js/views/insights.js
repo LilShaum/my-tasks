@@ -165,6 +165,18 @@ function overviewCard(logs, cycles, lengths, today) {
   // Three zeros under three headings is not an overview of anything.
   if (!cycles.length && !daysLogged(logs)) return null;
 
+  /*
+    Complete cycles, not every cycle that has begun.
+
+    `cycles` includes the one she is living through, so this headline read "6"
+    while the confidence line on Today said "based on 5 complete cycles" and
+    the sticker asking for six stayed locked. Three surfaces, three different
+    answers to how much history she has, and the loudest one was the wrong
+    one — a cycle is only a length once it has ended, which is exactly why the
+    average a few lines down was already counting five.
+  */
+  const complete = cycles.filter((c) => c.complete).length;
+
   const stats = summarize(lengths);
   /*
     Consistency over a window, not a streak.
@@ -186,7 +198,7 @@ function overviewCard(logs, cycles, lengths, today) {
     history older than a month for it to exclude.
   */
   const figures = [
-    cycles.length ? stat('Cycles', String(cycles.length), 'logged') : null,
+    complete ? stat('Cycles', String(complete), 'logged') : null,
     stat('Days', String(total), 'tracked'),
     recent < total
       ? stat('Last 30 days', String(recent), recent === 1 ? 'day logged' : 'days logged')

@@ -25,9 +25,10 @@
 import { el, replace, haptic, announce } from '../utils/dom.js';
 import {
   todayKey, makeKey, daysInMonth, fmtMonthYear, fmtLong, gridColumn, rotateDow,
-  DOW_MIN, MONTHS, MONTHS_SHORT, addDays, range,
+  DOW_MIN, MONTHS, MONTHS_SHORT, addDays, range, daysBetween, fmtDayMonth,
   month as monthOf, year as yearOf, dayOfMonth,
 } from '../utils/date.js';
+import { plural } from '../utils/fmt.js';
 import { buildCycles, filledPeriodDays } from '../domain/cycles.js';
 import { nothingRecorded } from '../domain/model.js';
 import { predict, upcomingPeriods, upcomingFertile } from '../domain/predict.js';
@@ -87,7 +88,76 @@ export function renderCalendar(host) {
       editMode: ui.periodEditMode,
     }),
     legend(prediction),
+    monthRecall({ year: ui.calYear, month: ui.calMonth, today, periodFill, logs }),
     !cycles.length ? firstRunHint() : null,
+  ]);
+}
+
+/**
+ * What happened in the month she is looking at.
+ *
+ * The grid answers "when", in colour, at a glance. It cannot answer "how long
+ * was that one" or "did I actually keep this up in March" without her counting
+ * circles, and below the legend there was half a screen of empty background
+ * where that answer could sit. Paging back through the year is the one thing
+ * this screen does that no other screen does, so it is worth it being able to
+ * say something when she gets there.
+ *
+ * Every figure is read off the same data the grid is drawn from, so the card
+ * cannot disagree with the circles above it. Nothing is stored.
+ *
+ * @param {Object} o
+ * @param {number} o.year
+ * @param {number} o.month
+ * @param {DateKey} o.today
+ * @param {Set<DateKey>} o.periodFill
+ * @param {Record<DateKey, import('../domain/model.js').DayLog>} o.logs
+ */
+function monthRecall({ year, month, today, periodFill, logs }) {
+  const total = daysInMonth(year, month);
+  const keys = [];
+  for (let d = 1; d <= total; d++) keys.push(makeKey(year, month, d));
+
+  // A month that has not started yet has nothing to recall, and one still
+  // running is only counted as far as today.
+  const elapsed = keys.filter((k) => k <= today);
+  if (!elapsed.length) return null;
+
+  const bled = elapsed.filter((k) => periodFill.has(k));
+  const logged = elapsed.filter((k) => {
+    const log = logs[k];
+    return log && (log.checkedIn || !nothingRecorded(log));
+  }).length;
+
+  if (!bled.length && !logged) return null;
+
+  /*
+    Runs, not a total. Two separate three-day bleeds and one six-day bleed are
+    very different months, and a single "6 days" figure would render them
+    identically. Consecutive keys are enough to split them: `periodFill` has
+    already closed the one-day gaps that `buildPeriods` tolerates.
+  */
+  const runs = [];
+  for (const key of bled) {
+    const last = runs[runs.length - 1];
+    if (last && daysBetween(last[last.length - 1], key) === 1) last.push(key);
+    else runs.push([key]);
+  }
+
+  const name = MONTHS[month];
+  const lines = [
+    runs.length
+      ? runs.map((run) => (run.length === 1
+        ? `${fmtDayMonth(run[0])}`
+        : `${dayOfMonth(run[0])}–${fmtDayMonth(run[run.length - 1])}`)).join(', ')
+        + ` — ${plural(runs.reduce((n, r) => n + r.length, 0), 'day')} of bleeding`
+      : `No period days marked in ${name}.`,
+    `Logged something on ${logged} of ${plural(elapsed.length, 'day')}.`,
+  ];
+
+  return el('div', { class: 'card data-zone cal-recall' }, [
+    el('h3', { text: elapsed.length < total ? `${name} so far` : name }),
+    ...lines.map((text) => el('p', { class: 'hint-sm', text })),
   ]);
 }
 
@@ -254,9 +324,12 @@ function editModeBar(active) {
       },
     }),
     active && el('p', { class: 'hint-sm', text:
-      'Tap any day to mark or unmark it as a period day. Drag across several to ' +
-      'do a run at once. Past months work too — filling in old periods makes ' +
-      'every prediction better.' }),
+      // "Any day" was not true: days after today are disabled in this mode,
+      // because a tap here means "I bled on this day". Saying so beats a tap
+      // that quietly does nothing.
+      'Tap any day up to today to mark or unmark it as a period day. Drag ' +
+      'across several to do a run at once. Past months work too — filling in ' +
+      'old periods makes every prediction better.' }),
   ]);
 }
 
