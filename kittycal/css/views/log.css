@@ -14,6 +14,17 @@
   cursor: pointer;
   list-style: none;
   user-select: none;
+  /*
+    Rides just under the search bar while its own chips are on screen, so a
+    long category never leaves her without the word for what she is looking
+    at. The offset is measured in log.js — the search bar grows a line while a
+    search is running, so it is not a number that can be written down here.
+    Below .search-wrap's z-index, which must stay on top of both.
+  */
+  position: sticky;
+  top: var(--log-sticky-top, 0px);
+  z-index: 1;
+  background: var(--surface);
 }
 
 /* Suppress the native disclosure triangle in both engines — we draw our own
