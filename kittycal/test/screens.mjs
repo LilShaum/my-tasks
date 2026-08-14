@@ -203,6 +203,66 @@ console.log('\nthe calendar answers for the month on screen');
     'and a month that has not happened yet stays quiet');
 }
 
+/* ── 4. The legend names what is on screen, and nothing else ──────────── */
+console.log('\nthe legend describes the grid rather than the prediction');
+{
+  const legend = async () => ((await page.locator('.cal-legend').count())
+    ? (await page.locator('.cal-legend').innerText()).replace(/\n/g, ' / ')
+    : '');
+
+  await page.locator('button:has-text("Today")').first().click();
+  await page.waitForTimeout(500);
+  const now = await legend();
+  check(/Period logged/.test(now) && /Period expected/.test(now),
+    'the current month names both what she logged and what is forecast', now);
+
+  /*
+    A month behind her has no forecast in it, so the three forward-looking
+    entries were pure noise — and "After ovulation" over a grid with no muted
+    day in it invites the reading that grey means unavailable.
+  */
+  for (let i = 0; i < 2; i += 1) {
+    await page.locator('[aria-label="Previous month"]').click();
+    await page.waitForTimeout(350);
+  }
+  const past = await legend();
+  check(past === 'Period logged',
+    'a month behind her names only the one state it draws', past);
+
+  await page.locator('button:has-text("Today")').first().click();
+  await page.waitForTimeout(400);
+  await page.locator('button:has-text("Year")').click();
+  await page.waitForTimeout(600);
+  const year = await legend();
+  check(!/Fertile|Ovulation|After ovulation/.test(year),
+    'and the year view, which draws neither, offers neither', year);
+}
+
+/* ── 5. Contraception suppresses the words as well as the days ────────── */
+console.log('\nnothing names ovulation to someone whose ovulation is suppressed');
+{
+  await page.evaluate(async () => {
+    const store = await import('/js/state/store.js');
+    store.updateSettings({ birthControl: 'pill-combined' });
+  });
+  await page.waitForTimeout(500);
+  await page.locator('button:has-text("Months")').click();
+  await page.waitForTimeout(600);
+
+  const text = (await page.locator('.cal-legend').innerText()).replace(/\n/g, ' / ');
+  /*
+    `buildMarks` already refuses to produce fertile, ovulation or luteal days
+    on hormonal contraception. The legend was built from the prediction rather
+    than from the grid, so it went on offering "After ovulation" underneath a
+    month that contained no such day — the safety rule held everywhere except
+    in the words.
+  */
+  check(!/Fertile|Ovulation|After ovulation/.test(text),
+    'the legend drops all three with the days they named', text);
+  check(await page.locator('.cal-cell.is-luteal').count() === 0,
+    'and there were none of those days to name', 'luteal cells present');
+}
+
 await browser.close();
 console.log(`\nscreens: ${checks - failures}/${checks} checks passed\n`);
 process.exit(failures ? 1 : 0);
