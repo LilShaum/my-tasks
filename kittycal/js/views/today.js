@@ -99,6 +99,28 @@ export function renderToday(host) {
   const recap = buildRecap({ cycles, logs, today });
   const showRecap = recap && settings.recapSeen !== recap.cycleStart;
 
+  /*
+    At most one data-safety nudge, never both.
+
+    Each has its own honest reason to exist — the install nudge is about the
+    browser discarding her data while the phone is still in her pocket, the
+    backup nudge is about losing the phone outright — and each used to render
+    unconditionally, so someone who has neither installed the app nor exported
+    a backup recently saw two amber warning cards back to back, every day,
+    until one condition cleared. Worse than the repetition: both cards' only
+    button calls the exact same `exportEverything()`, worded as "Save a
+    backup file" on one and "Back up now" on the other. That is not two
+    warnings, it is one warning said twice.
+
+    Install wins the tie. Its own comment below already ranks it as the more
+    urgent of the two — the eviction window is roughly a week, the backup
+    nudge does not even fire until fourteen days of history are unprotected —
+    and installing is also the fix that removes the *cause* of both: data that
+    lives in exempted storage was never at risk of the eviction the backup
+    nudge exists to survive being caught out by.
+  */
+  const installCard = installPrompt({ logs, periodDays, settings, today });
+
   replace(host, [
     greeting(settings.name, today),
 
@@ -158,8 +180,8 @@ export function renderToday(host) {
     ]),
 
     tipsRow({ phase, prediction, log: logs[today], today }),
-    installPrompt({ logs, periodDays, settings, today }),
-    backupPrompt({ logs, periodDays, settings, today }),
+    installCard,
+    installCard ? null : backupPrompt({ logs, periodDays, settings, today }),
     disclaimerNote(),
   ]);
 }
@@ -258,6 +280,11 @@ function installPrompt({ logs, periodDays, settings, today }) {
  * to answer "where am I in my cycle". It is also silent almost always —
  * `backupNudge` returns null until there is a fortnight of unprotected data,
  * and dismissing it buys a month.
+ *
+ * Only called from `renderToday` when the install nudge is absent — see the
+ * comment where that decision is made. Both cards' one button does the same
+ * `exportEverything()`, so showing both at once is not two warnings, it is
+ * one warning said twice.
  *
  * @param {Object} input
  * @param {Record<DateKey, import('../domain/model.js').DayLog>} input.logs
