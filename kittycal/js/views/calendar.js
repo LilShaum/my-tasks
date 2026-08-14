@@ -63,14 +63,35 @@ export function renderCalendar(host) {
   // the 12th is drawn as part of it.
   const periodFill = filledPeriodDays(cycles);
 
+  const shared = { today, periodDays, periodFill, marks, editMode: ui.periodEditMode };
+
   if (ui.calView === 'year') {
+    /*
+      The miniature months draw only logged and predicted periods — at that
+      size a fertile tint would be a smear of colour rather than information —
+      so the legend is narrowed to match rather than to what the year contains.
+    */
+    const across = [];
+    for (let m = 0; m < 12; m++) {
+      for (let d = 1; d <= daysInMonth(ui.calYear, m); d++) {
+        across.push(makeKey(ui.calYear, m, d));
+      }
+    }
+    const drawn = statesPresent(across, shared);
+    for (const state of ['fertile', 'isOvulation', 'luteal']) drawn.delete(state);
+
     replace(host, [
       yearHeader(ui.calYear),
       yearGrid({ year: ui.calYear, today, periodFill, marks,
                  firstDayOfWeek: settings.firstDayOfWeek }),
-      legend(prediction, { fertility: false }),
+      legend(drawn),
     ]);
     return;
+  }
+
+  const monthKeys = [];
+  for (let d = 1; d <= daysInMonth(ui.calYear, ui.calMonth); d++) {
+    monthKeys.push(makeKey(ui.calYear, ui.calMonth, d));
   }
 
   replace(host, [
@@ -87,7 +108,7 @@ export function renderCalendar(host) {
       marks,
       editMode: ui.periodEditMode,
     }),
-    legend(prediction),
+    legend(statesPresent(monthKeys, shared)),
     monthRecall({ year: ui.calYear, month: ui.calMonth, today, periodFill, logs }),
     !cycles.length ? firstRunHint() : null,
   ]);
@@ -448,6 +469,63 @@ function activate(key, editMode) {
 }
 
 /**
+ * Which of the five cycle states a day is drawn in, in priority order.
+ *
+ * Pulled out of `dayCell` so the legend can be built from the same answer the
+ * cells are. It used to be built from the prediction instead, which meant it
+ * described states the month on screen did not contain: paging back to March
+ * still listed "Period expected", and someone on hormonal contraception — for
+ * whom `buildMarks` deliberately produces no luteal days at all — was shown
+ * "After ovulation" under a grid that had no grey day in it. A legend for
+ * something absent is worse than no legend, and this is the only way to be
+ * sure the two agree.
+ *
+ * Two different truths about bleeding, and which one applies depends on what
+ * the tap does. Normally the cell shows the *filled span* — the one-day gap
+ * inside a period marked 10th, 11th, 13th, 14th is drawn as period, because
+ * that is how the cycle is actually counted. In edit mode the tap toggles
+ * membership of `periodDays`, so the cell has to show `periodDays`. Otherwise
+ * the gap day rendered as selected, and tapping it — which anyone would do to
+ * turn it off — turned it *on*, with no visible change: a control reporting a
+ * state its own tap did not control.
+ *
+ * @param {Object} o
+ * @param {DateKey} o.key
+ * @param {DateKey} o.today
+ * @param {Set<DateKey>} o.periodDays
+ * @param {Set<DateKey>} o.periodFill
+ * @param {ReturnType<typeof buildMarks>} o.marks
+ * @param {boolean} o.editMode
+ */
+function cellStates({ key, today, periodDays, periodFill, marks, editMode }) {
+  const marked = periodDays.has(key);
+  const logged = editMode ? marked : (marked || periodFill.has(key));
+  // Never show a prediction over a day that already has real data.
+  const predicted = !logged && marks.predictedPeriod.has(key) && key > today;
+  const fertile = !logged && !predicted && marks.fertile.has(key);
+  const isOvulation = marks.ovulation.has(key) && !logged;
+  const luteal = !logged && !predicted && !fertile && marks.luteal.has(key);
+
+  return { logged, predicted, fertile, isOvulation, luteal };
+}
+
+/**
+ * The states that actually appear across a run of days.
+ * @param {DateKey[]} keys
+ * @param {Omit<Parameters<typeof cellStates>[0], 'key'>} shared
+ */
+function statesPresent(keys, shared) {
+  /** @type {Set<string>} */
+  const present = new Set();
+  for (const key of keys) {
+    for (const [name, on] of Object.entries(cellStates({ ...shared, key }))) {
+      if (on) present.add(name);
+    }
+  }
+  return present;
+}
+
+/**
  * @param {Object} opts
  * @param {DateKey} opts.key
  * @param {number} opts.day
@@ -467,25 +545,9 @@ function dayCell(opts) {
   const isToday = key === today;
   const isPast = key <= today;
 
-  /*
-    Two different truths, and which one to show depends on what the tap does.
-
-    Normally the cell shows the *filled span* — the one-day gap inside a period
-    marked 10th, 11th, 13th, 14th is drawn as period, because that is how the
-    cycle is actually counted.
-
-    In edit mode the tap toggles membership of `periodDays`, so the cell has to
-    show `periodDays`. Otherwise the gap day rendered as selected, and tapping
-    it — which anyone would do to turn it off — turned it *on*, with no visible
-    change. The control was reporting a state its own tap did not control.
-  */
+  const { logged, predicted, fertile, isOvulation, luteal } =
+    cellStates({ key, today, periodDays, periodFill, marks, editMode });
   const marked = periodDays.has(key);
-  const logged = editMode ? marked : (marked || periodFill.has(key));
-  // Never show a prediction over a day that already has real data.
-  const predicted = !logged && marks.predictedPeriod.has(key) && key > today;
-  const fertile = !logged && !predicted && marks.fertile.has(key);
-  const isOvulation = marks.ovulation.has(key) && !logged;
-  const luteal = !logged && !predicted && !fertile && marks.luteal.has(key);
   const log = logs[key];
   /*
     The dot means "something else was logged here", so it has to key off what
@@ -603,36 +665,28 @@ function onGridKeydown(e, firstDayOfWeek) {
 /* ── Legend ─────────────────────────────────────────────────────────────── */
 
 /**
- * @param {import('../domain/predict.js').Prediction} prediction
- * @param {{fertility?: boolean}} [opts] set fertility:false where the view
- *   doesn't draw those states — a legend for something not on screen is worse
- *   than no legend.
+ * Names for the states the grid drew, and nothing else.
+ *
+ * Every entry is gated on `statesPresent`, so the list is a description of the
+ * screen rather than of the prediction behind it. That matters most for the
+ * two states an ordinary month often lacks: a block of muted days running from
+ * ovulation to the next expected period reads as "unavailable" if nothing
+ * names it, and naming it on a month that has none is the same fault pointing
+ * the other way.
+ *
+ * @param {Set<string>} present state names from `statesPresent`
  */
-function legend(prediction, opts = {}) {
-  const { fertility = true } = opts;
-
-  /** @type {{class: string, label: string}[]} */
+function legend(present) {
+  /** @type {{state: string, class: string, label: string}[]} */
   const items = [
-    { class: 'is-period', label: 'Period logged' },
-    { class: 'is-predicted', label: 'Period expected' },
-  ];
-  if (fertility && prediction.showFertility) {
-    items.push({ class: 'is-fertile', label: 'Fertile window' });
-    items.push({ class: 'is-ovulation', label: 'Ovulation estimated' });
-  }
+    { state: 'logged', class: 'is-period', label: 'Period logged' },
+    { state: 'predicted', class: 'is-predicted', label: 'Period expected' },
+    { state: 'fertile', class: 'is-fertile', label: 'Fertile window' },
+    { state: 'isOvulation', class: 'is-ovulation', label: 'Ovulation estimated' },
+    { state: 'luteal', class: 'is-luteal', label: 'After ovulation' },
+  ].filter((item) => present.has(item.state));
 
-  /*
-    The luteal shading was on the calendar and not in the legend.
-
-    This function already refuses to list a state the view does not draw, on
-    the grounds that a legend for something absent is worse than no legend —
-    the opposite case was the one that got missed. A block of muted days runs
-    from ovulation to the next expected period, and with nothing naming it the
-    obvious reading of grey is "unavailable", on days that are in the future.
-  */
-  if (prediction.nextStart) {
-    items.push({ class: 'is-luteal', label: 'After ovulation' });
-  }
+  if (!items.length) return null;
 
   return el('ul', { class: 'cal-legend' }, items.map((item) =>
     el('li', {}, [
