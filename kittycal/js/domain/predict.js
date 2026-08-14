@@ -464,9 +464,38 @@ export function predict({ periodDays, settings, today, logs }) {
 }
 
 /**
+ * How many cycles a projection is allowed to run forward.
+ *
+ * `count` once every time, regardless of whether the cycle she is *in* has
+ * already run past its own prediction. That drew a confident dashed "period
+ * expected" span, and a confident dotted ovulation ring, for a cycle two or
+ * three ahead of one that has not itself resolved — a forecast built on top
+ * of a forecast that has already missed. The luteal band a few lines up
+ * already refuses this ("Only drawn for the current cycle — projecting a
+ * luteal phase months out would imply precision we don't have"); this is the
+ * same restraint, extended to the two things that were still doing it.
+ *
+ * The current cycle's own window is kept even once late — `prediction.
+ * ovulation` and the first entry of `nextStart` were both computed before
+ * lateness was known, and by the time she is late the period they predicted
+ * has already passed, so neither is a claim about the future. It is entries
+ * beyond that one — a fresh `avgCycleLength * i` stacked on a start date that
+ * has not happened yet — that assume the overdue cycle will resolve exactly
+ * on schedule, which is the one thing "late" means it has not done.
+ *
+ * @param {Prediction} prediction
+ * @param {number} count
+ * @returns {number}
+ */
+function projectableCycles(prediction, count) {
+  return prediction.isLate ? Math.min(count, 1) : count;
+}
+
+/**
  * Predicted period spans for the next `count` cycles, for drawing the calendar
- * forward. Each successive one compounds the same average, so uncertainty grows
- * with distance — the calendar renders later ones more faintly to reflect that.
+ * forward. Each successive one compounds the same average, so uncertainty
+ * grows with distance — see `projectableCycles` for what happens to that once
+ * the current cycle is already late.
  *
  * @param {Prediction} prediction
  * @param {number} count
@@ -476,7 +505,7 @@ export function upcomingPeriods(prediction, count = 4) {
   if (!prediction.nextStart) return [];
   /** @type {{start: DateKey, end: DateKey, ordinal: number}[]} */
   const out = [];
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < projectableCycles(prediction, count); i++) {
     const start = addDays(prediction.nextStart, prediction.avgCycleLength * i);
     const span = periodSpan(start, prediction.avgPeriodLength);
     out.push({ ...span, ordinal: i });
@@ -486,6 +515,7 @@ export function upcomingPeriods(prediction, count = 4) {
 
 /**
  * Predicted ovulation days and fertile windows for the next `count` cycles.
+ * See `projectableCycles` for what happens once the current cycle is late.
  * @param {Prediction} prediction
  * @param {number} count
  */
@@ -496,7 +526,7 @@ export function upcomingFertile(prediction, count = 4) {
   const width = prediction.fertileWidened ? UNCERTAIN_WINDOW : FERTILE_BEFORE + FERTILE_AFTER + 1;
   const before = prediction.fertileWidened ? Math.floor(UNCERTAIN_WINDOW / 2) : FERTILE_BEFORE;
 
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < projectableCycles(prediction, count); i++) {
     const ovulation = addDays(prediction.ovulation, prediction.avgCycleLength * i);
     out.push({
       ovulation,
