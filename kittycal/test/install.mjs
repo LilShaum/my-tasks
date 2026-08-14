@@ -187,6 +187,35 @@ console.log('\na fresh install is not asked during setup');
   await ctx.close();
 }
 
+console.log('\ntwo data-safety warnings never show at once');
+{
+  // Both eligible: no install, storage not persisted, never backed up. The
+  // default seed carries 15 period days, well past the 14-day backup floor.
+  const { page, ctx } = await open({ storage: 'safari', settings: { lastBackup: '', lastBackupAt: 0 } });
+  const both = await page.evaluate(() => ({
+    install: document.querySelectorAll('.install-nudge').length,
+    backup: document.querySelectorAll('.backup-nudge').length,
+  }));
+  ok('install shows', both.install === 1, JSON.stringify(both));
+  ok('and backup does not, though its own condition is also true',
+    both.backup === 0, JSON.stringify(both));
+  await ctx.close();
+}
+{
+  // Storage already persisted, so install has nothing to warn about — backup
+  // should still appear on its own rather than staying silent by association.
+  const { page, ctx } = await open({
+    storage: 'persisted', settings: { lastBackup: '', lastBackupAt: 0 },
+  });
+  const solo = await page.evaluate(() => ({
+    install: document.querySelectorAll('.install-nudge').length,
+    backup: document.querySelectorAll('.backup-nudge').length,
+  }));
+  ok('backup shows on its own once install has nothing to say',
+    solo.install === 0 && solo.backup === 1, JSON.stringify(solo));
+  await ctx.close();
+}
+
 await browser.close();
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);
