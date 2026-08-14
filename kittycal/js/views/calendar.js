@@ -20,6 +20,7 @@
  * view that can only be used by tapping is unusable with a keyboard.
  *
  * @typedef {import('../utils/date.js').DateKey} DateKey
+ * @typedef {import('../domain/cycles.js').Cycle} Cycle
  */
 
 import { el, replace, haptic, announce } from '../utils/dom.js';
@@ -32,6 +33,7 @@ import { plural } from '../utils/fmt.js';
 import { buildCycles, filledPeriodDays } from '../domain/cycles.js';
 import { nothingRecorded } from '../domain/model.js';
 import { predict, upcomingPeriods, upcomingFertile } from '../domain/predict.js';
+import { phaseFor } from '../domain/phases.js';
 import { toastUndo } from '../ui/toast.js';
 import { spotArt } from '../ui/mascot.js';
 import { openLogSheet } from './log.js';
@@ -75,6 +77,7 @@ export function renderCalendar(host) {
 
   replace(host, [
     monthHeader(ui.calYear, ui.calMonth),
+    youAreHere({ year: ui.calYear, month: ui.calMonth, today, cycles, prediction }),
     editModeBar(ui.periodEditMode),
     grid({
       year: ui.calYear,
@@ -90,6 +93,57 @@ export function renderCalendar(host) {
     legend(prediction),
     monthRecall({ year: ui.calYear, month: ui.calMonth, today, periodFill, logs }),
     !cycles.length ? firstRunHint() : null,
+  ]);
+}
+
+/**
+ * Where she is in her cycle, said in words, above the grid.
+ *
+ * The grid draws the cycle but never names her place in it. Every colour on
+ * screen is a *state* — bleeding, fertile, expected — and none of them is
+ * "you are here"; today is a two-pixel ring competing with four dashed
+ * forecast rings of the same weight. The cycle day existed on Today and
+ * inside a day sheet she had to tap, so the one screen whose entire job is
+ * the shape of the cycle was the one screen that couldn't answer "which day
+ * am I on".
+ *
+ * Deliberately *not* a repeat of Today's headline. It says the day and the
+ * phase and stops. The next-period date is on screen already, as the dashed
+ * circles, and printing it here as a bare date would be the one thing this
+ * app doesn't do: state a prediction without the spread that goes with it.
+ * Today's card carries that number because it carries the confidence too.
+ *
+ * Only rendered when today is in the month on screen. Paging back to March
+ * and reading "Day 15" would be a sentence about now sitting under a grid
+ * about then — `monthRecall` is what answers for a month she has paged to.
+ *
+ * @param {Object} o
+ * @param {number} o.year
+ * @param {number} o.month
+ * @param {DateKey} o.today
+ * @param {Cycle[]} o.cycles
+ * @param {import('../domain/predict.js').Prediction} o.prediction
+ */
+function youAreHere({ year, month, today, cycles, prediction }) {
+  if (yearOf(today) !== year || monthOf(today) !== month) return null;
+
+  const phase = phaseFor({ date: today, cycles, prediction });
+  const day = prediction.cycleDay;
+
+  // No cycle day means no anchor to count from — a brand-new user, or a
+  // forecast that has gone stale. The phase copy covers both, and inventing
+  // a "Day —" would be worse than saying nothing.
+  if (day == null) return null;
+
+  return el('div', {
+    class: 'cal-here',
+    style: { '--phase': `var(${phase.token})` },
+  }, [
+    el('span', { class: 'cal-here-dot', 'aria-hidden': 'true' }),
+    el('p', {}, [
+      el('strong', { text: `Day ${day}` }),
+      el('span', { text: ` · ${phase.name}` }),
+    ]),
   ]);
 }
 

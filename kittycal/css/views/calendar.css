@@ -27,6 +27,47 @@
   font-size: var(--fs-sm);
 }
 
+/*
+  "You are here", between the month name and the grid.
+
+  A strip rather than a card: it is a caption on the grid below it, the same
+  relationship the phase line has to the ring on Today, and giving it a card's
+  border would make it compete with the month heading above and the Edit button
+  below for the same glance. `--phase` is set inline from the phase's own token,
+  so the words here and the colours in the grid come from one source.
+
+  Colour arrives as a dot, not as a wash. Two of the four phase tokens are
+  mid-dark by design (`--ovulation` is L54, `--period` L58, because both have
+  to carry white text elsewhere), and mixing a mid-dark colour into a near-white
+  card is how you make mud: at 14% the ovulatory strip came out a grey-green bar
+  sitting directly under the month name.
+
+  So it borrows the panel the day sheet already uses to say the same thing — a
+  `--surface-2` block, a phase dot, "Day n · Phase". Tapping a day and looking
+  at the top of the calendar should not be two different visual languages for
+  one fact.
+*/
+.cal-here {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.cal-here strong { color: var(--ink); font-weight: 700; }
+
+.cal-here-dot {
+  width: 10px; height: 10px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--phase, var(--primary));
+}
+
 .cal-editbar {
   display: flex;
   flex-direction: column;

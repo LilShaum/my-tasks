@@ -203,6 +203,51 @@ console.log('\nthe calendar answers for the month on screen');
     'and a month that has not happened yet stays quiet');
 }
 
+/* ── 4. The calendar says where in the cycle she is ───────────────────── */
+/*
+  The grid draws the cycle in colour but never named her place in it: every
+  state on screen is a *state* — bleeding, fertile, expected — and none of them
+  was "you are here". The cycle day lived on Today and inside a day sheet she
+  had to tap.
+
+  Both halves matter. A strip that named a different day from the one Today
+  names would be the same class of bug as §1, and a strip about *now* left
+  standing under a grid about March would be worse than no strip at all.
+*/
+console.log('\nthe calendar says which day of the cycle she is on');
+{
+  await tab('calendar');
+  // Back to the current month; §3 left the view several months ahead.
+  await page.locator('.cal-today-btn', { hasText: 'Today' }).click();
+  await page.waitForTimeout(450);
+
+  const here = page.locator('.cal-here');
+  check(await here.count() === 1, 'the month containing today carries the strip');
+
+  const shown = /Day\s+(\d+)/.exec(await here.innerText());
+  check(shown != null, 'and it names a cycle day', await here.innerText());
+
+  await tab('today');
+  const ring = await page.locator('.ring-day, .view#view-today').first().innerText();
+  const onToday = /DAY\s+(\d+)/i.exec(ring.replace(/\s+/g, ' '));
+  check(onToday != null && shown != null && shown[1] === onToday[1],
+    'the same day Today is counting', `calendar ${shown?.[1]} vs today ${onToday?.[1]}`);
+
+  // The phase has to agree too — the strip and the ring arc are both drawn
+  // from the phase token, so a mismatch would be two colours for one day.
+  const heading = await page.locator('.phase-line-head h3').innerText();
+
+  await tab('calendar');
+  const stripPhase = (await page.locator('.cal-here').innerText()).split('·')[1].trim();
+  check(heading.toLowerCase().startsWith(stripPhase.toLowerCase()),
+    'and the same phase', `${stripPhase} vs ${heading}`);
+
+  await page.locator('[aria-label="Previous month"]').click();
+  await page.waitForTimeout(450);
+  check(await page.locator('.cal-here').count() === 0,
+    'a month she has paged away to does not claim to be now');
+}
+
 await browser.close();
 console.log(`\nscreens: ${checks - failures}/${checks} checks passed\n`);
 process.exit(failures ? 1 : 0);
