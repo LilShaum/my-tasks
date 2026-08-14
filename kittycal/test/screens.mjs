@@ -263,6 +263,70 @@ console.log('\nnothing names ovulation to someone whose ovulation is suppressed'
     'and there were none of those days to name', 'luteal cells present');
 }
 
+/* ── 6. The diary never leaves her without the word for where she is ──── */
+console.log('\nthe category heading stays with its chips');
+{
+  await tab('today');
+  await page.locator('button:has-text("Add more")').first().click();
+  await page.waitForTimeout(800);
+
+  const offset = await page.evaluate(() => {
+    const body = document.querySelector('.sheet-body');
+    return body ? getComputedStyle(body).getPropertyValue('--log-sticky-top').trim() : '';
+  });
+  check(/^\d+(\.\d+)?px$/.test(offset) && parseFloat(offset) > 0,
+    'the headings are parked at the measured height of the search bar', offset);
+
+  /*
+    Body symptoms alone is thirty-eight chips. Scrolled into the middle of
+    them, exactly one heading should be sitting in the band between the top of
+    the sheet body and the bottom of the search bar — the one whose chips are
+    on screen.
+  */
+  await page.evaluate(() => document.querySelector('.sheet-body')?.scrollTo(0, 900));
+  await page.waitForTimeout(450);
+
+  const pinned = await page.evaluate(() => {
+    const body = document.querySelector('.sheet-body')?.getBoundingClientRect();
+    const search = document.querySelector('.search-wrap')?.getBoundingClientRect();
+    if (!body || !search) return [];
+    return [...document.querySelectorAll('.log-section-head')]
+      .filter((h) => {
+        const top = h.getBoundingClientRect().top;
+        return top >= body.top - 2 && top < search.bottom + 8;
+      })
+      .map((h) => h.querySelector('.log-section-title')?.textContent ?? '');
+  });
+
+  check(pinned.length === 1,
+    'one heading is pinned, not none and not a stack of them',
+    JSON.stringify(pinned));
+
+  // It has to be the open one whose chips fill the screen, not a leftover.
+  check(pinned[0] === 'Symptoms', 'and it is the category she is looking at',
+    JSON.stringify(pinned));
+
+  /*
+    The search bar owns the top of the scroller, so the pinned heading has to
+    clear it. Only the pinned one is asked: a heading whose section has already
+    scrolled past is released and sitting above the viewport, which is the
+    point of sticky rather than a fault.
+  */
+  const gap = await page.evaluate(() => {
+    const body = document.querySelector('.sheet-body')?.getBoundingClientRect();
+    const search = document.querySelector('.search-wrap')?.getBoundingClientRect();
+    if (!body || !search) return null;
+    const head = [...document.querySelectorAll('.log-section-head')]
+      .find((h) => {
+        const top = h.getBoundingClientRect().top;
+        return top >= body.top - 2 && top < search.bottom + 8;
+      });
+    return head ? head.getBoundingClientRect().top - search.bottom : null;
+  });
+  check(gap != null && gap >= -1,
+    'and it sits below the search bar rather than over it', String(gap));
+}
+
 await browser.close();
 console.log(`\nscreens: ${checks - failures}/${checks} checks passed\n`);
 process.exit(failures ? 1 : 0);

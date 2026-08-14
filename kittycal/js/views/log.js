@@ -109,11 +109,53 @@ export function openLogSheet(date) {
     }),
   ];
 
+  /** @type {ResizeObserver|null} */
+  let watcher = null;
+
   openSheet({
     title: fmtRelative(date),
     body,
     footer,
+    onClose: () => { watcher?.disconnect(); watcher = null; },
   });
+
+  watcher = parkHeadingsUnderSearch();
+}
+
+/**
+ * Keep the category heading on screen while its chips are.
+ *
+ * Body symptoms alone is thirty-eight chips, and a category opens by itself
+ * when the day already has something in it — so reopening a logged day drops
+ * her into a wall of chips with the word telling her which category she is in
+ * already scrolled away. There is no way back to it except scrolling up.
+ *
+ * The headings are `<summary>` elements, so sticking them costs nothing and
+ * behaves correctly by itself: each one releases as its own section scrolls
+ * past, and the next takes over.
+ *
+ * The offset has to be measured rather than written down. The search bar is
+ * sticky above them and its height is not a constant — it grows a line when
+ * a search is running and reports how many matches there were, and the clear
+ * button wraps on a narrow screen. A hard-coded number would be right until
+ * she typed something.
+ *
+ * @returns {ResizeObserver|null} so the caller can stop watching on close
+ */
+function parkHeadingsUnderSearch() {
+  const wrap = document.querySelector('.sheet-body .search-wrap');
+  if (!(wrap instanceof HTMLElement)) return null;
+
+  const body = wrap.closest('.sheet-body');
+  if (!(body instanceof HTMLElement)) return null;
+
+  const set = () => body.style.setProperty('--log-sticky-top', `${wrap.offsetHeight}px`);
+  set();
+
+  if (typeof ResizeObserver !== 'function') return null;
+  const watcher = new ResizeObserver(set);
+  watcher.observe(wrap);
+  return watcher;
 }
 
 /* ── Day summary ────────────────────────────────────────────────────────── */
