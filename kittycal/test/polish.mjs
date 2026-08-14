@@ -407,6 +407,29 @@ console.log('\na reading that cannot be true is not kept');
   await page.waitForTimeout(300);
 }
 
+/*
+  el()'s `style` object silently drops camelCase keys — `setProperty` needs
+  `margin-top`, not `marginTop`, and does nothing at all with the wrong one, no
+  error either way. Every call site in the app writes the JS spelling, since
+  that's the natural way to write an object literal, so this had gone quietly
+  wrong in 32 places: the button under every prediction card sat flush against
+  the sentence above it, number pickers in Settings didn't centre, and so on.
+  Nothing about it would show up as a JS error or a failed assertion elsewhere
+  — the only way to catch it is to render something and measure it, which is
+  what this file is for.
+*/
+const styleBug = await page.evaluate(async () => {
+  const { el } = await import('/js/utils/dom.js');
+  const node = el('div', { style: { marginTop: '13px', '--kc-test': '7px' } });
+  document.body.append(node);
+  const computed = getComputedStyle(node);
+  const out = { marginTop: computed.marginTop, custom: computed.getPropertyValue('--kc-test').trim() };
+  node.remove();
+  return out;
+});
+ok('el() applies a camelCase style key', styleBug.marginTop === '13px', styleBug.marginTop);
+ok('and still passes a custom property straight through', styleBug.custom === '7px', styleBug.custom);
+
 ok('no page errors throughout', errors.length === 0, errors.join(' | '));
 
 console.log(`\npolish: ${pass}/${pass + fail} checks passed`);

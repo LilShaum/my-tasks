@@ -451,11 +451,27 @@
 }
 
 .toast-action {
+  position: relative;
   margin-left: auto;
   font-weight: 800;
   color: var(--surface);
   text-decoration: underline;
   padding: var(--sp-1) var(--sp-2);
+}
+
+/*
+  An invisible 44px hit area around a ~28px-tall button, the same trick the
+  chip and toggle use above. This one earns it more than either: Undo is the
+  recovery path for the two actions in the app that discard data — clearing a
+  day, toggling a period day off — and it has a five-second window to be
+  tapped in before the toast dismisses itself. A visually chunky Undo pill
+  would fight the toast's compact shape; the pseudo-element keeps the shape
+  and grows only what a thumb has to land on.
+*/
+.toast-action::before {
+  content: '';
+  position: absolute;
+  inset: -8px -6px;
 }
 
 /* ── Bottom sheet ─────────────────────────────────────────────────────── */

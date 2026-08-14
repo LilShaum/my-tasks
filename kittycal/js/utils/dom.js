@@ -70,8 +70,20 @@ function applyAttrs(node, attrs) {
     } else if (key === 'style' && typeof value === 'object') {
       for (const [prop, v] of Object.entries(value)) {
         if (v == null) continue;
-        // setProperty handles custom properties (--foo); style[prop] doesn't.
-        /** @type {HTMLElement} */ (node).style.setProperty(prop, String(v));
+        /*
+          setProperty needs the CSS spelling, not the JS one: it takes
+          `margin-top`, not `marginTop`, and silently does nothing with the
+          latter — no error, no warning, the property is just never set. Every
+          call site in this codebase writes the JS spelling, because that's
+          the natural way to write an object literal, so this is where the
+          two have to meet. A custom property (`--foo`) is passed straight
+          through; lower-casing or hyphenating it would change which variable
+          it is.
+        */
+        const name = prop.startsWith('--')
+          ? prop
+          : prop.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+        /** @type {HTMLElement} */ (node).style.setProperty(name, String(v));
       }
     } else if (key === 'dataset' && typeof value === 'object') {
       for (const [prop, v] of Object.entries(value)) {

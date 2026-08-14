@@ -159,10 +159,34 @@ export function closeSheet() {
   root.dataset.open = 'false';
   backdrop.dataset.open = 'false';
 
-  setTimeout(() => {
+  /*
+    Removed once the slide-down actually finishes, not on a timer guessing how
+    long that takes. This used to be a bare `setTimeout(…, 340)` — 340 being
+    the same number hardcoded into .sheet's transition in components.css, two
+    copies of one duration with nothing keeping them equal. Change either
+    without the other and the sheet is either yanked from the DOM mid-slide or
+    left sitting there, invisible, for however long the timer overshoots by.
+    `prefers-reduced-motion` was the case that actually showed it: that mode
+    collapses every CSS transition to ~0ms (reset.css), so the closed sheet
+    was lingering for most of a third of a second after it had already
+    finished disappearing. `transitionend` tracks whatever the real duration
+    is, including that one; the timeout below it only guards the case the
+    event never fires at all, mirroring `mascot.js`'s `animationend` pattern.
+  */
+  let removed = false;
+  const finish = () => {
+    if (removed) return;
+    removed = true;
+    root.removeEventListener('transitionend', onSlideEnd);
     root.remove();
     backdrop.remove();
-  }, 340);
+  };
+  /** @param {TransitionEvent} e */
+  const onSlideEnd = (e) => {
+    if (e.target === root && e.propertyName === 'transform') finish();
+  };
+  root.addEventListener('transitionend', onSlideEnd);
+  setTimeout(finish, 500);
 
   /*
     Restored after the screen underneath has settled, not before it.
