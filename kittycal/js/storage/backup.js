@@ -18,6 +18,7 @@
  */
 
 import { normalizeLog, normalizeSettings } from '../domain/model.js';
+import { installPlatform, isInstalled } from './persist.js';
 
 export const EXPORT_VERSION = 1;
 const MAGIC = 'kittycal-export';
@@ -162,15 +163,51 @@ export function parseImport(text) {
 }
 
 /**
- * Trigger a download. Uses an object URL and a synthetic click, which is the
- * only approach that works across mobile browsers without a server.
+ * Hand a file to the person using the app, and say whether it got there.
+ *
+ * Two mechanisms, because there is no one that works everywhere.
+ *
+ * A synthetic click on an `<a download>` is the normal route and is reliable
+ * on desktop and Android. It is also silent: there is no event, no promise
+ * and no error if the browser decides to do nothing with it, which is exactly
+ * what an installed iOS web app does. That combination is the dangerous one —
+ * `exportEverything` went on to record that a backup had happened and stopped
+ * nudging her for a month, on the strength of a file that was never written.
+ * The whole point of the backup nudge is that this app has no server copy, so
+ * a false confirmation there is worse than no backup prompt at all.
+ *
+ * So where the anchor cannot be trusted, the share sheet is used instead. It
+ * is the supported way out of a standalone iOS app — the file goes to Save to
+ * Files, Mail, anywhere — and unlike the anchor it resolves on success and
+ * rejects when she backs out, which is the signal the caller needs.
+ *
  * @param {string} text
  * @param {string} filename
  * @param {string} [type] mime type; the CSV export needs its own, or a
  *   spreadsheet asked to open the file has to guess from the extension
+ * @returns {Promise<'saved'|'cancelled'|'unverified'>} `unverified` is the
+ *   anchor: it was handed over and nothing came back, which is the normal
+ *   answer everywhere the anchor works.
  */
-export function downloadFile(text, filename, type = 'application/json') {
+export async function downloadFile(text, filename, type = 'application/json') {
   const blob = new Blob([text], { type });
+
+  if (shareIsSaferHere()) {
+    const file = new File([blob], filename, { type });
+    if (navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: filename });
+        return 'saved';
+      } catch (err) {
+        // Her tapping Cancel is an answer, not a failure — and it means no
+        // file exists, so the caller must not record a backup.
+        if (err instanceof Error && err.name === 'AbortError') return 'cancelled';
+        // Anything else and the share sheet is broken rather than declined.
+        // The anchor is a long shot here, but it is better than giving up.
+      }
+    }
+  }
+
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -180,6 +217,19 @@ export function downloadFile(text, filename, type = 'application/json') {
   link.remove();
   // Revoke on the next tick — immediately can cancel the download in Safari.
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return 'unverified';
+}
+
+/**
+ * Whether `<a download>` is untrustworthy on this device.
+ *
+ * Narrow on purpose. Sharing is a worse experience than a straight download
+ * everywhere the download works — it costs an extra sheet and a decision — so
+ * it is used only where the alternative is silent failure: an iOS web app
+ * running from the Home Screen. Safari in a tab keeps the anchor.
+ */
+function shareIsSaferHere() {
+  return installPlatform() === 'ios' && isInstalled();
 }
 
 /**
