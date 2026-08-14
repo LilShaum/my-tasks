@@ -40,7 +40,18 @@ export async function exportEverything() {
     periodDays: state.periodDays,
   });
 
-  backup.downloadFile(text, backup.exportFilename());
+  const result = await backup.downloadFile(text, backup.exportFilename());
+
+  /*
+    A cancelled share is not a backup.
+
+    Where the file goes out through the share sheet — an installed iOS app —
+    backing out of it means no file was written. Recording a backup anyway
+    would silence the nudge for a month over a file that does not exist, on
+    the one screen whose entire job is making sure a copy exists. Nothing is
+    written down and nothing is announced; she cancelled, she knows.
+  */
+  if (result === 'cancelled') return;
 
   // Both are recorded: the date is what gets shown to a human ("last backup 8
   // days ago"), the timestamp is what the at-risk count compares against, and
@@ -73,7 +84,8 @@ export async function exportCSV() {
     periodDays: state.periodDays,
   });
 
-  backup.downloadFile(text, csv.csvFilename(), 'text/csv');
+  const result = await backup.downloadFile(text, csv.csvFilename(), 'text/csv');
+  if (result === 'cancelled') return;
 
   const days = Object.keys(state.logs).length;
   toast(`${days} ${days === 1 ? 'day' : 'days'} as a spreadsheet`);

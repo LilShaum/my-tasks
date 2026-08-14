@@ -242,6 +242,16 @@ function installPrompt({ logs, periodDays, settings, today }) {
       el('div', { text: risk }),
     ]),
     el('p', { class: 'hint-sm', text: how }),
+    /*
+      The card is headed with a fix she has to perform herself, in the browser
+      chrome, where no button here can reach — there is no API to open that
+      sheet, which is the whole reason this card exists. So the only thing it
+      can offer to do is the other protection, and without a sentence joining
+      the two the card read as a heading about installing above a button about
+      something else entirely.
+    */
+    el('p', { class: 'hint-sm', text:
+      'Until you do, an exported file is the only copy that would survive.' }),
     el('div', { class: 'backup-nudge-actions' }, [
       el('button', {
         type: 'button', class: 'btn',
@@ -799,16 +809,28 @@ function nextPeriodCard(prediction) {
     here, one line down, where it is a fact about the period rather than a
     claim about the forecast.
   */
+  /*
+    The heading has to say which question the big number answers.
+
+    Headed plainly "Next period", a headline of 28 Aug – 1 Sep reads as the
+    days she will bleed on — and then the line below it named a *different*
+    range, 30 Aug to 3 Sep, for the days she will actually bleed on. Two date
+    ranges one line apart, both true, answering questions nobody had been told
+    apart. Saying "starts" costs a word and removes the collision.
+
+    "Give or take 2 days" went with it: the window is exactly the estimate plus
+    or minus that number, so once the headline is labelled as the start window
+    the phrase is the headline said twice.
+  */
   return el('div', { class: 'card data-zone' }, [
-    el('h3', { text: 'Next period' }),
+    el('h3', { text: window ? 'Next period starts' : 'Next period' }),
     el('p', { class: 'big-value num', text: window
       ? `${fmtDayMonth(window.from)} – ${fmtDayMonth(window.to)}`
       : fmtDayMonth(start) }),
     el('p', { class: 'hint-sm', text: window
-      ? `Most likely ${fmtDayMonth(start)}, give or take `
-        + `${plural(window.days, 'day')}. Usually a `
-        + `${prediction.avgPeriodLength}-day period, so ${fmtDayMonth(start)}`
-        + ` to ${fmtDayMonth(end)}.`
+      ? `Most likely ${fmtDayMonth(start)}. Usually a `
+        + `${prediction.avgPeriodLength}-day period, so bleeding around `
+        + `${fmtDayMonth(start)} to ${fmtDayMonth(end)}.`
       : `Estimated ${prediction.avgPeriodLength}-day period.` }),
     confidenceLine(prediction),
   ]);
@@ -1145,11 +1167,23 @@ function packCard(settings, logs, today) {
   return el('div', { class: 'card data-zone' }, [
     el('h3', { text: 'Your pack' }),
     el('p', { class: 'big-value num', text: describePack(position) ?? '' }),
+    /*
+      Counted from tomorrow, because the headline above already counts today.
+
+      `left` includes today, so under "Pill 10 of 21" this said "12 days of
+      this pack left" — correct, and unreadable: the two numbers on screen
+      invite 21 − 10, which is 11, and there was nothing to say the 12 had
+      counted today twice. Naming the pills still to come after this one
+      leaves the arithmetic where she can check it.
+
+      A continuous pack has no break, and "then 0 days off" under a regimen
+      labelled "Every day, no break" is the card contradicting the setting
+      that drew it.
+    */
     el('p', { class: 'hint-sm', text: position.active
-      // A continuous pack has no break, and "then 0 days off" under a regimen
-      // labelled "Every day, no break" is the card contradicting the setting
-      // that drew it.
-      ? `${plural(position.left, 'day')} of this pack left` +
+      ? (position.left > 1
+        ? `${plural(position.left - 1, 'more pill')} after today`
+        : 'Last pill of the pack') +
         (position.breakDays
           ? `, then ${plural(position.breakDays, 'day')} off.`
           : ', then straight on to the next.')
