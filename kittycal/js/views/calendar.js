@@ -70,7 +70,7 @@ export function renderCalendar(host) {
       yearHeader(ui.calYear),
       yearGrid({ year: ui.calYear, today, periodFill, marks,
                  firstDayOfWeek: settings.firstDayOfWeek }),
-      legend(prediction, { fertility: false }),
+      legend(prediction, marks, { fertility: false }),
     ]);
     return;
   }
@@ -90,7 +90,7 @@ export function renderCalendar(host) {
       marks,
       editMode: ui.periodEditMode,
     }),
-    legend(prediction),
+    legend(prediction, marks),
     monthRecall({ year: ui.calYear, month: ui.calMonth, today, periodFill, logs }),
     !cycles.length ? firstRunHint() : null,
   ]);
@@ -658,11 +658,13 @@ function onGridKeydown(e, firstDayOfWeek) {
 
 /**
  * @param {import('../domain/predict.js').Prediction} prediction
+ * @param {ReturnType<typeof buildMarks>} marks the sets the grid is drawn
+ *   from, so an entry can be gated on what is actually on screen
  * @param {{fertility?: boolean}} [opts] set fertility:false where the view
  *   doesn't draw those states — a legend for something not on screen is worse
  *   than no legend.
  */
-function legend(prediction, opts = {}) {
+function legend(prediction, marks, opts = {}) {
   const { fertility = true } = opts;
 
   /** @type {{class: string, label: string}[]} */
@@ -680,11 +682,29 @@ function legend(prediction, opts = {}) {
 
     This function already refuses to list a state the view does not draw, on
     the grounds that a legend for something absent is worse than no legend —
-    the opposite case was the one that got missed. A block of muted days runs
+    the opposite case was the one that got missed. A block of shaded days runs
     from ovulation to the next expected period, and with nothing naming it the
-    obvious reading of grey is "unavailable", on days that are in the future.
+    obvious reading was "unavailable", on days that are in the future.
+
+    Fixing that reintroduced the first bug, because the item went in *after*
+    the fertility guard and was gated on `nextStart` alone. Two states where
+    the calendar drew no luteal day and the legend named one anyway:
+
+      - The year view, which passes `fertility: false` because at that size a
+        phase tint is a smear rather than information. It listed "After
+        ovulation" against twelve grids that contain only period days.
+      - Anyone on hormonal contraception. `buildMarks` builds the luteal set
+        only when `showFertility`, so nothing was drawn — but the legend said
+        "After ovulation" to someone the app otherwise refuses to say the word
+        "ovulation" to, which is the exact claim the fertility rule exists to
+        avoid making.
+
+    Now read off `marks.luteal`, the same set the grid is drawn from, so the
+    legend cannot disagree with the circles above it; and inside the fertility
+    guard, because a phase measured backwards from the ovulation estimate is a
+    fertility state whatever it is called.
   */
-  if (prediction.nextStart) {
+  if (fertility && marks.luteal.size) {
     items.push({ class: 'is-luteal', label: 'After ovulation' });
   }
 

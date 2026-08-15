@@ -131,6 +131,75 @@ console.log('\nthe calendar legend covers what the calendar draws');
     `drawn ${JSON.stringify(drawn)}, explained ${JSON.stringify(explained)}`);
   ok('the luteal shading in particular is named', explained.includes('is-luteal'),
     JSON.stringify(explained));
+
+  /*
+    And the converse, which is the direction that broke when the check above
+    was satisfied: the fix for the unlabelled shading appended its legend item
+    *after* the guard that keeps this function from naming absent states, so
+    the two directions ended up enforced by different code paths.
+
+    Scoped to the three conditional states, and deliberately not applied to the
+    whole list. "Period logged" is unconditional — the calendar always draws
+    logged periods — and this fixture's current month happens to contain none,
+    so a blanket converse would fail on a legend entry that is doing its job.
+    What the code actually promises is narrower: the fertility family is listed
+    when it is drawn and not otherwise.
+  */
+  const conditional = ['is-fertile', 'is-ovulation', 'is-luteal'];
+  const unused = conditional.filter((c) => explained.includes(c) && !drawn.includes(c));
+  ok('and no fertility state is explained without being drawn',
+    unused.length === 0,
+    `explained-but-undrawn ${JSON.stringify(unused)}`);
+}
+
+/*
+  Two views that draw no luteal days at all, and used to explain them anyway.
+
+  Worth separating from the block above because neither is reachable from that
+  fixture: one is a different view, and the other is a different person.
+*/
+console.log('\nthe legend stays quiet where the calendar says nothing');
+{
+  // The year view drops the phase tints on purpose — at twelve grids to a
+  // screen a tint is a smear — so it must drop their legend entries too.
+  await page.locator('.cal-today-btn', { hasText: 'Year' }).click();
+  await page.waitForTimeout(500);
+
+  const yearLegend = await page.$$eval('.cal-legend-swatch', (n) =>
+    n.map((s) => [...s.classList].find((c) => c.startsWith('is-'))));
+  ok('the year view explains only what its mini-grids draw',
+    !yearLegend.includes('is-luteal') && !yearLegend.includes('is-fertile')
+    && !yearLegend.includes('is-ovulation'),
+    JSON.stringify(yearLegend));
+
+  await page.locator('.cal-today-btn', { hasText: 'Months' }).click();
+  await page.waitForTimeout(500);
+
+  /*
+    On a hormonal method the app refuses to predict ovulation, because it is
+    not happening. `buildMarks` follows that and builds no luteal set — but the
+    legend was gated on `nextStart` alone, so it went on saying "After
+    ovulation" to the one person the rule exists to protect from that sentence.
+  */
+  await page.evaluate(async () => {
+    const store = await import('/js/state/store.js');
+    store.updateSettings({ birthControl: 'pill-combined' });
+  });
+  await page.waitForTimeout(600);
+
+  const cells = await page.$$eval('.cal-cell.is-luteal', (n) => n.length);
+  ok('a hormonal method draws no luteal days', cells === 0, `${cells} cells`);
+
+  const onPill = await page.$$eval('.cal-legend-swatch', (n) =>
+    n.map((s) => [...s.classList].find((c) => c.startsWith('is-'))));
+  ok('and the legend does not say "After ovulation" to her',
+    !onPill.includes('is-luteal'), JSON.stringify(onPill));
+
+  await page.evaluate(async () => {
+    const store = await import('/js/state/store.js');
+    store.updateSettings({ birthControl: 'none' });
+  });
+  await page.waitForTimeout(600);
 }
 
 console.log('\nchips are as big to tap as the app claims');
