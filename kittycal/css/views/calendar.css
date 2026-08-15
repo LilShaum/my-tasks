@@ -167,7 +167,26 @@
   font-weight: 800;
 }
 
-.cal-cell.is-luteal { background: var(--luteal-soft); }
+/*
+  The `color` is not redundant with the rule above it.
+
+  `.is-future` drops a day's number to `--ink-3`, and most luteal days in any
+  current month are in the future — so the date inside a luteal circle was
+  being drawn in tertiary ink on a tinted fill, which measured 2.7–2.9:1 in
+  every light theme, under the 3:1 this app holds tertiary text to everywhere
+  else. A future *fertile* day never had the problem, because `.is-fertile`
+  sets `--ink` and wins on source order. That was the whole difference: two
+  neighbouring days on the same grid, one readable and one not, decided by
+  which rule came second.
+
+  So luteal does what fertile already does. A day carrying a phase fill takes
+  the fill's text colour, and `--ink` on `--luteal-soft` is pinned in
+  contrast.mjs.
+*/
+.cal-cell.is-luteal {
+  background: var(--luteal-soft);
+  color: var(--ink);
+}
 
 .cal-cell.is-selected {
   outline: 2.5px solid var(--ink);
