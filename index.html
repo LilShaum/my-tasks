@@ -1,322 +1,235 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<!--
+  KittyCal — Hello Kitty period tracker
+  Improved index.html — changes from original:
+    • data-theme="hellokitty" and data-pattern="gingham" set as defaults
+      so first-time users land in the Hello Kitty theme, not a generic fallback.
+    • viewport-fit=cover added for iPhone notch/home-indicator safe areas.
+    • color-scheme meta for OS-level dark-mode respect before CSS loads.
+    • Improved title and description.
+    • apple-touch-icon for iOS add-to-home-screen.
+    • Preload for Fredoka (display font) so the ring headline doesn't flash.
+    • theme-color meta updated to match Hello Kitty primary at L68.
+-->
+<html lang="en" data-theme="hellokitty" data-pattern="gingham">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>My Tasks</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="description"
+        content="KittyCal — a Hello Kitty period tracker that lives on your phone, works offline, and keeps your data private." />
+  <!-- Pink matching hellokitty theme primary oklch(68% 0.145 18) ≈ #e8705a -->
+  <meta name="theme-color" content="#e8705a" />
 
-  <!-- Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500&display=swap" rel="stylesheet"/>
+  <title>KittyCal</title>
 
-  <!-- Icons -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"/>
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
 
-  <!-- Your styles -->
-  <link rel="stylesheet" href="style.css"/>
+  <!--
+    Fonts.
+    Fredoka is the display face (ring headline, buttons, big numbers).
+    Nunito is the body face.
+    Both are bundled in assets/fonts/ for offline use;
+    the Google Fonts URLs are the fallback while the SW primes its cache.
+    preload the display font so the ring number doesn't FOUT.
+  -->
+  <link rel="preload" href="assets/fonts/fredoka.woff2"
+        as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="assets/fonts/nunito.woff2"
+        as="font" type="font/woff2" crossorigin />
+
+  <!--
+    Single merged stylesheet (tokens → themes → layout → components → views).
+    When deploying the full app, split back into the individual files in css/.
+  -->
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="css/print.css" media="print" />
 </head>
+
 <body>
+  <!--
+    Background pattern layer.
+    Fixed, z-1, pointer-events:none — sits behind everything.
+    The active pattern class on <html> drives which CSS pattern is rendered.
+  -->
+  <div class="app-bg" aria-hidden="true"></div>
 
-<canvas id="confetti"></canvas>
-
-<div class="wrap" id="wrap">
-
-  <!-- ── Main view ── -->
-  <div class="view" id="main-view">
-    <div class="top-meta">
-      <span class="date-lbl" id="date-lbl"></span>
-      <span class="pct-lbl" id="pct-lbl">0%</span>
-    </div>
-    <div class="prog-track"><div class="prog-fill" id="prog-fill" style="width:0"></div></div>
-
-    <div class="page-hdr">
-      <h1 class="page-title">My <em>tasks</em></h1>
-      <div class="hdr-right">
-        <span class="active-cnt" id="active-cnt">0 left</span>
-        <select class="sort-sel" onchange="setSortBy(this.value)" aria-label="Sort tasks">
-          <option value="added">Date added</option>
-          <option value="priority">Priority</option>
-          <option value="due">Due date</option>
-          <option value="alpha">A → Z</option>
-          <option value="status">Status</option>
-        </select>
-        <button class="hdr-btn" id="dark-btn" onclick="toggleDark()" title="Toggle dark mode" aria-label="Toggle dark mode">
-          <i class="ti ti-moon"></i>
-        </button>
-        <button class="hdr-btn" onclick="showView('stats')" title="Statistics" aria-label="Statistics">
-          <i class="ti ti-chart-bar"></i>
-        </button>
-        <button class="hdr-btn" onclick="showView('calendar')" title="Calendar" aria-label="Calendar">
-          <i class="ti ti-calendar-month"></i>
-        </button>
-        <button class="hdr-btn" onclick="showView('help')" title="Help" aria-label="Help">
-          <i class="ti ti-help"></i>
-        </button>
-      </div>
-    </div>
-
-    <div class="search-wrap">
-      <i class="ti ti-search si-icon"></i>
-      <input class="search-inp" id="search-inp" placeholder="Search tasks…" oninput="onSearch(this.value)" aria-label="Search"/>
-      <button class="si-clear" id="si-clear" onclick="clearSearch()" aria-label="Clear search">
-        <i class="ti ti-x"></i>
-      </button>
-    </div>
-
-    <div class="add-card">
-      <div class="add-top">
-        <input class="add-inp" id="new-inp" placeholder="What needs doing?" maxlength="200"/>
-        <button class="add-go" onclick="addTodo()" aria-label="Add task">
-          <i class="ti ti-arrow-up"></i>
-        </button>
-      </div>
-      <div class="add-div"></div>
-      <div class="add-opts" id="add-opts"></div>
-    </div>
-
-    <div class="backup-bar" id="backup-bar">
-      <i class="ti ti-device-floppy"></i>
-      <span id="backup-lbl">Auto-backup: off</span>
-      <button id="backup-link-btn"    class="backup-btn" onclick="linkBackupFile()">Link file</button>
-      <button id="backup-unlink-btn"  class="backup-btn" onclick="unlinkBackupFile()" style="display:none">Unlink</button>
-      <button id="backup-restore-btn" class="backup-btn" onclick="restoreFromFile()">Restore</button>
-    </div>
-
-    <div class="toolbar">
-      <div class="tabs">
-        <button class="tab act" onclick="setFilter('all',this)">All</button>
-        <button class="tab" onclick="setFilter('active',this)">Active</button>
-        <button class="tab" onclick="setFilter('done',this)">Done</button>
-      </div>
-      <button class="sel-btn" id="sel-btn" onclick="toggleSelectMode()">Select</button>
-    </div>
-
-    <div class="tag-strip" id="tag-strip"></div>
-
-    <div id="bulk-bar" style="display:none" class="bulk-bar">
-      <span id="bulk-lbl">0 selected</span>
-      <div class="bulk-acts">
-        <button class="bulk-btn b-comp" onclick="bulkComplete()">
-          <i class="ti ti-check"></i> Complete
-        </button>
-        <button class="bulk-btn b-del" onclick="bulkDelete()">
-          <i class="ti ti-trash"></i> Delete
-        </button>
-      </div>
-    </div>
-
-    <div class="todo-list" id="todo-list"></div>
-
-    <div class="ftr" id="ftr" style="display:none">
-      <span class="ftr-note" id="ftr-note"></span>
-      <button class="clr-btn" onclick="clearDone()">Clear completed</button>
-    </div>
-
-    <div class="toast-wrap" id="toast-wrap" style="display:none">
-      <div class="toast">
-        <span>Task deleted</span>
-        <button class="undo-btn" onclick="undoDelete()">Undo</button>
-      </div>
-    </div>
-
-    <div class="kb-bar">
-      <span class="kb-item"><span class="kbd">N</span> new task</span>
-      <span class="kb-item"><span class="kbd">/</span> search</span>
-      <span class="kb-item"><span class="kbd">S</span> stats</span>
-      <span class="kb-item"><span class="kbd">D</span> dark mode</span>
-      <span class="kb-item"><span class="kbd">?</span> help</span>
-      <span class="kb-item"><span class="kbd">Esc</span> back</span>
-    </div>
+  <!--
+    Boot screen.
+    Shown on first paint; JS removes data-hide once the DB is ready.
+    wobble animation is in components.css.
+  -->
+  <div class="boot" id="boot">
+    <img class="boot-art" src="assets/icons/icon.svg" alt="" aria-hidden="true" />
   </div>
 
-  <!-- ── Stats view ── -->
-  <div class="view" id="stats-view" style="display:none">
-    <div class="help-hdr">
-      <h2 class="help-title">Statistics</h2>
-      <button class="help-back" onclick="showView('main')">
-        <i class="ti ti-arrow-left"></i> Back
-      </button>
-    </div>
-    <div id="stats-content"></div>
+  <!--
+    Toast notification host.
+    aria-live="polite" so screen readers announce toasts without interrupting.
+    Contents are injected by js/ui/toast.js.
+  -->
+  <div class="toast-host" id="toast-host"
+       aria-live="polite" aria-atomic="true" role="status"></div>
+
+  <!--
+    Sheet backdrop.
+    Covers the page when a bottom sheet is open.
+    data-open toggled by js/ui/sheet.js, which also manages aria-modal.
+  -->
+  <div class="sheet-backdrop" id="sheet-backdrop"
+       data-open="false" aria-hidden="true"></div>
+
+  <!--
+    App shell — the phone-column layout.
+    Rendered content goes in #view-* sections.
+    Navigation is the fixed tab bar at the bottom.
+  -->
+  <div class="shell" id="shell" hidden>
+
+    <!-- Sticky app header: mascot + view title + contextual actions -->
+    <header class="app-head" id="app-head">
+      <h1 id="view-title">
+        <!--
+          Mascot SVG is injected here by js/ui/mascot.js.
+          It reacts to logging (mascot-bob) and cycle closes (mascot-cheer)
+          as defined in components.css.
+        -->
+        <span class="mascot-mini sticker" id="header-mascot" aria-hidden="true"></span>
+        <span id="head-title-text">KittyCal</span>
+      </h1>
+      <!-- Per-view action buttons (settings, export, etc.) injected here -->
+      <div id="head-actions" class="head-actions"></div>
+    </header>
+
+    <!-- ── Views ────────────────────────────────────────────────────────── -->
+    <main id="main">
+
+      <!--
+        TODAY — the daily loop.
+        Contains: greeting, cycle ring, week strip, phase line, check-in or
+        logged state, prediction cards, tips scroller, backup/install nudges.
+        Rendered by js/views/today.js.
+      -->
+      <section class="view" id="view-today"
+               role="main" aria-labelledby="head-title-text">
+      </section>
+
+      <!--
+        CALENDAR — month and year views.
+        Rendered by js/views/calendar.js.
+      -->
+      <section class="view" id="view-calendar" hidden
+               aria-label="Calendar">
+      </section>
+
+      <!--
+        LOG — diary of all recorded days.
+        Rendered by js/views/log.js.
+      -->
+      <section class="view" id="view-log" hidden
+               aria-label="Log">
+      </section>
+
+      <!--
+        INSIGHTS — charts and stats.
+        Rendered by js/views/insights.js.
+      -->
+      <section class="view" id="view-insights" hidden
+               aria-label="Insights">
+      </section>
+
+      <!--
+        NOTES — free-text journal, never analysed.
+        Rendered by js/views/notes.js.
+      -->
+      <section class="view" id="view-notes" hidden
+               aria-label="Notes">
+      </section>
+
+      <!--
+        SETTINGS — cycle length, reminders, theme, lock, data.
+        Rendered by js/views/settings.js.
+      -->
+      <section class="view" id="view-settings" hidden
+               aria-label="Settings">
+      </section>
+
+      <!--
+        HELP — how the app works, what each phase means.
+        Rendered by js/views/help.js.
+      -->
+      <section class="view" id="view-help" hidden
+               aria-label="Help">
+      </section>
+
+      <!--
+        REPORT — shareable one-page summary for doctor appointments.
+        Rendered by js/views/report.js.
+      -->
+      <section class="view" id="view-report" hidden
+               aria-label="Report for doctor">
+      </section>
+
+      <!--
+        STICKERS — earned milestones displayed as a collection.
+        Rendered by js/views/stickers.js.
+      -->
+      <section class="view" id="view-stickers" hidden
+               aria-label="Sticker collection">
+      </section>
+
+    </main>
+
+    <!--
+      Tab bar.
+      Four primary destinations; all others reachable from Settings or
+      the header action buttons. Each tab is a button with aria-selected.
+      SVGs are injected by js/main.js so they stay in sync with the icon
+      set used by views.
+    -->
+    <nav class="tabbar" id="tabbar" aria-label="Main navigation">
+      <!--
+        Tab buttons are injected by js/main.js.
+        Expected order: Today, Calendar, Log, Insights.
+        Each gets: class="tab", aria-selected="true|false", data-view="..."
+      -->
+    </nav>
+
+  </div><!-- /.shell -->
+
+  <!--
+    Onboarding flow.
+    Fullscreen; shown instead of .shell on first run.
+    Rendered and dismissed by js/views/onboarding.js.
+  -->
+  <div class="onb" id="onboarding" hidden
+       aria-label="Welcome to KittyCal">
   </div>
 
-  <!-- ── Calendar view ── -->
-  <div class="view" id="cal-view" style="display:none">
-    <div class="help-hdr">
-      <h2 class="help-title">Calendar</h2>
-      <div class="cal-nav">
-        <button class="cal-nav-btn" onclick="calPrev()" title="Previous month" aria-label="Previous month">
-          <i class="ti ti-chevron-left"></i>
-        </button>
-        <span class="cal-month-lbl" id="cal-month-lbl"></span>
-        <button class="cal-nav-btn" onclick="calNext()" title="Next month" aria-label="Next month">
-          <i class="ti ti-chevron-right"></i>
-        </button>
-      </div>
-      <button class="help-back" onclick="showView('main')">
-        <i class="ti ti-arrow-left"></i> Back
-      </button>
-    </div>
-    <div id="cal-content"></div>
+  <!--
+    Lock screen.
+    Overlays everything when a PIN is set and the app loses focus.
+    Rendered by js/ui/lock.js.
+  -->
+  <div class="view" id="view-lock" hidden
+       aria-label="Locked">
   </div>
 
-  <!-- ── Help view ── -->
-  <div class="view" id="help-view" style="display:none">
-    <div class="help-hdr">
-      <h2 class="help-title">How it works</h2>
-      <button class="help-back" onclick="showView('main')">
-        <i class="ti ti-arrow-left"></i> Back
-      </button>
-    </div>
+  <!--
+    Service worker registration.
+    Happens before the app module so the SW is ready to intercept
+    network requests during the first JS evaluation.
+  -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js');
+    }
+  </script>
 
-    <div class="help-sec">
-      <div class="h-sec-lbl">Adding tasks</div>
-      <div class="h-item">
-        <div class="h-ic"><i class="ti ti-plus"></i></div>
-        <div>
-          <div class="h-t">Add a task</div>
-          <div class="h-d">Type in the "What needs doing?" box and press <span class="kbd">Enter</span> or the ↑ button. Set priority, date, repeat, and tags in the options row before adding.</div>
-        </div>
-      </div>
-      <div class="h-item">
-        <div class="h-ic"><i class="ti ti-flag-3"></i></div>
-        <div>
-          <div class="h-t">Priority</div>
-          <div class="h-d">Click the Priority pill to cycle None → Low → Medium → High. The coloured stripe on the left of each task shows its priority. Change it anytime from the detail panel.</div>
-        </div>
-      </div>
-      <div class="h-item">
-        <div class="h-ic"><i class="ti ti-calendar"></i></div>
-        <div>
-          <div class="h-t">Due dates</div>
-          <div class="h-d">Pick a date when adding, or edit it in the detail panel. Overdue tasks show red, today shows amber.</div>
-        </div>
-      </div>
-      <div class="h-item">
-        <div class="h-ic"><i class="ti ti-repeat"></i></div>
-        <div>
-          <div class="h-t">Recurring tasks</div>
-          <div class="h-d">Click Repeat to cycle Daily, Weekdays, Weekly, or Monthly. Completing a recurring task auto-reschedules it to the next occurrence.</div>
-        </div>
-      </div>
-      <div class="h-item">
-        <div class="h-ic"><i class="ti ti-hash"></i></div>
-        <div>
-          <div class="h-t">Tags</div>
-          <div class="h-d">Click a tag pill to attach it. Click "+ tag" to create a new one. Filter by clicking a tag chip below the filter tabs. Hover a chip to rename or delete it.</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="help-sec">
-      <div class="h-sec-lbl">Managing tasks</div>
-      <div class="h-item">
-        <div class="h-ic"><i class="ti ti-circle-check"></i></div>
-        <div>
-          <div class="h-t">Complete a task</div>
-          <div class="h-d">Click the circle to mark done. Click again to unmark. Recurring tasks reschedule automatically.</div>
-        </div>
-      </div>
-      <div class="h-item">
-        <div class="h-ic"><i class="ti ti-pin"></i></div>
-        <div>
-          <div class="h-t">Pin tasks</div>
-          <div class="h-d">Hover a task and click the pin icon to pin it. Pinned tasks always appear at the top of the list.</div>
-        </div>
-      </div>
-      <div class="h-item">
-        <div class="h-ic"><i class="ti ti-pencil"></i></div>
-        <div>
-          <div class="h-t">Edit task text</div>
-          <div class="h-d">Hover a task and click the pencil icon. Press <span class="kbd">Enter</span> to save or <span class="kbd">Esc</span> to cancel.</div>
-        </div>
-      </div>
-      <div class="h-item">
-        <div class="h-ic"><i class="ti ti-chevron-down"></i></div>
-        <div>
-          <div class="h-t">Task details</div>
-          <div class="h-d">Click the ↓ chevron to expand a task. Inside: priority, due date, recurrence, time estimate, notes, and subtasks.</div>
-        </div>
-      </div>
-      <div class="h-item">
-        <div class="h-ic"><i class="ti ti-grip-vertical"></i></div>
-        <div>
-          <div class="h-t">Drag to reorder</div>
-          <div class="h-d">Hover to reveal the grip handle on the left, then drag up or down.</div>
-        </div>
-      </div>
-      <div class="h-item">
-        <div class="h-ic"><i class="ti ti-trash"></i></div>
-        <div>
-          <div class="h-t">Delete &amp; undo</div>
-          <div class="h-d">Hover and click the trash icon. An Undo toast appears for 5 seconds at the bottom.</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="help-sec">
-      <div class="h-sec-lbl">Organising</div>
-      <div class="h-item">
-        <div class="h-ic"><i class="ti ti-search"></i></div>
-        <div>
-          <div class="h-t">Search</div>
-          <div class="h-d">Filters tasks in real time by name, note, or tag. Press <span class="kbd">/</span> to jump to it, <span class="kbd">Esc</span> to clear.</div>
-        </div>
-      </div>
-      <div class="h-item">
-        <div class="h-ic"><i class="ti ti-checks"></i></div>
-        <div>
-          <div class="h-t">Bulk actions</div>
-          <div class="h-d">Click "Select" to enter selection mode, tick tasks, then Complete or Delete all at once.</div>
-        </div>
-      </div>
-      <div class="h-item">
-        <div class="h-ic"><i class="ti ti-device-floppy"></i></div>
-        <div>
-          <div class="h-t">Auto-backup</div>
-          <div class="h-d">Click "Link file" in the backup bar to pick a local JSON file. Every change is saved to it automatically. Click "Restore" to load tasks from a backup file.</div>
-        </div>
-      </div>
-      <div class="h-item">
-        <div class="h-ic"><i class="ti ti-chart-bar"></i></div>
-        <div>
-          <div class="h-t">Statistics</div>
-          <div class="h-d">Click the chart icon (or press <span class="kbd">S</span>) to see your completion stats, streaks, and task breakdowns.</div>
-        </div>
-      </div>
-      <div class="h-item">
-        <div class="h-ic"><i class="ti ti-confetti"></i></div>
-        <div>
-          <div class="h-t">Confetti</div>
-          <div class="h-d">Complete every task on your list and watch what happens 🎉</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="help-sec">
-      <div class="h-sec-lbl">Keyboard shortcuts</div>
-      <div class="h-item">
-        <div class="h-ic"><i class="ti ti-keyboard"></i></div>
-        <div>
-          <div class="h-t">Shortcuts</div>
-          <div class="h-d" style="display:flex;flex-direction:column;gap:5px">
-            <span><span class="kbd">N</span> — focus the new task input</span>
-            <span><span class="kbd">/</span> — focus search</span>
-            <span><span class="kbd">S</span> — open statistics</span>
-            <span><span class="kbd">D</span> — toggle dark mode</span>
-            <span><span class="kbd">?</span> — open this help page</span>
-            <span><span class="kbd">Enter</span> — add task / save edit</span>
-            <span><span class="kbd">Esc</span> — go back / cancel / clear search</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-</div>
-
-<!-- Your scripts -->
-<script src="script.js"></script>
+  <!-- App entry point — ES module, loads after DOM is parsed -->
+  <script type="module" src="js/main.js"></script>
 </body>
 </html>
