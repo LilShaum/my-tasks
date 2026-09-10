@@ -10,10 +10,9 @@
  * Run: node test/stickers.mjs   (with a static server on 8099)
  */
 
-import pw from '/opt/node22/lib/node_modules/playwright/index.js';
+import { launchChromium } from './browser.mjs';
 
 const BASE = 'http://127.0.0.1:8099/';
-const CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 
 let checks = 0;
 let failures = 0;
@@ -24,7 +23,7 @@ const check = (cond, label, extra = '') => {
   else { failures += 1; console.log(`  FAIL  ${label}${extra ? ` — ${extra}` : ''}`); }
 };
 
-const browser = await pw.chromium.launch({ executablePath: CHROME });
+const browser = await launchChromium();
 
 /** @param {(p: import('playwright').Page) => Promise<void>} fn */
 async function withPage(fn) {

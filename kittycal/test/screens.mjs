@@ -16,10 +16,9 @@
  * Run: node test/screens.mjs   (with a static server on 8099)
  */
 
-import pw from '/opt/node22/lib/node_modules/playwright/index.js';
+import { launchChromium } from './browser.mjs';
 
 const BASE = 'http://127.0.0.1:8099/';
-const CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 
 let checks = 0;
 let failures = 0;
@@ -30,7 +29,7 @@ const check = (cond, label, extra = '') => {
   else { failures += 1; console.log(`  FAIL  ${label}${extra ? ` — ${extra}` : ''}`); }
 };
 
-const browser = await pw.chromium.launch({ executablePath: CHROME });
+const browser = await launchChromium();
 const ctx = await browser.newContext({
   viewport: { width: 430, height: 932 }, deviceScaleFactor: 2,
   isMobile: true, hasTouch: true,
@@ -346,6 +345,7 @@ console.log('\nthe category heading stays with its chips');
   });
   check(gap != null && gap >= -1,
     'and it sits below the search bar rather than over it', String(gap));
+}
 
 /* ── 7. The calendar says where in the cycle she is ───────────────────── */
 /*
@@ -360,6 +360,13 @@ console.log('\nthe category heading stays with its chips');
 */
 console.log('\nthe calendar says which day of the cycle she is on');
 {
+  // §6 finishes with the diary sheet open over the app, and a sheet is a real
+  // modal here — it swallows the tab tap rather than letting it through.
+  if (await page.locator('.sheet[data-open="true"]').count()) {
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(450);
+  }
+
   /*
     §5 leaves her on a hormonal method, where there is no ovulatory phase to
     name. Put that back first: this section is about the ordinary case, and

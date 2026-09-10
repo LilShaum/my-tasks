@@ -23,17 +23,14 @@
  * Exits non-zero on any failure.
  */
 
-import pw from '/opt/node22/lib/node_modules/playwright/index.js';
+import { launchChromium } from './browser.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const { chromium } = pw;
 const BASE = process.argv[2] || 'http://127.0.0.1:8099';
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'kittycal-restore-'));
-const b = await chromium.launch({
-  executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
-});
+const b = await launchChromium();
 
 let fails = 0;
 const check = (ok, what, detail='') => {
