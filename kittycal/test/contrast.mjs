@@ -55,6 +55,20 @@ const CHECKS = [
   ['--ink-2', '--surface-2', 4.5, 'secondary text on the quiet card tier'],
   // The one destructive button in the app. Held to the text bar, not 3:1.
   ['--on-danger', '--danger-solid', 4.5, 'label on the erase button'],
+  /*
+    Calendar day numbers sit on the phase fills, and those two pairs were the
+    gap in this list: every check above is text on a *surface* token, but a
+    third of the days in any month are drawn on `--fertile-soft` or
+    `--luteal-soft` instead. The separation block below proves the fills are
+    distinguishable from each other and says nothing about whether the date
+    written inside one is readable.
+
+    Worth pinning rather than eyeballing, because both fills are derived from
+    `--c-cycle` — anyone retuning the cycle palette's saturation moves the
+    background under these digits without touching anything named "text".
+  */
+  ['--ink', '--fertile-soft', 4.5, 'a date on a fertile day'],
+  ['--ink', '--luteal-soft', 4.5, 'a date on a luteal day'],
 ];
 
 /** sRGB relative luminance, per WCAG 2.x. @param {number[]} rgb 0-255 */
