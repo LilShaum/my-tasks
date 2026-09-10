@@ -171,8 +171,28 @@
   --fertile:       oklch(68% calc(var(--c-cycle) * 0.62) 195);
   --fertile-soft:  oklch(91% calc(var(--c-cycle) * 0.26) 195);
   --ovulation:     oklch(54% calc(var(--c-cycle) * 0.66) 195);
-  --luteal:        oklch(78% 0.035 var(--h));
-  --luteal-soft:   oklch(90% 0.02 var(--h));
+  /*
+    Luteal was the one cycle colour that broke the rule stated at the top of
+    this block. It read `oklch(78% 0.035 var(--h))` — theme hue, fixed chroma —
+    so the phase changed colour with the theme (greenish under Keroppi, yellow
+    under Gudetama) while period and fertile stayed put. It was also the only
+    one of the four with no chroma to speak of, which had two costs:
+
+      - On the calendar it is the largest block of colour on the screen, and a
+        near-neutral fill on a pastel page reads as *disabled*, not as a phase.
+        Half the month looked switched off.
+      - It was the only phase without an identity, so the ring, the phase
+        caption and the Mood-by-phase dot all named a phase in grey.
+
+    Hue 305 for the same reason 12 and 195 were chosen: far enough from both
+    (>100°) to survive colour-blind vision, and a soft lilac is the reading
+    most cycle apps already use for the luteal stretch. Chroma comes off
+    `--c-cycle` like the rest of the family, so it moves with the theme without
+    changing what it means, and the low-chroma themes keep the floor that stops
+    a luteal day and a period day collapsing into the same grey.
+  */
+  --luteal:        oklch(78% calc(var(--c-cycle) * 0.52) 305);
+  --luteal-soft:   oklch(91% calc(var(--c-cycle) * 0.24) 305);
 
   /*
     The "typical range" band on the Insights charts.
@@ -292,8 +312,10 @@
      on the cycle ring, and at L36 it vanished against the background. */
   --fertile-soft: oklch(52% calc(var(--c-cycle) * 0.40) 195);
   --ovulation:    oklch(88% calc(var(--c-cycle) * 0.62) 195);
-  --luteal:       oklch(42% 0.03 var(--h));
-  --luteal-soft:  oklch(30% 0.02 var(--h));
+  /* Same pinning as light. Kept dark enough that a luteal cell stays clearly
+     behind a fertile one in the stacking the calendar implies. */
+  --luteal:       oklch(46% calc(var(--c-cycle) * 0.50) 305);
+  --luteal-soft:  oklch(32% calc(var(--c-cycle) * 0.32) 305);
   --band:         oklch(70% calc(var(--c-cycle) * 0.55) 150);
 
   --danger:    oklch(74% 0.17 25);
