@@ -14,7 +14,7 @@
  * @typedef {import('../utils/date.js').DateKey} DateKey
  */
 
-import { el, replace, need, haptic } from '../utils/dom.js';
+import { el, svg, replace, need, haptic } from '../utils/dom.js';
 import { todayKey, addDays, fmtLong, daysBetween } from '../utils/date.js';
 import { plural } from '../utils/fmt.js';
 import { BIRTH_CONTROL } from '../domain/model.js';
@@ -507,7 +507,17 @@ function stepCycleLength() {
       haptic(8);
     },
   }, [
-    el('span', { class: 'choice-emoji', text: '🤷' }),
+    // The last system emoji in the app. A shrug drawn by the operating system
+    // is a different picture on every phone and in none of the fourteen
+    // palettes; this is the same open-path, currentColor mark the diary uses.
+    svg('svg', {
+      class: 'choice-icon', viewBox: '0 0 24 24', fill: 'none',
+      stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round',
+      'stroke-linejoin': 'round', 'aria-hidden': 'true',
+      html: '<path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>'
+        + '<path d="M9.4 9.6a2.7 2.7 0 0 1 5.2.9c0 1.8-2.6 2.2-2.6 3.8"/>'
+        + '<path d="M12 17.4h.01"/>',
+    }),
     el('span', { class: 'choice-text' }, [
       'I am not sure',
       el('span', { class: 'choice-sub', text:

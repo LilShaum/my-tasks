@@ -26,6 +26,7 @@ import { burst } from '../ui/particles.js';
 import { toast } from '../ui/toast.js';
 import { promptSheet } from '../ui/dialog.js';
 import { getTheme } from '../data/themes.js';
+import { iconFor } from '../data/icons.js';
 import { mascotReact } from '../ui/mascot.js';
 import {
   cToF, fToC, kgToLb, lbToKg, mlToOz, fmtWater, fmtTemp, fmtWeight, round,
@@ -341,11 +342,14 @@ function searchBar() {
         /*
           `dataset.label`, not `textContent`.
 
-          Every option carries an emoji, and the chip renders it as a sibling
-          span — so `textContent` came back as "🤢Nausea", which normalises to
-          "🤢nausea" and starts with neither the query nor any word in it.
-          Searching for an option by its own name matched nothing, for all 104
-          of them, from the day the search was added.
+          A chip is a mark plus a label, so `textContent` picks up both. When
+          the mark was an emoji this came back as "\u{1F922}Nausea", which
+          normalises to something starting with neither the query nor any word
+          in it: searching for an option by its own name matched nothing, for
+          all 104 of them, from the day the search was added. The mark is an
+          inline SVG now and contributes no text, but reading the label out of
+          `dataset` rather than the DOM is what makes that a detail of how the
+          chip is drawn rather than something search depends on.
 
           It looked like it worked because roughly twenty options also carry
           hand-written synonyms, and those are clean strings — so "sore boobs"
@@ -466,6 +470,37 @@ function symptomSeverity(draft, chips, field = 'symptoms') {
 }
 
 /**
+ * The mark for an option, as an element.
+ *
+ * `aria-hidden`, because the label beside it already says the word and a
+ * screen reader announcing both would read every chip twice. The mark is
+ * navigational, not informational — it is what lets the eye find "cramps"
+ * again in a list of thirty-nine, and it carries no meaning the text lacks.
+ *
+ * Inherits `currentColor` from the chip, so it is correct in all fourteen
+ * themes, in both colour modes, and on both sides of the selected state
+ * without anything here knowing which of those is true.
+ *
+ * @param {string} id
+ * @param {string} category
+ */
+function optionIcon(id, category) {
+  const mark = iconFor(id, category);
+  if (!mark) return null;
+  return svg('svg', {
+    class: 'chip-icon',
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    'stroke-width': '2',
+    'stroke-linecap': 'round',
+    'stroke-linejoin': 'round',
+    'aria-hidden': 'true',
+    html: mark,
+  });
+}
+
+/**
  * The sheet's live UI state: every chip, and every count badge.
  *
  * The same option can now appear twice — once in its category and once in the
@@ -577,9 +612,8 @@ function sheetState(draft) {
         type: 'button',
         class: opts.compact ? 'chip chip-quick' : 'chip',
         'aria-pressed': 'false',
-        // The label travels as data. Reading it back out of `textContent`
-        // concatenated the emoji onto the front of the word — "🤢Nausea" —
-        // and nothing matched.
+        // The label travels as data, so search never has to read it back out
+        // of the DOM alongside whatever the chip draws next to it.
         dataset: { opt: option.id, label: option.label },
         onclick: () => {
           if (cat.id === 'flow') flowAnswered = true;
@@ -588,7 +622,7 @@ function sheetState(draft) {
           haptic(8);
         },
       }, [
-        option.emoji && el('span', { 'aria-hidden': 'true', text: option.emoji }),
+        optionIcon(option.id, cat.id),
         el('span', { text: option.label }),
       ]);
 
@@ -780,7 +814,7 @@ function testsSection(draft, chips) {
           haptic(8);
         },
       }, [
-        option.emoji && el('span', { 'aria-hidden': 'true', text: option.emoji }),
+        optionIcon(option.id, test.id),
         el('span', { text: option.label }),
       ]);
       row.append(chip);
