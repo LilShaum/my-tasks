@@ -21,6 +21,44 @@
  *   - **Facts, warmly.** The tone is a knowledgeable friend, not a brochure
  *     and not a pastel greeting card.
  *
+ * ── Where the physiological claims come from
+ *
+ * These were checked against the literature rather than written from memory,
+ * because a cycle tracker that states mechanism as fact and gets it wrong is
+ * doing the one thing this app ranks second-worst after losing her data.
+ *
+ * Two were wrong and are now corrected, both from the same source — Najmabadi
+ * et al. 2020, a pooled analysis of three cohorts, 581 women and 3,324 cycles,
+ * doi:10.1111/ppe.12644 (retrieved via PubMed):
+ *
+ *   - `luteal-fixed` said the luteal phase is "about 14 days for most people,
+ *     and it stays put even when cycles vary". That study measured a mean of
+ *     11.7 days (SD 2.8), median 12 — and found within-woman variation of more
+ *     than 3 days in 58.8% of women. Both halves of the claim were overstated.
+ *     Fourteen is a textbook convention, not a measured average.
+ *   - `follicular-variable` said "the second half stays roughly fixed", the
+ *     same overstatement. The comparative claim survives and is what the tip
+ *     now makes: follicular SD 6.5 days against luteal SD 2.8, so roughly
+ *     twice the variation.
+ *
+ * Confirmed as written, and left alone:
+ *
+ *   - `ovulatory-window` — "sperm survive around five days, an egg about one".
+ *     Mihm et al. 2011 puts the fertile phase at "5 days before to the day of
+ *     ovulation", doi:10.1016/j.anireprosci.2010.08.030.
+ *   - `period-length` — three to seven days. Najmabadi measured a mean menses
+ *     of 6.2 days (SD 1.5); Mihm gives 5.
+ *   - `any-range` — 21 to 35 days, which is the ACOG figure `acog.js` already
+ *     cites and uses.
+ *
+ * NOTE, not yet acted on: `settings.lutealLength` still defaults to 14, and
+ * every fertile window for someone who has not logged a thermal shift or an
+ * ovulation test is `next period − 14`. If 12 is the better population figure
+ * then that default places her estimated ovulation two days early. It is one
+ * study against a long-standing convention, and `ovulation.js` already
+ * measures her real value once it can, so this is recorded rather than
+ * changed — but it is the highest-value open question in the app's arithmetic.
+ *
  * Each tip declares when it applies. `pick` scores the candidates and returns
  * the most specific few, so the same three cards don't show every day.
  *
@@ -79,9 +117,10 @@ export const TIPS = [
   {
     id: 'follicular-variable',
     title: 'This is the part that varies',
-    body: 'When a cycle runs long or short, it is almost always this phase ' +
-      'stretching or shrinking — the second half stays roughly fixed. A late ' +
-      'period usually means ovulation came late, not that anything went wrong.',
+    body: 'When a cycle runs long or short, it is usually this phase ' +
+      'stretching or shrinking — it varies about twice as much as the second ' +
+      'half. A late period usually means ovulation came late, not that ' +
+      'anything went wrong.',
     phases: ['follicular'],
   },
   {
@@ -126,11 +165,12 @@ export const TIPS = [
   /* ── Luteal ────────────────────────────────────────────────────────── */
   {
     id: 'luteal-fixed',
-    title: 'This phase barely moves',
-    body: 'The stretch between ovulation and your period is about 14 days for ' +
-      'most people, and it stays put even when cycles vary. That is why ' +
-      'Kittycal counts backwards from your next period to estimate ovulation ' +
-      'rather than halving the cycle.',
+    title: 'This phase moves less than the first half',
+    body: 'The stretch between ovulation and your period is nearer 12 days ' +
+      'than the 14 you often see quoted, and it varies less than the first ' +
+      'half does — which is why Kittycal counts backwards from your next ' +
+      'period to estimate ovulation rather than halving the cycle. It still ' +
+      'shifts for plenty of people, so Kittycal measures yours when it can.',
     phases: ['luteal'],
   },
   {
