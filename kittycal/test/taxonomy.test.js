@@ -13,10 +13,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  CATEGORIES, labelOf, labelFor, labelIndexEntries, optionCount,
+  CATEGORIES, TESTS, labelOf, labelFor, labelIndexEntries, optionCount,
   optionMatches, normalizeQuery,
 } from '../js/data/taxonomy.js';
 import { loggedIds } from '../js/domain/stats.js';
+import { ICONS, ICONS_BY_CATEGORY, iconFor } from '../js/data/icons.js';
 
 test('ids in the flat label index are unambiguous', () => {
   /** @type {Map<string, {category: string, label: string}>} */
@@ -119,4 +120,62 @@ test('an emoji in front of a label does not hide it from search', () => {
   const glued = { id: 'nausea', label: '🤢Nausea' };
   assert.equal(optionMatches(glued, normalizeQuery('nausea')), false,
     'if this ever passes, the guard above has stopped guarding anything');
+});
+
+/*
+  Every option has a mark, and every mark belongs to an option.
+
+  Both directions, because they fail differently. A missing mark is a chip that
+  renders a label with a hole beside it where its neighbours have a picture — a
+  visible defect, but only on the screen nobody screenshots with all thirty-nine
+  chips open. An orphaned mark is invisible: an option renamed in taxonomy.js
+  leaves the old drawing behind in icons.js, and nothing anywhere says so.
+
+  This is the check that makes the docstring in icons.js true rather than
+  hopeful: it says the set is keyed by the ids taxonomy.js stores, and this is
+  what fails when that stops being the case.
+*/
+test('every loggable option has a mark', () => {
+  const missing = [];
+  // TESTS is a separate export rendered by the same chip builder, so it is
+  // just as much a source of chips as CATEGORIES is.
+  for (const category of [...CATEGORIES, ...TESTS]) {
+    for (const option of category.options) {
+      if (!iconFor(option.id, category.id)) {
+        missing.push(`${category.id}:${option.id}`);
+      }
+    }
+  }
+  assert.deepEqual(missing, [], 'options with no mark in icons.js');
+});
+
+test('no mark is left behind by a renamed option', () => {
+  const live = new Set();
+  for (const category of [...CATEGORIES, ...TESTS]) {
+    for (const option of category.options) {
+      live.add(option.id);
+      live.add(`${category.id}:${option.id}`);
+    }
+  }
+  const orphans = [...Object.keys(ICONS), ...Object.keys(ICONS_BY_CATEGORY)]
+    .filter((key) => !live.has(key));
+  assert.deepEqual(orphans, [], 'marks in icons.js with no option to draw');
+});
+
+/*
+  The construction contract, enforced.
+
+  icons.js states that every mark is open paths in one weight inheriting
+  currentColor. Nothing stopped a later edit from pasting in a mark with its own
+  fill or a hard-coded hex, which would then be the one chip that ignores the
+  theme — and it would look fine in whichever theme happened to be open.
+*/
+test('no mark carries its own colour', () => {
+  const offenders = [];
+  for (const [key, markup] of Object.entries({ ...ICONS, ...ICONS_BY_CATEGORY })) {
+    if (/fill="(?!none")/.test(markup)) offenders.push(`${key}: has a fill`);
+    if (/#[0-9a-fA-F]{3,8}\b|rgb\(|oklch\(/.test(markup)) offenders.push(`${key}: has a colour literal`);
+    if (/stroke="(?!currentColor")/.test(markup)) offenders.push(`${key}: overrides stroke`);
+  }
+  assert.deepEqual(offenders, []);
 });

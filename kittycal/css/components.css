@@ -117,6 +117,26 @@
 .btn-icon:hover { background: var(--surface-2); }
 
 /* ── Chips — the logging taxonomy's primary control ───────────────────── */
+/*
+  The mark inside a chip.
+
+  18px rather than the 24 the viewBox implies: at a 38px chip a 24px mark
+  crowds the label and reads as an illustration rather than a bullet. Stroke
+  width scales with it, which is why the whole set is authored at one weight
+  in one box — changing the size here changes every mark identically.
+
+  No colour of its own. `currentColor` means it follows the chip's text, so it
+  inherits the theme, the colour mode, and the flip that happens when the chip
+  is selected, without any of those being restated here.
+*/
+.chip-icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  /* Optical centring: the label's baseline sits below the box's centre. */
+  margin-block: -1px;
+}
+
 .chip {
   position: relative;
   display: inline-flex;

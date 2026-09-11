@@ -139,8 +139,9 @@ function matchedPattern(log, logs, cycles) {
 
   if (!best) return null;
 
-  // `labelOf` gives clean text with no emoji, and a custom symptom echoes its
-  // own name back — so both drop into the sentence without special handling.
+  // `labelOf` gives the label and nothing else, and a custom symptom echoes
+  // its own name back — so both drop into the sentence without special
+  // handling.
   const name = labelOf(best.id).toLowerCase();
   const days = listJoin(best.peakDays.map(String));
   return `You have logged ${name} in ${best.cyclesWith} of your last ` +

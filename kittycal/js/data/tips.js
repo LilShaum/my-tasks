@@ -21,8 +21,65 @@
  *   - **Facts, warmly.** The tone is a knowledgeable friend, not a brochure
  *     and not a pastel greeting card.
  *
- * Each tip declares when it applies. `pick` scores the candidates and returns
- * the most specific few, so the same three cards don't show every day.
+ * ── Where the physiological claims come from
+ *
+ * These were checked against the literature rather than written from memory,
+ * because a cycle tracker that states mechanism as fact and gets it wrong is
+ * doing the one thing this app ranks second-worst after losing her data.
+ *
+ * Three sources, deliberately using three different ovulation markers, because
+ * the first pass through this used one and drew a conclusion the other two do
+ * not support. All retrieved via PubMed.
+ *
+ *   - Lenton et al. 1984, doi:10.1111/j.1471-0528.1984.tb04831.x — 327 luteal
+ *     phases dated from the LH peak, the most precise marker available. Mean
+ *     14.13 days (SD 1.41).
+ *   - Najmabadi et al. 2020, doi:10.1111/ppe.12644 — 581 women, 3,324 cycles,
+ *     dated from peak cervical mucus and *not* screened for ovulatory cycles.
+ *     Mean 11.7 days (SD 2.8), median 12, with within-woman variation over 3
+ *     days in 58.8% of women.
+ *   - Henry et al. 2024, doi:10.1093/humrep/deae215 — 53 women, 694 cycles by
+ *     quantitative basal temperature, pre-screened to be normally ovulatory.
+ *     Concludes the luteal phase "is not predictably 13-14 days long", and
+ *     measures follicular length variance as significantly greater than luteal
+ *     (P < 0.001).
+ *
+ * The 14-versus-12 gap is a cohort difference, not a contradiction: Lenton and
+ * Henry selected ovulatory cycles, Najmabadi took all of them, and cycles with
+ * subclinical ovulatory disturbance pull the mean down. Henry found 55% of
+ * *pre-screened, normally ovulatory* women still had at least one luteal phase
+ * under 10 days.
+ *
+ * So what survives all three is the shape, not a number: the luteal phase is
+ * around two weeks, it varies more than "fixed at 14" implies, and it varies
+ * less than the follicular phase. That is what `luteal-fixed` now says. An
+ * earlier version of this file said "nearer 12 days than the 14 you often see
+ * quoted", which was Najmabadi's figure stated as though it were the whole
+ * literature — the same overclaiming this pass existed to remove, in the
+ * opposite direction.
+ *
+ * `follicular-variable` previously said "the second half stays roughly fixed",
+ * which Henry contradicts directly. The comparative claim is what it makes now.
+ *
+ * Confirmed as written, and left alone:
+ *
+ *   - `ovulatory-window` — "sperm survive around five days, an egg about one".
+ *     Mihm et al. 2011 puts the fertile phase at "5 days before to the day of
+ *     ovulation", doi:10.1016/j.anireprosci.2010.08.030.
+ *   - `period-length` — three to seven days. Najmabadi measured a mean menses
+ *     of 6.2 days (SD 1.5); Mihm gives 5.
+ *   - `any-range` — 21 to 35 days, which is the ACOG figure `acog.js` already
+ *     cites and uses.
+ *
+ * RESOLVED, on `settings.lutealLength` defaulting to 14: it stays at 14. The
+ * first pass here flagged it as likely two days too high on Najmabadi alone.
+ * Lenton dates 327 cycles from the LH peak and gets 14.13, and Henry's cohort
+ * was screened to a ≥10-day luteal phase — so for the ovulatory cycle this
+ * default is a stand-in for, 14 is the better-supported figure, and the lower
+ * population mean reflects disturbed cycles the default should not be tuned
+ * to. `ovulation.js` measures her real value the moment a thermal shift or an
+ * ovulation test makes it knowable, which is the right answer for the people
+ * the average fits worst.
  *
  * @typedef {import('../domain/phases.js').PhaseId} PhaseId
  */
@@ -79,9 +136,10 @@ export const TIPS = [
   {
     id: 'follicular-variable',
     title: 'This is the part that varies',
-    body: 'When a cycle runs long or short, it is almost always this phase ' +
-      'stretching or shrinking — the second half stays roughly fixed. A late ' +
-      'period usually means ovulation came late, not that anything went wrong.',
+    body: 'When a cycle runs long or short, it is usually this phase ' +
+      'stretching or shrinking — it varies about twice as much as the second ' +
+      'half. A late period usually means ovulation came late, not that ' +
+      'anything went wrong.',
     phases: ['follicular'],
   },
   {
@@ -126,11 +184,12 @@ export const TIPS = [
   /* ── Luteal ────────────────────────────────────────────────────────── */
   {
     id: 'luteal-fixed',
-    title: 'This phase barely moves',
-    body: 'The stretch between ovulation and your period is about 14 days for ' +
-      'most people, and it stays put even when cycles vary. That is why ' +
+    title: 'This phase moves less than the first half',
+    body: 'The stretch between ovulation and your period is around two ' +
+      'weeks, and it varies less than the first half does — which is why ' +
       'Kittycal counts backwards from your next period to estimate ovulation ' +
-      'rather than halving the cycle.',
+      'rather than halving the cycle. It is not the fixed number it is often ' +
+      'called, though, so Kittycal measures yours when it can.',
     phases: ['luteal'],
   },
   {
