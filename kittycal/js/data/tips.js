@@ -27,19 +27,39 @@
  * because a cycle tracker that states mechanism as fact and gets it wrong is
  * doing the one thing this app ranks second-worst after losing her data.
  *
- * Two were wrong and are now corrected, both from the same source — Najmabadi
- * et al. 2020, a pooled analysis of three cohorts, 581 women and 3,324 cycles,
- * doi:10.1111/ppe.12644 (retrieved via PubMed):
+ * Three sources, deliberately using three different ovulation markers, because
+ * the first pass through this used one and drew a conclusion the other two do
+ * not support. All retrieved via PubMed.
  *
- *   - `luteal-fixed` said the luteal phase is "about 14 days for most people,
- *     and it stays put even when cycles vary". That study measured a mean of
- *     11.7 days (SD 2.8), median 12 — and found within-woman variation of more
- *     than 3 days in 58.8% of women. Both halves of the claim were overstated.
- *     Fourteen is a textbook convention, not a measured average.
- *   - `follicular-variable` said "the second half stays roughly fixed", the
- *     same overstatement. The comparative claim survives and is what the tip
- *     now makes: follicular SD 6.5 days against luteal SD 2.8, so roughly
- *     twice the variation.
+ *   - Lenton et al. 1984, doi:10.1111/j.1471-0528.1984.tb04831.x — 327 luteal
+ *     phases dated from the LH peak, the most precise marker available. Mean
+ *     14.13 days (SD 1.41).
+ *   - Najmabadi et al. 2020, doi:10.1111/ppe.12644 — 581 women, 3,324 cycles,
+ *     dated from peak cervical mucus and *not* screened for ovulatory cycles.
+ *     Mean 11.7 days (SD 2.8), median 12, with within-woman variation over 3
+ *     days in 58.8% of women.
+ *   - Henry et al. 2024, doi:10.1093/humrep/deae215 — 53 women, 694 cycles by
+ *     quantitative basal temperature, pre-screened to be normally ovulatory.
+ *     Concludes the luteal phase "is not predictably 13-14 days long", and
+ *     measures follicular length variance as significantly greater than luteal
+ *     (P < 0.001).
+ *
+ * The 14-versus-12 gap is a cohort difference, not a contradiction: Lenton and
+ * Henry selected ovulatory cycles, Najmabadi took all of them, and cycles with
+ * subclinical ovulatory disturbance pull the mean down. Henry found 55% of
+ * *pre-screened, normally ovulatory* women still had at least one luteal phase
+ * under 10 days.
+ *
+ * So what survives all three is the shape, not a number: the luteal phase is
+ * around two weeks, it varies more than "fixed at 14" implies, and it varies
+ * less than the follicular phase. That is what `luteal-fixed` now says. An
+ * earlier version of this file said "nearer 12 days than the 14 you often see
+ * quoted", which was Najmabadi's figure stated as though it were the whole
+ * literature — the same overclaiming this pass existed to remove, in the
+ * opposite direction.
+ *
+ * `follicular-variable` previously said "the second half stays roughly fixed",
+ * which Henry contradicts directly. The comparative claim is what it makes now.
  *
  * Confirmed as written, and left alone:
  *
@@ -51,16 +71,15 @@
  *   - `any-range` — 21 to 35 days, which is the ACOG figure `acog.js` already
  *     cites and uses.
  *
- * NOTE, not yet acted on: `settings.lutealLength` still defaults to 14, and
- * every fertile window for someone who has not logged a thermal shift or an
- * ovulation test is `next period − 14`. If 12 is the better population figure
- * then that default places her estimated ovulation two days early. It is one
- * study against a long-standing convention, and `ovulation.js` already
- * measures her real value once it can, so this is recorded rather than
- * changed — but it is the highest-value open question in the app's arithmetic.
- *
- * Each tip declares when it applies. `pick` scores the candidates and returns
- * the most specific few, so the same three cards don't show every day.
+ * RESOLVED, on `settings.lutealLength` defaulting to 14: it stays at 14. The
+ * first pass here flagged it as likely two days too high on Najmabadi alone.
+ * Lenton dates 327 cycles from the LH peak and gets 14.13, and Henry's cohort
+ * was screened to a ≥10-day luteal phase — so for the ovulatory cycle this
+ * default is a stand-in for, 14 is the better-supported figure, and the lower
+ * population mean reflects disturbed cycles the default should not be tuned
+ * to. `ovulation.js` measures her real value the moment a thermal shift or an
+ * ovulation test makes it knowable, which is the right answer for the people
+ * the average fits worst.
  *
  * @typedef {import('../domain/phases.js').PhaseId} PhaseId
  */
@@ -166,11 +185,11 @@ export const TIPS = [
   {
     id: 'luteal-fixed',
     title: 'This phase moves less than the first half',
-    body: 'The stretch between ovulation and your period is nearer 12 days ' +
-      'than the 14 you often see quoted, and it varies less than the first ' +
-      'half does — which is why Kittycal counts backwards from your next ' +
-      'period to estimate ovulation rather than halving the cycle. It still ' +
-      'shifts for plenty of people, so Kittycal measures yours when it can.',
+    body: 'The stretch between ovulation and your period is around two ' +
+      'weeks, and it varies less than the first half does — which is why ' +
+      'Kittycal counts backwards from your next period to estimate ovulation ' +
+      'rather than halving the cycle. It is not the fixed number it is often ' +
+      'called, though, so Kittycal measures yours when it can.',
     phases: ['luteal'],
   },
   {
