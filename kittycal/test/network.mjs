@@ -16,15 +16,12 @@
  *      what "installs to your home screen and works offline" has to mean.
  */
 
-import pw from '/opt/node22/lib/node_modules/playwright/index.js';
-const { chromium } = pw;
+import { launchChromium } from './browser.mjs';
 
 const BASE = process.argv[2] || 'http://127.0.0.1:8099';
 const ORIGIN = new URL(BASE).origin;
 
-const browser = await chromium.launch({
-  executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
-});
+const browser = await launchChromium();
 const context = await browser.newContext({
   viewport: { width: 390, height: 844 },
   isMobile: true,

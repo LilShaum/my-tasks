@@ -16,10 +16,9 @@
  * Run: node test/export.mjs   (with a static server on 8099)
  */
 
-import pw from '/opt/node22/lib/node_modules/playwright/index.js';
+import { launchChromium } from './browser.mjs';
 
 const BASE = 'http://127.0.0.1:8099/';
-const CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 
 const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) '
   + 'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
@@ -33,7 +32,7 @@ const check = (cond, label, extra = '') => {
   else { failures += 1; console.log(`  FAIL  ${label}${extra ? ` — ${extra}` : ''}`); }
 };
 
-const browser = await pw.chromium.launch({ executablePath: CHROME });
+const browser = await launchChromium();
 
 /**
  * Boot a seeded app pretending to be a particular device.

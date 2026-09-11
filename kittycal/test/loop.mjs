@@ -17,11 +17,9 @@
  * Exits non-zero on any failure, so it can gate a commit.
  */
 
-import pw from '/opt/node22/lib/node_modules/playwright/index.js';
-const { chromium } = pw;
+import { launchChromium } from './browser.mjs';
 
 const BASE = process.argv[2] || 'http://127.0.0.1:8099';
-const CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 
 let failures = 0;
 let checks = 0;
@@ -138,7 +136,7 @@ async function completeCheckinWithSymptom(p) {
   await p.waitForTimeout(1400);
 }
 
-const browser = await chromium.launch({ executablePath: CHROME });
+const browser = await launchChromium();
 
 /** @param {(p: import('playwright').Page) => Promise<void>} fn */
 async function withPage(fn, { clock = false, reducedMotion = false } = {}) {

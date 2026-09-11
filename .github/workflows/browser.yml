@@ -1,0 +1,58 @@
+# Drives the app in a real Chromium and checks what the page actually renders.
+#
+# Separate from Test on purpose. That workflow's value is that it needs nothing
+# installed — `node --test` is built in, the project has no dependencies, and
+# its comment says so. This one downloads a browser, which is exactly the thing
+# Test declines to do, so it gets its own job rather than making that
+# workflow's promise untrue. If this is ever slow or flaky it can be made
+# advisory without weakening the suite that gates the maths.
+#
+# What it covers is what unit tests structurally cannot: contrast across all 14
+# themes in both modes, the zero-network claim, the daily loop end to end, and
+# every state of every screen with real history behind it. Until now those were
+# a local step nobody was obliged to run, which for the checks guarding "does
+# it lie to her" and "does it phone home" was the wrong way round.
+name: Browser probes
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: browser-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  probes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: kittycal
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # --no-save --no-package-lock: Playwright is the harness, not a
+      # dependency of the app. Neither package.json nor a lockfile is written,
+      # so the repo keeps the empty dependency tree its README is built on and
+      # nothing shipped to a phone changes. Pinned because a browser automation
+      # library that floats will eventually disagree with the probes.
+      - name: Install Playwright (harness only, not saved)
+        run: npm install --no-save --no-package-lock playwright@1.56.1
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # The runner serves the app itself and picks the browser Playwright just
+      # installed, so there is nothing to wire up here.
+      - name: Browser probes
+        run: npm run test:browser

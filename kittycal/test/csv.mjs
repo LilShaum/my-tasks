@@ -16,17 +16,15 @@
  *     node test/csv.mjs http://127.0.0.1:8099
  */
 
-import pw from '/opt/node22/lib/node_modules/playwright/index.js';
-const { chromium } = pw;
+import { launchChromium } from './browser.mjs';
 const BASE = process.argv[2] || 'http://127.0.0.1:8099';
-const CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 let fails = 0;
 const check = (ok, what, detail = '') => {
   console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${what}${detail ? ` — ${detail}` : ''}`);
   if (!ok) fails += 1;
 };
 
-const browser = await chromium.launch({ executablePath: CHROME });
+const browser = await launchChromium();
 const ctx = await browser.newContext({ viewport: { width: 420, height: 900 }, acceptDownloads: true });
 const p = await ctx.newPage();
 await p.goto(BASE);
