@@ -233,8 +233,42 @@ console.log('\nthe legend describes the grid rather than the prediction');
   await page.locator('button:has-text("Today")').first().click();
   await page.waitForTimeout(500);
   const now = await legend();
-  check(/Period logged/.test(now) && /Period expected/.test(now),
-    'the current month names both what she logged and what is forecast', now);
+
+  /*
+    Read the expectation off the grid rather than assuming a forecast is in
+    view. This check used to assert that the current month names both a logged
+    period and a predicted one, which is only true when the next predicted
+    period happens to land in the current month — and with this fixture it does
+    not, for most of the month. It failed on a date, not on a defect.
+
+    What the legend actually promises is that it describes the grid, so that is
+    what is asserted: whatever states the cells carry are named, and nothing
+    else is.
+  */
+  const drawnNow = await page.$$eval('.cal-cell', (cells) => {
+    const seen = new Set();
+    for (const c of cells) {
+      if (c.classList.contains('is-period')) seen.add('Period logged');
+      if (c.classList.contains('is-predicted')) seen.add('Period expected');
+      if (c.classList.contains('is-fertile')) seen.add('Fertile window');
+      if (c.classList.contains('is-ovulation')) seen.add('Ovulation estimated');
+      if (c.classList.contains('is-luteal')) seen.add('After ovulation');
+    }
+    return [...seen];
+  });
+
+  check(drawnNow.length > 0, 'the current month draws at least one cycle state',
+    JSON.stringify(drawnNow));
+  const missingNow = drawnNow.filter((label) => !now.includes(label));
+  check(missingNow.length === 0,
+    'and the legend names every state the current month draws',
+    `drawn ${JSON.stringify(drawnNow)} vs legend "${now}"`);
+
+  const ALL = ['Period logged', 'Period expected', 'Fertile window',
+    'Ovulation estimated', 'After ovulation'];
+  const extraNow = ALL.filter((label) => now.includes(label) && !drawnNow.includes(label));
+  check(extraNow.length === 0,
+    'and names nothing it does not draw', JSON.stringify(extraNow));
 
   /*
     A month behind her has no forecast in it, so the three forward-looking
