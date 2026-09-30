@@ -149,13 +149,27 @@ console.log('\nedit mode does not offer a tap that does nothing');
   check(!/tap any day to/i.test(hint),
     'it no longer says "any day", which was never true', hint);
 
+  /*
+    On the last day of a month there is no future day in the grid, so asking for
+    one here failed once every thirty days for a calendar that was right. Page
+    forward when that happens: next month is entirely future, which tests the
+    same rule on any date.
+  */
+  if (!await page.locator('.cal-cell.is-future').count()) {
+    await page.locator('[aria-label="Next month"]').click();
+    await page.waitForTimeout(450);
+  }
   const future = page.locator('.cal-cell.is-future').first();
   if (await future.count()) {
     check(await future.isDisabled(),
       'because a day after today genuinely cannot be marked');
   } else {
-    check(false, 'expected at least one future day in this month');
+    check(false, 'no future day was reachable even a month ahead');
   }
+
+  // Back to where today is, so the sections below are about the current month.
+  await page.locator('.cal-today-btn', { hasText: 'Today' }).click();
+  await page.waitForTimeout(450);
 
   /*
     The mode is carried by a titled panel, not by a full-width filled button.
@@ -212,7 +226,26 @@ console.log('\nthe calendar answers for the month on screen');
   await page.locator('[aria-label="Next month"]').click();
   await page.waitForTimeout(450);
   const heading = await page.locator('.cal-recall h3').innerText();
-  check(/so far$/.test(heading), 'the current month is labelled as unfinished', heading);
+
+  /*
+    "so far" marks a month counted only as far as today. Asserting the current
+    month always carries it is wrong on the last day of the month, when every
+    day of it has happened and the count really is the whole month — which is
+    what made this fail on the 30th. The contract is the relationship, so read
+    both numbers out of the card and check that instead: the card says how many
+    days it counted, and the calendar knows how many the month has.
+  */
+  const counted = Number((await page.locator('.cal-recall').innerText()).match(/of (\d+) days?\./)?.[1]);
+  const inMonth = await page.evaluate(() => {
+    const dates = [...document.querySelectorAll('.cal-cell[data-date]')]
+      .map((c) => c.getAttribute('data-date') ?? '');
+    const [y, m] = (dates[0] ?? '').split('-').map(Number);
+    return new Date(y, m, 0).getDate();
+  });
+  check(Number.isFinite(counted) && counted > 0, 'the recall card says how many days it counted', String(counted));
+  check(/ so far$/.test(heading) === (counted < inMonth),
+    `the heading says "so far" exactly when the month is only counted part-way (${counted} of ${inMonth})`,
+    heading);
 
   // Forward into months she has not lived yet: nothing to recall, so nothing.
   for (let i = 0; i < 3; i += 1) {
@@ -233,8 +266,42 @@ console.log('\nthe legend describes the grid rather than the prediction');
   await page.locator('button:has-text("Today")').first().click();
   await page.waitForTimeout(500);
   const now = await legend();
-  check(/Period logged/.test(now) && /Period expected/.test(now),
-    'the current month names both what she logged and what is forecast', now);
+
+  /*
+    Read the expectation off the grid rather than assuming a forecast is in
+    view. This check used to assert that the current month names both a logged
+    period and a predicted one, which is only true when the next predicted
+    period happens to land in the current month — and with this fixture it does
+    not, for most of the month. It failed on a date, not on a defect.
+
+    What the legend actually promises is that it describes the grid, so that is
+    what is asserted: whatever states the cells carry are named, and nothing
+    else is.
+  */
+  const drawnNow = await page.$$eval('.cal-cell', (cells) => {
+    const seen = new Set();
+    for (const c of cells) {
+      if (c.classList.contains('is-period')) seen.add('Period logged');
+      if (c.classList.contains('is-predicted')) seen.add('Period expected');
+      if (c.classList.contains('is-fertile')) seen.add('Fertile window');
+      if (c.classList.contains('is-ovulation')) seen.add('Ovulation estimated');
+      if (c.classList.contains('is-luteal')) seen.add('After ovulation');
+    }
+    return [...seen];
+  });
+
+  check(drawnNow.length > 0, 'the current month draws at least one cycle state',
+    JSON.stringify(drawnNow));
+  const missingNow = drawnNow.filter((label) => !now.includes(label));
+  check(missingNow.length === 0,
+    'and the legend names every state the current month draws',
+    `drawn ${JSON.stringify(drawnNow)} vs legend "${now}"`);
+
+  const ALL = ['Period logged', 'Period expected', 'Fertile window',
+    'Ovulation estimated', 'After ovulation'];
+  const extraNow = ALL.filter((label) => now.includes(label) && !drawnNow.includes(label));
+  check(extraNow.length === 0,
+    'and names nothing it does not draw', JSON.stringify(extraNow));
 
   /*
     A month behind her has no forecast in it, so the three forward-looking

@@ -261,7 +261,24 @@
 
 [data-pattern='none'] .app-bg { background-image: none; }
 
-/* Patterns are decoration. Drop them, don't slow them. */
-@media (prefers-reduced-motion: reduce) {
-  .app-bg { background-image: none !important; }
-}
+/*
+  The patterns stay under `prefers-reduced-motion`, and that is deliberate.
+
+  They used to be removed by a rule here, reasoning that they were decoration
+  and that decoration should be dropped rather than slowed. The second half is
+  right and the first half applies to the wrong thing: every pattern above is a
+  static `repeating-linear-gradient` or `radial-gradient`. None of them move,
+  animate, parallax or transition. `prefers-reduced-motion` is a request from
+  someone who gets ill from things that move, not a request for less visual
+  interest, and answering it by deleting a still background trades away a
+  visible part of the app for no reduction in motion at all.
+
+  It was reported as a bug, by the person it happened to: every theme's
+  background had "disappeared" and nothing in the app connected that to a
+  system setting she had turned on months earlier for unrelated reasons.
+
+  Real motion is suppressed elsewhere and still is: reset.css flattens every
+  animation and transition to 0.01ms, particles.js returns early rather than
+  firing a celebration, and lock.js skips its shake. Those are the things that
+  move.
+*/

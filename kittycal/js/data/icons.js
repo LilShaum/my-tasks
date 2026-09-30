@@ -4,7 +4,7 @@
  *
  * ── Why this exists
  *
- * Every one of the 102 loggable options used to carry a system emoji: 🌀 for
+ * Every one of the 111 loggable options used to carry a system emoji: 🌀 for
  * cramps, 🎈 for bloating, 😴 for fatigue. On the screen this app is used on
  * most, that meant a wall of multi-colour glyphs drawn by the operating system
  * — a different set on every phone, none of them in the palette, all of them
@@ -20,7 +20,13 @@
  *   - 24×24 viewBox, always.
  *   - `fill="none"`, `stroke="currentColor"`, `stroke-width="2"`, round caps
  *     and joins. Nothing carries its own colour.
- *   - Strokes stay inside 3…21 so a mark never touches its own edge.
+ *   - Nothing clips. A stroke is two units wide, so a path reaching 22 is
+ *     painted to 23, and `test/icons.mjs` measures the real stroked extent of
+ *     every mark and fails anything that comes within half a unit of the box.
+ *     Aim for 3…21 when drawing a new one — most marks sit there and it leaves
+ *     room to breathe — but a wide mark like "cramps" or "swimming" is allowed
+ *     the space it needs. This used to be stated as a flat 3…21 rule, which
+ *     fourteen marks quietly broke, so it now says what is actually enforced.
  *
  * `currentColor` is the load-bearing part. A mark inherits the colour of the
  * chip it sits in, so it is correct in all fourteen themes and both colour
@@ -37,9 +43,31 @@
  * No mark tries to be a picture of a sensation. "Backache", "joint pain" and
  * "muscle ache" are not three different drawings, and pretending otherwise
  * produces three identical human silhouettes that are slower to tell apart
- * than the words underneath them. Related symptoms share a base form and vary
- * one element. The label is what names the thing; the mark is what lets the
- * eye find it again in a list of thirty-nine.
+ * than the words underneath them. The label is what names the thing; the mark
+ * is what lets the eye find it again in a list of thirty-nine.
+ *
+ * ── The rule that had to be measured before it was believed
+ *
+ * The first version of this file put related options on a shared base form and
+ * varied one element inside it, which reads well written down and failed in
+ * the only place that counts. `test/icons.mjs` draws every mark at the 18px a
+ * chip really uses and scores each pair: the ten discharge options came out 90
+ * to 96% identical to each other, and the ovulation readings "peak" and "high"
+ * 98.9%. The shared outline was nearly all of the ink and the element carrying
+ * the entire meaning was two or three pixels across. Ten options, one picture.
+ *
+ * So the rule is now the other way round: **the thing that differs owns the
+ * silhouette.** Watery discharge falls as separate drips where creamy is a
+ * dollop; sex drive is counted like the flow scale rather than sized; a test
+ * mark is the reading itself rather than a stick with the reading drawn inside.
+ * Where two options genuinely are near neighbours — "happy" and "playful" are
+ * both smiling faces — they are allowed to stay near neighbours, because
+ * forcing them apart would misrepresent what they mean.
+ *
+ * The probe enforces a ceiling of 90% within a category, so this particular
+ * mistake cannot come back without saying so. It is a floor and not a verdict:
+ * a mark can pass it and still be a poor drawing of the thing it names, and
+ * that part still wants eyes on a contact sheet.
  *
  * Exported as inner SVG markup rather than as elements, so the same string can
  * be used by `icon()` in the DOM and by the printable report.
@@ -49,6 +77,19 @@
 
 /** The droplet, used by everything to do with fluid. */
 const DROP = 'M12 3.6c-3.1 3.8-5.2 6.7-5.2 9.1a5.2 5.2 0 0 0 10.4 0c0-2.4-2.1-5.3-5.2-9.1Z';
+
+/**
+ * A small flame at a given centre, so sex drive can be counted the way flow is.
+ * @param {number} cx
+ */
+const flame = (cx) => `M${cx} 8.6c1.3 1.5 2 2.5 2 3.4a2 2 0 0 1-4 0c0-.5.2-.9.5-1.3`
+  + `.2.7.6 1 1 1 .6 0 .7-.6.5-1.3-.2-.7-.2-1.3 0-1.8Z`;
+
+/**
+ * The stub of a test stick. Just enough to say "this was a test" and stop a
+ * single negative line reading as the plain dash that means "none".
+ */
+const TEST_HANDLE = 'M12 16.8v3.4';
 
 /** A smaller droplet, for scales that count them. */
 const DROP_SM = 'M12 9.5c-1.8 2.2-3 3.9-3 5.3a3 3 0 0 0 6 0c0-1.4-1.2-3.1-3-5.3Z';
@@ -154,8 +195,11 @@ export const ICONS = {
   migraine: p('M12 5a6 6 0 0 0-6 6c0 2 .9 3 1.4 4 .4.9.4 1.7.4 2.6h8.4c0-.9 0-1.7.4-2.6.5-1 1.4-2 1.4-4a6 6 0 0 0-6-6Z')
     + p('M9.6 11.6 12 8.8l-.6 3.6 2.8-1.6')
     + p('M2.6 8.4h2M2.6 12.4h2M19.4 8.4h2M19.4 12.4h2'),
-  'tender-breasts': p('M8.2 10.8a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2ZM15.8 10.8a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2Z') + p('M8.2 14.4h.01M15.8 14.4h.01'),
-  'breast-lumps': p('M8.2 10.8a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2ZM15.8 10.8a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2Z') + p('M15.8 13a1.4 1.4 0 1 0 0 2.8 1.4 1.4 0 0 0 0-2.8Z'),
+  'tender-breasts': p('M8.2 10.8a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2ZM15.8 10.8a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2Z')
+    + p('M4.4 7.6 6.2 9.4M8.2 6.2v2.4M12 7.6l-1.8 1.8M19.6 7.6l-1.8 1.8M15.8 6.2v2.4'),
+  'breast-lumps': p('M8.2 10.8a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2ZM15.8 10.8a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2Z')
+    + p('M15.8 12.6a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6Z')
+    + p('M8.2 12.8a1.4 1.4 0 1 0 0 2.8 1.4 1.4 0 0 0 0-2.8Z'),
   bloating: p('M12 7.4c-3.8 0-6.6 2-6.6 4.6s2.8 4.6 6.6 4.6 6.6-2 6.6-4.6-2.8-4.6-6.6-4.6Z')
     + p('M4.6 9.6 3.2 12l1.4 2.4M19.4 9.6 20.8 12l-1.4 2.4'),
   gas: p('M9.4 16.4a3.4 3.4 0 1 0 0-6.8 3.4 3.4 0 0 0 0 6.8Z') + p('M15.6 9.4a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z') + p('M17.6 15.2a1.4 1.4 0 1 0 0-2.8 1.4 1.4 0 0 0 0 2.8Z'),
@@ -166,7 +210,8 @@ export const ICONS = {
   indigestion: p('M12 5.4c-4 0-7 2.8-7 6.4s3 6.6 7 6.6 7-3 7-6.6-3-6.4-7-6.4Z') + p('M8.6 12.8c1.2-1.4 2.3-1.4 3.4 0s2.2 1.4 3.4 0'),
   fatigue: p(EYES_SHUT) + p('M8.4 15.4h7.2') + p('M17.4 3.4h3.8l-3.8 4h3.8'),
   dizziness: p('M6 6.8 9.6 10.4M9.6 6.8 6 10.4M14.4 6.8 18 10.4M18 6.8l-3.6 3.6') + p('M5.8 15.6c1.2-1.6 2.4-1.6 3.6 0s2.4 1.6 3.6 0 2.4-1.6 3.6 0'),
-  fainting: p('M5.8 8.8h3.6M14.6 8.8h3.6') + p('M6.6 15h10.8') + p('M12 18.4v2.6'),
+  fainting: p('M12 3.2a2.1 2.1 0 1 0 0 4.2 2.1 2.1 0 0 0 0-4.2Z')
+    + p('M6.4 11 12 15.2l5.6-4.2') + p('M6.4 16 12 20.2l5.6-4.2'),
   insomnia: p('M17.4 14.6A7.4 7.4 0 0 1 8.2 5.4a7.6 7.6 0 1 0 9.2 9.2Z') + p('M14.6 4.2h3.8l-3.8 4h3.8'),
   'restless-sleep': p('M17.4 14.6A7.4 7.4 0 0 1 8.2 5.4a7.6 7.6 0 1 0 9.2 9.2Z') + p('M3.4 18.6c1-1 2-1 3 0s2 1 3 0s2-1 3 0'),
   'night-sweats': p('M17.4 14.6A7.4 7.4 0 0 1 8.2 5.4a7.6 7.6 0 1 0 9.2 9.2Z') + p(DROP_SM),
@@ -174,8 +219,10 @@ export const ICONS = {
   'vaginal-dryness': p('M12 4.4c-3.2 3.8-5.4 6.8-5.4 9.2a5.4 5.4 0 0 0 10.8 0c0-2.4-2.2-5.4-5.4-9.2Z') + p('M5.2 5.2 18.8 18.8'),
   chills: p('M12 3.6v16.8M4.8 7.8l14.4 8.4M19.2 7.8 4.8 16.2') + p('M12 6.6 9.8 4.8M12 6.6l2.2-1.8'),
   fever: p('M14.6 13.4V6.2a2.2 2.2 0 1 0-4.4 0v7.2a4 4 0 1 0 4.4 0Z') + p('M12.4 9.6v6.2'),
-  acne: p('M12 3.8a8.2 8.2 0 1 0 0 16.4 8.2 8.2 0 0 0 0-16.4Z') + p('M9 9.4h.01M15.2 10.6h.01M10.6 15h.01M14.6 15.4h.01'),
-  'oily-skin': p('M12 3.8a8.2 8.2 0 1 0 0 16.4 8.2 8.2 0 0 0 0-16.4Z') + p('M9.4 9c1.4 1.2 1.4 2.6 0 3.6M14.4 12c1.4 1.2 1.4 2.6 0 3.6'),
+  acne: p('M12 3.8a8.2 8.2 0 1 0 0 16.4 8.2 8.2 0 0 0 0-16.4Z')
+    + p('M9 8.6a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4ZM15.2 10a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4ZM10.6 14.2a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4ZM14.8 14.6a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4Z'),
+  'oily-skin': p('M12 3.8a8.2 8.2 0 1 0 0 16.4 8.2 8.2 0 0 0 0-16.4Z')
+    + p('M7.2 13.4c0-3.4 2.2-6.2 5.2-7.4') + p('M15.6 8.6c1.2 1 1.2 2.2 0 3.2'),
   'dry-skin': p('M12 3.8a8.2 8.2 0 1 0 0 16.4 8.2 8.2 0 0 0 0-16.4Z') + p('M8.4 9.6h2.6M13.4 9.6h2.6M8.4 14.2h2.6M13.4 14.2h2.6'),
   itching: p('M9.6 20.6V14a1.6 1.6 0 0 1 3.2 0v-1.4a1.6 1.6 0 0 1 3.2 0V14a1.6 1.6 0 0 1 3.2 0v2.6a4 4 0 0 1-4 4Z') + p('M6.4 4.2 8 5.8M4.4 8.4h2.2M6.4 12.6 8 11'),
   'hair-loss': p('M6 14.4c0-4.6 2.6-8 6-8s6 3.4 6 8') + p('M6 14.4h12') + p('M9 18.2l-1.4 2.4M12 18.2l-1.4 2.4M15 18.2l-1.4 2.4'),
@@ -189,14 +236,40 @@ export const ICONS = {
   'uti-pain': p(DROP) + p('M8.2 6.8 15.8 17M15.8 6.8 8.2 17'),
   thrush: p('M12 4.4c-3.2 3.8-5.4 6.8-5.4 9.2a5.4 5.4 0 0 0 10.8 0c0-2.4-2.2-5.4-5.4-9.2Z') + p('M9.6 13h.01M12.6 15h.01M14 11.6h.01'),
 
-  /* ── Discharge. One form, varying texture. ───────────────────────────── */
-  sticky: p(DROP) + p('M9.8 13.6c1.4-1 2.8-1 4.2 0'),
-  creamy: p(DROP) + p('M9.2 12.8c1-.8 2-.8 3 0s2 .8 3 0'),
-  watery: p(DROP) + p('M9.2 12.4c1-.8 2-.8 3 0s2 .8 3 0') + p('M9.2 15.4c1-.8 2-.8 3 0s2 .8 3 0'),
-  'egg-white': p(DROP) + p('M9.6 15.6c0-2.4 1-4 2.4-4s2.4 1.6 2.4 4'),
-  'clumpy-white': p(DROP) + p('M10.2 13.2h.01M13.4 12.4h.01M11.8 15.6h.01M14 15.2h.01'),
-  brown: p(DROP) + p('M9.4 14.4h5.2'),
-  grey: p(DROP) + p('M9.4 13.2h5.2M9.4 15.8h5.2'),
+  /*
+    ── Discharge. Consistency, drawn as consistency. ─────────────────────
+
+    This category was one droplet outline with a different squiggle inside it,
+    which is a reasonable thing to draw and a measurably useless thing to look
+    at. `icons.mjs` renders every mark at the 18px a chip actually uses and
+    compares them: the old set came out 90–95% identical to each other, because
+    the shared outline is most of the ink and the squiggle that carried all the
+    meaning was two or three pixels. Ten options, one picture.
+
+    So the distinguishing property now owns the silhouette. Watery falls in
+    separate drips, creamy is a dollop, sticky is a mass with a thread hanging
+    off it, egg white is the long stretch it is named for, clumpy is curds.
+    Those are outlines that differ before the eye resolves any detail, which is
+    what "find it again in a list" needs.
+
+    Brown and grey are the exception and keep the droplet, because they are the
+    two that describe a colour rather than a texture and there is no honest
+    silhouette for a colour. They are separated by how much ink fills them —
+    hatched for brown, stippled for grey — which is the nearest a
+    one-colour mark gets to saying "darker".
+  */
+  sticky: p('M12 4.4a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z')
+    + p('M12 12.6c-.8 1.8.8 2.6 0 4.4') + p('M12 19.4v.01'),
+  creamy: p('M5.6 17.4c0-4.6 2.8-8.4 6.4-8.4s6.4 3.8 6.4 8.4Z') + p('M4.4 17.4h15.2'),
+  watery: p('M7.2 4.6c-1.3 1.6-2.1 2.8-2.1 3.8a2.1 2.1 0 0 0 4.2 0c0-1-.8-2.2-2.1-3.8Z')
+    + p('M16.8 6.6c-1.3 1.6-2.1 2.8-2.1 3.8a2.1 2.1 0 0 0 4.2 0c0-1-.8-2.2-2.1-3.8Z')
+    + p('M12 12.8c-1.3 1.6-2.1 2.8-2.1 3.8a2.1 2.1 0 0 0 4.2 0c0-1-.8-2.2-2.1-3.8Z'),
+  'egg-white': p('M9.4 3.8c5 2.7 5 5.1 0 7.8s-5 5.1 0 7.8') + p('M7.4 3.8h4M12.6 19.4h-4'),
+  'clumpy-white': p('M8.8 7.8a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4Z')
+    + p('M15.4 7a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8Z')
+    + p('M12 13.6a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6Z'),
+  brown: p(DROP) + p('M8.4 13.4 12.6 17.2M9.8 10.4 14.8 15.2M12.8 9.2 15.8 12'),
+  grey: p(DROP) + p('M10.2 12.2h.01M13.6 11.8h.01M11.8 15h.01M14.4 14.6h.01M9.6 15.4h.01'),
   'unusual-smell': p(DROP) + p('M16.4 5.6c1.2 1 1.2 2.2 0 3.2s-1.2 2.2 0 3.2') + p('M19.4 5.6c1.2 1 1.2 2.2 0 3.2s-1.2 2.2 0 3.2'),
   atypical: p(DROP) + p('M12 18.6v1.8') + p('M18 5.4a2.6 2.6 0 1 0-2.6 2.6'),
 
@@ -204,14 +277,23 @@ export const ICONS = {
   protected: p('M12 20.4c-3.4-2.4-6.2-4.8-6.2-8a3.6 3.6 0 0 1 6.2-2.4 3.6 3.6 0 0 1 6.2 2.4c0 3.2-2.8 5.6-6.2 8Z') + p('M8.4 6.6a3.6 3.6 0 0 1 7.2 0'),
   unprotected: p('M12 20.4c-3.4-2.4-6.2-4.8-6.2-8a3.6 3.6 0 0 1 6.2-2.4 3.6 3.6 0 0 1 6.2 2.4c0 3.2-2.8 5.6-6.2 8Z') + p('M8.4 7.4 15.6 3.8'),
   oral: p('M4.4 12c2.4-3.2 4.8-4.8 7.6-4.8s5.2 1.6 7.6 4.8c-2.4 3.2-4.8 4.8-7.6 4.8S6.8 15.2 4.4 12Z') + p('M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z'),
-  anal: p('M12 20.4c-3.4-2.4-6.2-4.8-6.2-8a3.6 3.6 0 0 1 6.2-2.4 3.6 3.6 0 0 1 6.2 2.4c0 3.2-2.8 5.6-6.2 8Z') + p('M12 3.6v3.2'),
+  anal: p('M12 20.4c-3.4-2.4-6.2-4.8-6.2-8a3.6 3.6 0 0 1 6.2-2.4 3.6 3.6 0 0 1 6.2 2.4c0 3.2-2.8 5.6-6.2 8Z')
+    + p('M18.4 3.4v6.2M16 7.2l2.4 2.4 2.4-2.4'),
   masturbation: p('M9.2 20.4V13a1.8 1.8 0 0 1 3.6 0v-1.6a1.8 1.8 0 0 1 3.6 0V13a1.8 1.8 0 0 1 3.6 0v3a4.4 4.4 0 0 1-4.4 4.4Z') + p('M6 6.2c1 .8 1 1.8 0 2.6'),
   toys: p('M14.6 3.8a3 3 0 0 0-5.2 0c-.8 1.4-.6 3 .4 4.2v10.2a2.2 2.2 0 1 0 4.4 0V8c1-1.2 1.2-2.8.4-4.2Z'),
   orgasm: p('M12 10.4a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2Z') + p('M12 3.4v3.6M12 17v3.6M4.6 13h3.6M15.8 13h3.6M6.4 7.4l2.6 2.6M15 16l2.6 2.6M17.6 7.4 15 10M9 16l-2.6 2.6'),
   painful: p('M12 20.4c-3.4-2.4-6.2-4.8-6.2-8a3.6 3.6 0 0 1 6.2-2.4 3.6 3.6 0 0 1 6.2 2.4c0 3.2-2.8 5.6-6.2 8Z') + p('M9 5.4 12 8l3-2.6'),
 
-  /* ── Sex drive. A flame at three heights. ────────────────────────────── */
-  high: p('M12 3.4c2.6 3 4 5 4 6.8a4 4 0 0 1-8 0c0-1 .4-1.8 1-2.6.4 1.4 1.2 2 2 2 1.2 0 1.4-1.2 1-2.6-.4-1.4-.4-2.6 0-3.6Z') + p('M6.4 17.6h11.2'),
+  /*
+    ── Sex drive. Counted, like the flow scale. ──────────────────────────
+
+    One flame with a bar of varying length under it measured 95% identical
+    between "neutral" and "high", for the same reason the flow scale stopped
+    drawing a level inside a single droplet: at 18px a length is not readable,
+    a count is. This is the same language the diary already teaches one screen
+    earlier — one mark, two marks, three — so there is nothing new to learn.
+  */
+  high: p(flame(6.2)) + p(flame(12)) + p(flame(17.8)),
 
   /* ── Activity. The thing you did. ────────────────────────────────────── */
   walking: p('M13.4 3.6a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6Z') + p('M10 20.4l2.2-5 2.6 2.4v3.4') + p('M12.2 15.4 11 10.6l3.2-1.8 2 3 2.6 1'),
@@ -236,31 +318,46 @@ export const ICONS = {
   'poor-diet': p('M6.4 4.4v6a2.4 2.4 0 0 0 4.8 0v-6') + p('M8.8 10.6v9.2') + p('M16.6 4.4c-1.4 1.2-2 3-2 5.4 0 1.4.8 2.2 2 2.2s2-.8 2-2.2c0-2.4-.6-4.2-2-5.4Z') + p('M16.6 12v7.8') + p('M3.6 3.6l16.8 16.8'),
   'big-day': p('M6.4 6h11.2a1.6 1.6 0 0 1 1.6 1.6v10.8a1.6 1.6 0 0 1-1.6 1.6H6.4a1.6 1.6 0 0 1-1.6-1.6V7.6A1.6 1.6 0 0 1 6.4 6Z') + p('M4.8 10.4h14.4M8.6 3.6v4M15.4 3.6v4') + p('M12 13 12.9 14.9 15 15.2l-1.5 1.4.4 2-1.9-1-1.9 1 .4-2L9 15.2l2.1-.3Z'),
 
-  /* ── Tests. A stick, and what it read. ───────────────────────────────── */
-  positive: p('M8.6 3.6h6.8v16.8H8.6Z') + p('M8.6 8.6h6.8') + p('M12 11.4v6M9 14.4h6'),
-  negative: p('M8.6 3.6h6.8v16.8H8.6Z') + p('M8.6 8.6h6.8') + p('M9 14.4h6'),
-  peak: p('M8.6 3.6h6.8v16.8H8.6Z') + p('M8.6 8.6h6.8') + p('M9.4 12.4h5.2M9.4 15.4h5.2') + p('M12 17.8v.01'),
+  /*
+    ── Tests. What she read, not the plastic it was printed on. ──────────
+
+    These were a full-height stick outline with the reading drawn small inside
+    it, and the stick was four fifths of the ink: "peak" and "high" came out
+    98.9% identical at 18px, and positive and negative 95.4%. The one thing a
+    test mark has to do is say which result it was, and that was the one thing
+    it could not do.
+
+    The stick is gone. What is left is the reading itself at full size, over a
+    short handle that keeps it from being read as a bare dash — and the handle
+    is cheap enough that the result still owns the mark.
+  */
+  positive: p('M12 4.6v11.4M6.6 10.4h10.8') + p(TEST_HANDLE),
+  negative: p('M6.6 10.4h10.8') + p(TEST_HANDLE),
+  peak: p('M6.6 9.8h10.8M6.6 13.8h10.8') + p(TEST_HANDLE)
+    + p('M12 3.2 12.8 4.9 14.6 5.6 12.8 6.3 12 8 11.2 6.3 9.4 5.6 11.2 4.9Z'),
 };
 
 /**
- * Option ids that share a mark with another category.
+ * Option ids whose mark depends on which category they appear in.
  *
  * `none`, `negative`, `high`, `low` and `neutral` each appear in more than one
- * category, and they do not always mean the same thing — "None" in discharge is
- * an absence, "No sex" is a choice, and "Low" in sex drive is a level. Rather
- * than let one key silently serve two meanings, the ones that need their own
- * mark are listed here as `category:id` and win over the plain id.
+ * category. Most of the time that costs nothing: `none` is an absence wherever
+ * it turns up — no bleeding, no discharge, no sex, no exercise — and all four
+ * draw the same plain dash on purpose, so the dash is a convention the eye
+ * learns once instead of four drawings of nothing.
+ *
+ * Listed here are the ids where the same word is genuinely a different thing.
+ * "Low" and "Neutral" in sex drive are points on a scale rather than an
+ * absence, and a test reading of "High" or "Negative" is a line on a stick.
+ * Those are keyed `category:id` and win over the plain id.
  *
  * @type {Record<string, string>}
  */
 export const ICONS_BY_CATEGORY = {
-  'discharge:none': p('M5.5 12h13'),
-  'sex:none': p('M5.5 12h13'),
-  'activity:none': p('M5.5 12h13'),
-  'drive:low': p('M12 3.4c2.6 3 4 5 4 6.8a4 4 0 0 1-8 0c0-1 .4-1.8 1-2.6.4 1.4 1.2 2 2 2 1.2 0 1.4-1.2 1-2.6-.4-1.4-.4-2.6 0-3.6Z'),
-  'drive:neutral': p('M12 3.4c2.6 3 4 5 4 6.8a4 4 0 0 1-8 0c0-1 .4-1.8 1-2.6.4 1.4 1.2 2 2 2 1.2 0 1.4-1.2 1-2.6-.4-1.4-.4-2.6 0-3.6Z') + p('M8.4 17.6h7.2'),
-  'testOvulation:high': p('M8.6 3.6h6.8v16.8H8.6Z') + p('M8.6 8.6h6.8') + p('M9.4 12.4h5.2M9.4 15.4h5.2'),
-  'testOvulation:negative': p('M8.6 3.6h6.8v16.8H8.6Z') + p('M8.6 8.6h6.8') + p('M9.4 12.4h5.2'),
+  'drive:low': p(flame(12)),
+  'drive:neutral': p(flame(8.4)) + p(flame(15.6)),
+  'testOvulation:high': p('M6.6 9.8h10.8M6.6 13.8h10.8') + p(TEST_HANDLE),
+  'testOvulation:negative': p('M8.8 10.4h6.4') + p(TEST_HANDLE),
 };
 
 /**

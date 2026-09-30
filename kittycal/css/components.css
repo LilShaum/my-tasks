@@ -262,13 +262,25 @@
 }
 
 /*
-  An invisible 44px hit area around a 32px switch.
+  An invisible hit area around a 32px switch — above it, and only above it.
 
-  The visual switch is deliberately small — a chunky one would dominate the
-  settings rows — but a 52x32 target misses the 44px minimum this app committed
-  to. Growing the element itself would move its border and pill shape, so the
-  target is extended with a pseudo-element instead: no layout change, no visual
-  change, six more pixels of forgiveness above and below.
+  The visual switch is deliberately small, because a chunky one would dominate
+  the settings rows, but 52x32 misses the 44px minimum this app committed to.
+  Growing the element itself would move its border and pill shape, so the
+  target is extended with a pseudo-element instead: no layout change, no
+  visual change.
+
+  What this comment used to claim, and what is actually true, are different
+  things, so: measured with elementFromPoint, a point 5px *above* the switch
+  hits the switch and a point 5px *below* it hits the next `.row`. The reach
+  downward is covered by the following row, which is later in the DOM and
+  therefore painted on top. Effective target is about 38px tall, not 44.
+
+  Left as it is on purpose. Fixing it means giving every settings row its own
+  stacking order so this one can sit above its neighbour, and a restack of the
+  whole screen is more risk than six pixels on one edge of one control is
+  worth. `z-index` on the switch alone was tried and does nothing — the
+  blocking element is a sibling of its parent, not of it.
 */
 .toggle::before {
   content: '';

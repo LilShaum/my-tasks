@@ -108,6 +108,79 @@ let saveErrorHandler = null;
 /** @param {(err: unknown) => void} fn */
 export function onSaveError(fn) { saveErrorHandler = fn; }
 
+/* ── Keeping two tabs from eating each other ─────────────────────────────
+   Every write sends the whole in-memory value of a slice, not a diff. That is
+   the right shape for one tab and quietly destructive with two: the second tab
+   holds whatever it loaded when it opened, and the moment she logs anything
+   there it writes that stale copy over everything the first tab saved since.
+
+   Reproduced before this existed: tab A logs cramps, tab B logs headache, and
+   only headache is on disk afterwards. No error, no warning — the entry is
+   simply gone, which for this app is the worst class of bug there is.
+
+   A tab therefore announces what it wrote, and the others re-read those slices
+   before she can touch them. The announcement carries no data: the receiver
+   reads storage itself, so there is one source of truth and no chance of two
+   tabs trading increasingly stale copies of the same record.
+
+   Anything this tab has dirty is deliberately skipped. Unsaved local edits are
+   newer than what is on disk and are about to be written, so adopting the
+   stored version would undo what she just typed — the same bug, pointed the
+   other way.                                                              */
+
+/** @type {BroadcastChannel|null} */
+let sync = null;
+try {
+  // Absent in a few older browsers, and it throws rather than being undefined
+  // in some privacy modes, so this is a try and not a feature check.
+  sync = typeof BroadcastChannel === 'function' ? new BroadcastChannel('kittycal-sync') : null;
+} catch { sync = null; }
+
+/**
+ * Adopt what another tab just wrote.
+ * @param {{settings?: boolean, periods?: boolean, logs?: DateKey[]}} msg
+ */
+async function adoptRemote(msg) {
+  // Before hydrate there is nothing to reconcile, and the boot load will pick
+  // the change up anyway.
+  if (!state.ready) return;
+
+  let changed = false;
+  try {
+    if (msg.settings && !dirty.settings) {
+      state.settings = await repo.loadSettings();
+      changed = true;
+    }
+    if (msg.periods && !dirty.periods) {
+      state.periodDays = await repo.loadPeriodDays();
+      changed = true;
+    }
+    const dates = (msg.logs ?? []).filter((d) => !dirty.logs.has(d));
+    if (dates.length) {
+      /*
+        Reloads every log rather than the named dates, because the repo has no
+        single-date read. Cheap enough: this runs only when another tab wrote,
+        which is rare, and it is the same query the app already does at boot.
+      */
+      const fresh = await repo.loadLogs();
+      for (const date of dates) {
+        if (fresh[date]) state.logs[date] = fresh[date];
+        else delete state.logs[date];
+      }
+      changed = true;
+    }
+  } catch (err) {
+    // A failed re-read leaves this tab showing its own copy, which is the
+    // behaviour it had before any of this. Not worth a toast.
+    console.error('kittycal: could not adopt another tab\'s write', err);
+    return;
+  }
+
+  if (changed) notify();
+}
+
+if (sync) sync.onmessage = (ev) => { void adoptRemote(ev.data ?? {}); };
+
 /**
  * Write everything currently dirty, and put it all back if the write fails.
  *
@@ -137,6 +210,9 @@ async function writeDirty() {
 
   try {
     await Promise.all(jobs);
+    // Only after it is genuinely on disk — announcing an intention would have
+    // other tabs read the old value and believe it was the new one.
+    sync?.postMessage({ settings, periods, logs: dates });
     return true;
   } catch (err) {
     if (settings) dirty.settings = true;

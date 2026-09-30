@@ -598,6 +598,21 @@ function weekStrip(logs, periodDays, today) {
   const days = [];
   let missed = 0;
 
+  /*
+    Nothing before her first record counts as missed.
+
+    "Missed" means she was using the app and did not answer. A day before she
+    ever opened it is not a day she skipped — nobody was asking. Without this,
+    a brand-new user's very first screen reads "6 days not logged — tap to
+    catch up", which is a verdict delivered to someone who has not been given a
+    chance to act, and it contradicts the distinction this function is built
+    on two comments below.
+
+    Reproduced on a fresh profile before fixing.
+  */
+  const everKnown = [...Object.keys(logs), ...periodDays].sort();
+  const firstEver = everKnown.length ? everKnown[0] : today;
+
   for (let back = 6; back >= 0; back -= 1) {
     const key = addDays(today, -back);
     const log = logs[key];
@@ -615,8 +630,8 @@ function weekStrip(logs, periodDays, today) {
     if (periodDays.has(key)) classes.push('is-period');
 
     // Today has not been missed, it just has not happened yet, so it is never
-    // part of the catch-up count.
-    if (!log && !isToday) missed += 1;
+    // part of the catch-up count; nor is anything from before she started.
+    if (!log && !isToday && key >= firstEver) missed += 1;
 
     const label = `${fmtRelative(key)}${
       log ? ', logged' : isToday ? ', not checked in yet' : ', not logged'}`;

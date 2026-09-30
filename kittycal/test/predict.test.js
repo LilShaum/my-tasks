@@ -13,7 +13,8 @@ import assert from 'node:assert/strict';
 import {
   predict, weightedAverage, detectRecalibration, rateConfidence,
   upcomingPeriods, upcomingFertile, conceptionChance,
-  CYCLE_MIN_CLAMP, CYCLE_MAX_CLAMP, STALE_AFTER_DAYS, startWindow, lastActivity,
+  CYCLE_MIN_CLAMP, CYCLE_MAX_CLAMP, CYCLE_STATED_MIN, CYCLE_STATED_MAX,
+  STALE_AFTER_DAYS, startWindow, lastActivity,
 } from '../js/domain/predict.js';
 // Moved to its own module so that a prediction can depend on measured
 // ovulation without ovulation depending on predictions.
@@ -219,21 +220,55 @@ test('very irregular cycles are reported as irregular', () => {
   assert.notEqual(p.confidence, 'high');
 });
 
-test('predicted cycle length is clamped to a physiological range', () => {
-  // A wildly long stated average must not produce a 90-day forecast.
+test('a cycle length she cannot have stated is still bounded', () => {
+  // Only an imported or hand-edited file can carry this; `normalizeSettings`
+  // allows up to 90 so an import is never silently dropped, but it must not
+  // become a 90-day forecast.
   const high = predict({
     periodDays: period('2026-07-01', 5),
     settings: settings({ avgCycleLength: 85 }),
     today: '2026-07-02',
   });
-  assert.equal(high.avgCycleLength, CYCLE_MAX_CLAMP);
+  assert.equal(high.avgCycleLength, CYCLE_STATED_MAX);
+});
 
-  const low = predict({
-    periodDays: period('2026-07-01', 5),
-    settings: settings({ avgCycleLength: 15 }),
-    today: '2026-07-02',
-  });
-  assert.equal(low.avgCycleLength, CYCLE_MIN_CLAMP);
+test('every cycle length the app offers her is the one it forecasts from', () => {
+  /*
+    The regression this guards is a silent one. Onboarding and Settings both
+    accept up to CYCLE_STATED_MAX days, and the forecast used to clamp that
+    answer to CYCLE_MAX_CLAMP — so 50, 55 and 60 produced one identical
+    prediction. Long cycles are common enough (PCOS being the usual reason)
+    that this was a permanent ten-day error for the women it applied to, set
+    on the first screen they ever saw.
+  */
+  for (let stated = CYCLE_STATED_MIN; stated <= CYCLE_STATED_MAX; stated += 1) {
+    const p = predict({
+      periodDays: period('2026-07-01', 5),
+      settings: settings({ avgCycleLength: stated }),
+      today: '2026-07-02',
+    });
+    assert.equal(p.avgCycleLength, stated,
+      `stating ${stated} days should forecast from ${stated}`);
+    assert.equal(p.nextStart, addDays('2026-07-01', stated));
+  }
+});
+
+test('a derived average is still held to the physiological range', () => {
+  /*
+    Widening the clamp to admit her stated length must not widen it for numbers
+    the data produced. She says 28; the logged history says something absurd;
+    the forecast stays inside CYCLE_MIN_CLAMP…CYCLE_MAX_CLAMP.
+  */
+  const long = history('2024-01-01', 80, 8);   // 80-day "cycles"
+  const p = predict({ periodDays: long, settings: settings({}), today: addDays('2024-01-01', 80 * 7 + 10) });
+  assert.ok(p.avgCycleLength <= CYCLE_MAX_CLAMP,
+    `derived ${p.avgCycleLength} escaped the ceiling`);
+  assert.ok(p.avgCycleLength >= CYCLE_MIN_CLAMP);
+
+  const short = history('2024-01-01', 16, 8);  // 16-day "cycles"
+  const q = predict({ periodDays: short, settings: settings({}), today: addDays('2024-01-01', 16 * 7 + 5) });
+  assert.ok(q.avgCycleLength >= CYCLE_MIN_CLAMP,
+    `derived ${q.avgCycleLength} escaped the floor`);
 });
 
 /* ── predict: lateness ───────────────────────────────────────────────────── */

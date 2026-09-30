@@ -2,7 +2,16 @@
 
 .today-greeting { margin-bottom: var(--sp-3); }
 
-.today-greeting h2 { font-size: var(--fs-xl); }
+/*
+  The name is the one piece of free text rendered at headline size, and the
+  field that supplies it accepts 40 characters. Anything over roughly 20
+  without a space had no break opportunity, so the heading set one long line
+  and every screen in the app scrolled sideways — 752px of page on a 390px
+  phone at the full 40. `anywhere` rather than `break-word` because the failing
+  input is a single unbroken token, which is exactly the case `break-word`
+  declines to split.
+*/
+.today-greeting h2 { font-size: var(--fs-xl); overflow-wrap: anywhere; }
 
 .today-greeting .hint-sm { letter-spacing: 0.08em; font-weight: 700; }
 

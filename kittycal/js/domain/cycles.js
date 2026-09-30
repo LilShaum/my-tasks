@@ -93,9 +93,19 @@ function makePeriod(days) {
 }
 
 /**
- * Fold together periods whose starts are implausibly close. Runs repeatedly
- * until stable, so a run of three closely-spaced fragments collapses fully
- * rather than only pairwise.
+ * Fold together periods whose starts are implausibly close.
+ *
+ * One pass is enough, and it is worth saying why rather than leaving a reader
+ * to wonder whether it should loop. Each comparison is against the *accumulated*
+ * period rather than the previous input one, and merging never moves a start
+ * earlier — the days arrive sorted, so the absorbed fragment always begins
+ * later. A run of three close fragments therefore collapses on the one pass,
+ * and a second pass could not find anything the first left behind.
+ *
+ * `invariants.test.js` asserts the post-condition directly across thousands of
+ * generated histories: no two starts in the output are closer than
+ * `MIN_PLAUSIBLE_CYCLE`.
+ *
  * @param {Period[]} periods
  * @returns {Period[]}
  */
