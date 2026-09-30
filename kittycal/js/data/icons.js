@@ -4,7 +4,7 @@
  *
  * ── Why this exists
  *
- * Every one of the 102 loggable options used to carry a system emoji: 🌀 for
+ * Every one of the 111 loggable options used to carry a system emoji: 🌀 for
  * cramps, 🎈 for bloating, 😴 for fatigue. On the screen this app is used on
  * most, that meant a wall of multi-colour glyphs drawn by the operating system
  * — a different set on every phone, none of them in the palette, all of them
@@ -243,20 +243,22 @@ export const ICONS = {
 };
 
 /**
- * Option ids that share a mark with another category.
+ * Option ids whose mark depends on which category they appear in.
  *
  * `none`, `negative`, `high`, `low` and `neutral` each appear in more than one
- * category, and they do not always mean the same thing — "None" in discharge is
- * an absence, "No sex" is a choice, and "Low" in sex drive is a level. Rather
- * than let one key silently serve two meanings, the ones that need their own
- * mark are listed here as `category:id` and win over the plain id.
+ * category. Most of the time that costs nothing: `none` is an absence wherever
+ * it turns up — no bleeding, no discharge, no sex, no exercise — and all four
+ * draw the same plain dash on purpose, so the dash is a convention the eye
+ * learns once instead of four drawings of nothing.
+ *
+ * Listed here are the ids where the same word is genuinely a different thing.
+ * "Low" and "Neutral" in sex drive are points on a scale rather than an
+ * absence, and a test reading of "High" or "Negative" is a line on a stick.
+ * Those are keyed `category:id` and win over the plain id.
  *
  * @type {Record<string, string>}
  */
 export const ICONS_BY_CATEGORY = {
-  'discharge:none': p('M5.5 12h13'),
-  'sex:none': p('M5.5 12h13'),
-  'activity:none': p('M5.5 12h13'),
   'drive:low': p('M12 3.4c2.6 3 4 5 4 6.8a4 4 0 0 1-8 0c0-1 .4-1.8 1-2.6.4 1.4 1.2 2 2 2 1.2 0 1.4-1.2 1-2.6-.4-1.4-.4-2.6 0-3.6Z'),
   'drive:neutral': p('M12 3.4c2.6 3 4 5 4 6.8a4 4 0 0 1-8 0c0-1 .4-1.8 1-2.6.4 1.4 1.2 2 2 2 1.2 0 1.4-1.2 1-2.6-.4-1.4-.4-2.6 0-3.6Z') + p('M8.4 17.6h7.2'),
   'testOvulation:high': p('M8.6 3.6h6.8v16.8H8.6Z') + p('M8.6 8.6h6.8') + p('M9.4 12.4h5.2M9.4 15.4h5.2'),

@@ -20,6 +20,7 @@ import { measuredLuteal } from '../domain/ovulation.js';
 import { REGIMENS, regimen, packPosition, describePack } from '../domain/pill.js';
 import { describeBackup } from '../domain/backup-check.js';
 import { buildCycles } from '../domain/cycles.js';
+import { CYCLE_STATED_MIN, CYCLE_STATED_MAX } from '../domain/predict.js';
 import { themePicker, setPickerSelection } from '../ui/theme-picker.js';
 import { getTheme } from '../data/themes.js';
 import { applyTheme } from '../ui/theme.js';
@@ -361,7 +362,7 @@ function cycleRows(settings) {
       numberRow({
         label: 'Typical cycle length',
         value: settings.avgCycleLength,
-        min: 15, max: 60, unit: 'days',
+        min: CYCLE_STATED_MIN, max: CYCLE_STATED_MAX, unit: 'days',
         onChange: (v) => store.updateSettings({ avgCycleLength: v }),
       }),
       numberRow({

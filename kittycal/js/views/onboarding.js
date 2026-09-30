@@ -19,6 +19,7 @@ import { todayKey, addDays, fmtLong, daysBetween } from '../utils/date.js';
 import { plural } from '../utils/fmt.js';
 import { BIRTH_CONTROL } from '../domain/model.js';
 import { seedPeriodDays, CYCLE_LENGTH_FLOOR } from '../domain/cycles.js';
+import { CYCLE_STATED_MIN, CYCLE_STATED_MAX } from '../domain/predict.js';
 import { themePicker, setPickerSelection } from '../ui/theme-picker.js';
 import { mascot, spotArt } from '../ui/mascot.js';
 import { applyTheme } from '../ui/theme.js';
@@ -533,8 +534,8 @@ function stepCycleLength() {
         'around, put roughly the middle — this is a starting point, not a rule.' }),
       stepper({
         value: draft.cycleLength,
-        min: 15,
-        max: 60,
+        min: CYCLE_STATED_MIN,
+        max: CYCLE_STATED_MAX,
         unit: 'days',
         label: 'Cycle length',
         onChange: (v) => { draft.cycleLength = v; draft.cycleUnknown = false;

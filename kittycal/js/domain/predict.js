@@ -76,8 +76,41 @@ export const STALE_AFTER_DAYS = 90;
  */
 export const ACTIVE_WITHIN_DAYS = 30;
 
+/**
+ * The range a *derived* cycle length is allowed to fall in.
+ *
+ * These bound the model, not her testimony. A weighted average pulled out of
+ * logged data can be wrong in ways she would never claim — one mis-tapped date
+ * in 2023 is enough — so what the data infers is held to the range that covers
+ * almost everybody.
+ */
 export const CYCLE_MIN_CLAMP = 21;
 export const CYCLE_MAX_CLAMP = 45;
+
+/**
+ * The range she is allowed to *state*, which must match the steppers in
+ * onboarding and Settings — both import these so the three cannot drift.
+ *
+ * Onboarding asks how long her cycle usually is and accepts anything up to
+ * sixty days. The forecast then clamped that answer to forty-five, so stating
+ * 50, 55 or 60 produced one identical prediction: the app asked a question,
+ * offered the answer, and discarded it without a word. For long cycles — PCOS
+ * is the common reason, and it is not rare — that is the same ten-day error
+ * every cycle, on the first screen she ever sees, forever.
+ *
+ * So the clamp widens to take in whatever she has told us. Below the stated
+ * number the data is still held to `CYCLE_MIN_CLAMP`…`CYCLE_MAX_CLAMP`; a
+ * woman who says her cycles run to fifty-five has also said that a fifty-day
+ * observation is signal rather than a logging slip. Once she has three logged
+ * cycles the weighted average takes over regardless, so a mis-tapped stepper
+ * corrects itself rather than sticking.
+ *
+ * Values outside this range can still arrive from an imported or hand-edited
+ * file (`normalizeSettings` allows 15…90 so an import is never silently
+ * dropped), and those do not get to widen anything.
+ */
+export const CYCLE_STATED_MIN = 15;
+export const CYCLE_STATED_MAX = 60;
 
 /**
  * @typedef {'none'|'low'|'medium'|'high'} Confidence
@@ -315,7 +348,13 @@ export function predict({ periodDays, settings, today, logs }) {
     avg = (observed + settings.avgCycleLength) / 2;
   }
 
-  avg = clamp(Math.round(avg), CYCLE_MIN_CLAMP, CYCLE_MAX_CLAMP);
+  // Widened to include her own stated cycle length — see CYCLE_STATED_MAX.
+  const stated = clamp(settings.avgCycleLength, CYCLE_STATED_MIN, CYCLE_STATED_MAX);
+  avg = clamp(
+    Math.round(avg),
+    Math.min(CYCLE_MIN_CLAMP, stated),
+    Math.max(CYCLE_MAX_CLAMP, stated),
+  );
 
   const avgPeriod = periods.length
     ? clamp(Math.round(periods.reduce((a, b) => a + b, 0) / periods.length), 1, 14)
