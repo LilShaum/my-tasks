@@ -263,9 +263,13 @@ console.log('\nthe calendar refuses to log a period that has not happened');
   });
   await page.waitForTimeout(300);
 
-  const cells = await page.evaluate(() => {
-    const today = new Date();
-    const key = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  /**
+   * Split the visible grid into the days that have happened and the days that
+   * have not, and report what each lets her do.
+   */
+  const inspect = () => page.evaluate(() => {
+    const t = new Date();
+    const key = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
     const all = [...document.querySelectorAll('.cal-cell[data-date]')];
     const future = all.filter((c) => (c.dataset.date ?? '') > key);
     const past = all.filter((c) => (c.dataset.date ?? '') <= key);
@@ -273,6 +277,7 @@ console.log('\nthe calendar refuses to log a period that has not happened');
       futureCount: future.length,
       futureDisabled: future.every((c) => c.disabled),
       futureSaysWhy: future.every((c) => /cannot be marked/.test(c.getAttribute('aria-label') ?? '')),
+      pastCount: past.length,
       pastEnabled: past.length > 0 && past.every((c) => !c.disabled),
     };
   });
@@ -281,11 +286,26 @@ console.log('\nthe calendar refuses to log a period that has not happened');
     Marking one future day used to be enough to have Today announce "Day -29"
     and "58 days to your period" while another card on the same screen said
     there was not enough data to say anything at all.
+
+    Both halves of the rule need a month that contains the days they are about,
+    and on the last day of a month the current grid contains no future days at
+    all — this probe used to assert `futureCount > 0` and so went red once every
+    thirty days for a calendar behaving perfectly. So the past half is measured
+    where today is, and the future half pages forward if it has to.
   */
-  ok('there are future days on this month to test', cells.futureCount > 0);
-  ok('every one of them refuses the tap in edit mode', cells.futureDisabled === true);
-  ok('and says why, rather than only looking greyed', cells.futureSaysWhy === true);
-  ok('while past days stay markable', cells.pastEnabled === true);
+  const thisMonth = await inspect();
+  ok('the visible month has days that have already happened', thisMonth.pastCount > 0);
+  ok('and past days stay markable', thisMonth.pastEnabled === true);
+
+  let ahead = thisMonth;
+  if (!ahead.futureCount) {
+    await page.locator('[aria-label="Next month"]').click();
+    await page.waitForTimeout(450);
+    ahead = await inspect();
+  }
+  ok('there are future days to test', ahead.futureCount > 0);
+  ok('every one of them refuses the tap in edit mode', ahead.futureDisabled === true);
+  ok('and says why, rather than only looking greyed', ahead.futureSaysWhy === true);
 }
 
 console.log('\nthe screen has a hierarchy rather than one weight');

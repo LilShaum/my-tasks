@@ -149,13 +149,27 @@ console.log('\nedit mode does not offer a tap that does nothing');
   check(!/tap any day to/i.test(hint),
     'it no longer says "any day", which was never true', hint);
 
+  /*
+    On the last day of a month there is no future day in the grid, so asking for
+    one here failed once every thirty days for a calendar that was right. Page
+    forward when that happens: next month is entirely future, which tests the
+    same rule on any date.
+  */
+  if (!await page.locator('.cal-cell.is-future').count()) {
+    await page.locator('[aria-label="Next month"]').click();
+    await page.waitForTimeout(450);
+  }
   const future = page.locator('.cal-cell.is-future').first();
   if (await future.count()) {
     check(await future.isDisabled(),
       'because a day after today genuinely cannot be marked');
   } else {
-    check(false, 'expected at least one future day in this month');
+    check(false, 'no future day was reachable even a month ahead');
   }
+
+  // Back to where today is, so the sections below are about the current month.
+  await page.locator('.cal-today-btn', { hasText: 'Today' }).click();
+  await page.waitForTimeout(450);
 
   /*
     The mode is carried by a titled panel, not by a full-width filled button.
@@ -212,7 +226,26 @@ console.log('\nthe calendar answers for the month on screen');
   await page.locator('[aria-label="Next month"]').click();
   await page.waitForTimeout(450);
   const heading = await page.locator('.cal-recall h3').innerText();
-  check(/so far$/.test(heading), 'the current month is labelled as unfinished', heading);
+
+  /*
+    "so far" marks a month counted only as far as today. Asserting the current
+    month always carries it is wrong on the last day of the month, when every
+    day of it has happened and the count really is the whole month — which is
+    what made this fail on the 30th. The contract is the relationship, so read
+    both numbers out of the card and check that instead: the card says how many
+    days it counted, and the calendar knows how many the month has.
+  */
+  const counted = Number((await page.locator('.cal-recall').innerText()).match(/of (\d+) days?\./)?.[1]);
+  const inMonth = await page.evaluate(() => {
+    const dates = [...document.querySelectorAll('.cal-cell[data-date]')]
+      .map((c) => c.getAttribute('data-date') ?? '');
+    const [y, m] = (dates[0] ?? '').split('-').map(Number);
+    return new Date(y, m, 0).getDate();
+  });
+  check(Number.isFinite(counted) && counted > 0, 'the recall card says how many days it counted', String(counted));
+  check(/ so far$/.test(heading) === (counted < inMonth),
+    `the heading says "so far" exactly when the month is only counted part-way (${counted} of ${inMonth})`,
+    heading);
 
   // Forward into months she has not lived yet: nothing to recall, so nothing.
   for (let i = 0; i < 3; i += 1) {
