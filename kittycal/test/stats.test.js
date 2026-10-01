@@ -13,6 +13,7 @@ import {
   loggedIds, symptomFrequency, symptomPattern, detectPatterns, series,
   loggingStreak, loggingConsistency, CONSISTENCY_WINDOW, daysLogged, bbtForCycle,
   moodByPhase,
+  habitualMeasures,
 } from '../js/domain/stats.js';
 import { buildCycles } from '../js/domain/cycles.js';
 import { phaseInCycle } from '../js/domain/phases.js';
@@ -389,4 +390,60 @@ test('a peak spread across too many days is not a peak', () => {
   }
   const p = symptomPattern('bloating', logs, buildCycles(periodDays));
   assert.deepEqual(p.peakDays, [], 'six joint-first days is not a typical day');
+});
+
+/* ── which measurements she actually keeps ───────────────────────────────── */
+
+test('a measurement she logs regularly becomes part of her daily habit', () => {
+  /*
+    The check-in asked three fixed questions and never offered a temperature,
+    so a woman charting hers every morning was asked how she felt and then left
+    to find the field that actually sharpens her fertile window — four taps into
+    a drawer, every day. The question now follows the habit she has shown.
+  */
+  const logs = {};
+  for (let i = 1; i <= 6; i += 1) logs[addDays('2026-06-30', -i)] = { date: addDays('2026-06-30', -i), bbt: 36.5 };
+
+  assert.deepEqual(
+    habitualMeasures(logs, '2026-06-30', ['bbt', 'weight', 'sleep'], addDays),
+    ['bbt'],
+  );
+});
+
+test('one or two readings are not a habit', () => {
+  /*
+    A single entry is curiosity, or the morning of a doctor's appointment, and
+    it must not reshape her daily routine on the strength of that.
+  */
+  const logs = {
+    '2026-06-29': { date: '2026-06-29', bbt: 36.5 },
+    '2026-06-28': { date: '2026-06-28', bbt: 36.6 },
+  };
+  assert.deepEqual(habitualMeasures(logs, '2026-06-30', ['bbt'], addDays), []);
+});
+
+test('the habit lapses on the same evidence it was learned from', () => {
+  // Readings from two months ago say nothing about what she is doing now, so
+  // stopping removes the question again without her turning anything off.
+  const logs = {};
+  for (let i = 40; i <= 50; i += 1) logs[addDays('2026-06-30', -i)] = { date: addDays('2026-06-30', -i), bbt: 36.5 };
+  assert.deepEqual(habitualMeasures(logs, '2026-06-30', ['bbt'], addDays), []);
+});
+
+test('several habits are returned in the order asked for', () => {
+  const logs = {};
+  for (let i = 1; i <= 5; i += 1) {
+    logs[addDays('2026-06-30', -i)] = { date: addDays('2026-06-30', -i), bbt: 36.5, sleep: 7 };
+  }
+  assert.deepEqual(
+    habitualMeasures(logs, '2026-06-30', ['bbt', 'weight', 'sleep'], addDays),
+    ['bbt', 'sleep'],
+  );
+});
+
+test('a zero reading still counts as logged', () => {
+  // `0` is a real answer for steps or water and must not read as absent.
+  const logs = {};
+  for (let i = 1; i <= 4; i += 1) logs[addDays('2026-06-30', -i)] = { date: addDays('2026-06-30', -i), steps: 0 };
+  assert.deepEqual(habitualMeasures(logs, '2026-06-30', ['steps'], addDays), ['steps']);
 });

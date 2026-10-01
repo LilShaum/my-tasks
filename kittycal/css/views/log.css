@@ -335,3 +335,18 @@
 }
 
 .measure-input[aria-invalid='true'] { border-color: var(--danger); }
+
+/*
+  The offer that appears when a search found nothing.
+
+  Full width under the count rather than beside it: it is the only thing on
+  screen at that moment — every section is hidden — so there is nothing for it
+  to sit next to, and a half-width button floating in an empty sheet reads as
+  debris rather than the answer.
+*/
+.search-offer {
+  display: block;
+  width: 100%;
+  margin-top: var(--sp-2);
+  min-height: var(--tap);
+}

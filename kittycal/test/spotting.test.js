@@ -102,3 +102,15 @@ test('period days themselves are never counted, whatever they are logged as', ()
   const logs = spotOn([...periodSet(4)]);
   assert.deepEqual(spottingBetweenPeriods(logs, cycles), { days: 0, cycles: 0 });
 });
+
+test('no doctor flag about periods stopping after a positive pregnancy test', () => {
+  /*
+    The flag's own text says "when you are not pregnant", and it fired at
+    sixteen weeks anyway — telling a pregnant woman to book an appointment
+    about her periods stopping.
+  */
+  const base = { cycleLengths: [28, 28, 28], periodLengths: [5, 5, 5], daysSinceLastPeriod: 112 };
+  assert.ok(evaluate(base).some((f) => f.id === 'no-period'), 'fires without a test');
+  assert.ok(!evaluate({ ...base, explained: true }).some((f) => f.id === 'no-period'),
+    'and stays quiet with one');
+});

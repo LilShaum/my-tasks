@@ -13,15 +13,15 @@ import assert from 'node:assert/strict';
 import {
   predict, weightedAverage, detectRecalibration, rateConfidence,
   upcomingPeriods, upcomingFertile, conceptionChance,
-  CYCLE_MIN_CLAMP, CYCLE_MAX_CLAMP, CYCLE_STATED_MIN, CYCLE_STATED_MAX,
-  STALE_AFTER_DAYS, startWindow, lastActivity,
+  CYCLE_STATED_MIN, CYCLE_STATED_MAX,
+  STALE_AFTER_DAYS, startWindow, lastActivity, PREGNANCY_HOLD_DAYS,
 } from '../js/domain/predict.js';
 // Moved to its own module so that a prediction can depend on measured
 // ovulation without ovulation depending on predictions.
 import { detectThermalShift } from '../js/domain/ovulation.js';
 import { defaultSettings, emptyLog } from '../js/domain/model.js';
-import { phaseFor, PHASES } from '../js/domain/phases.js';
-import { buildCycles } from '../js/domain/cycles.js';
+import { phaseFor, PHASES, ringSegments } from '../js/domain/phases.js';
+import { buildCycles, CYCLE_LENGTH_FLOOR, CYCLE_LENGTH_CEIL } from '../js/domain/cycles.js';
 import { range, addDays, daysBetween } from '../js/utils/date.js';
 
 const period = (start, len) => range(start, addDays(start, len - 1));
@@ -236,7 +236,7 @@ test('every cycle length the app offers her is the one it forecasts from', () =>
   /*
     The regression this guards is a silent one. Onboarding and Settings both
     accept up to CYCLE_STATED_MAX days, and the forecast used to clamp that
-    answer to CYCLE_MAX_CLAMP — so 50, 55 and 60 produced one identical
+    answer to 45 — so 50, 55 and 60 produced one identical
     prediction. Long cycles are common enough (PCOS being the usual reason)
     that this was a permanent ten-day error for the women it applied to, set
     on the first screen they ever saw.
@@ -253,22 +253,43 @@ test('every cycle length the app offers her is the one it forecasts from', () =>
   }
 });
 
-test('a derived average is still held to the physiological range', () => {
+test('months of her own long or short cycles are believed, not capped', () => {
   /*
-    Widening the clamp to admit her stated length must not widen it for numbers
-    the data produced. She says 28; the logged history says something absurd;
-    the forecast stays inside CYCLE_MIN_CLAMP…CYCLE_MAX_CLAMP.
+    The forecast was clamped to a "typical" 21…45 days, widened only for what
+    she typed. Six logged 50-day cycles forecast 45 — five days early, every
+    cycle — and someone who answered "not sure" at onboarding (which stores
+    28) could never get past 45 however long her cycles ran.
   */
-  const long = history('2024-01-01', 80, 8);   // 80-day "cycles"
-  const p = predict({ periodDays: long, settings: settings({}), today: addDays('2024-01-01', 80 * 7 + 10) });
-  assert.ok(p.avgCycleLength <= CYCLE_MAX_CLAMP,
-    `derived ${p.avgCycleLength} escaped the ceiling`);
-  assert.ok(p.avgCycleLength >= CYCLE_MIN_CLAMP);
+  const long = history('2025-01-06', 50, 7);
+  const p = predict({ periodDays: long, settings: settings({ avgCycleLength: 28 }),
+    today: addDays('2025-01-06', 50 * 6 + 3) });
+  assert.equal(p.avgCycleLength, 50);
 
-  const short = history('2024-01-01', 16, 8);  // 16-day "cycles"
-  const q = predict({ periodDays: short, settings: settings({}), today: addDays('2024-01-01', 16 * 7 + 5) });
-  assert.ok(q.avgCycleLength >= CYCLE_MIN_CLAMP,
-    `derived ${q.avgCycleLength} escaped the floor`);
+  const short = history('2025-01-06', 18, 7);
+  const q = predict({ periodDays: short, settings: settings({ avgCycleLength: 28 }),
+    today: addDays('2025-01-06', 18 * 6 + 3) });
+  assert.equal(q.avgCycleLength, 18);
+});
+
+test('the forecast never leaves the range of a plausible cycle', () => {
+  // The bound that remains: averages of lengths that each count as a cycle
+  // stay inside what counts as a cycle.
+  const long = history('2024-01-01', 80, 8);
+  const p = predict({ periodDays: long, settings: settings({}), today: addDays('2024-01-01', 80 * 7 + 10) });
+  assert.ok(p.avgCycleLength >= CYCLE_LENGTH_FLOOR && p.avgCycleLength <= CYCLE_LENGTH_CEIL,
+    String(p.avgCycleLength));
+});
+
+test('one period that was never logged moves the forecast the same as before', () => {
+  // What the old cap was meant to guard against. It never did: this was 36
+  // with the cap and is 36 without it.
+  const lens = [28, 28, 28, 28, 28, 56];
+  const days = [];
+  let start = '2025-01-06';
+  for (const len of lens) { days.push(...period(start, 5)); start = addDays(start, len); }
+  days.push(...period(start, 5));
+  const p = predict({ periodDays: days, settings: settings({}), today: addDays(start, 3) });
+  assert.equal(p.avgCycleLength, 36);
 });
 
 /* ── predict: lateness ───────────────────────────────────────────────────── */
@@ -756,4 +777,198 @@ test('the card headline is the start window, not the bleed', () => {
     'the window opens before the estimate');
   assert.ok(p.startWindow.to > /** @type {string} */ (p.nextStart),
     'and closes after it');
+});
+
+/* ── predict: a positive pregnancy test ──────────────────────────────────── */
+
+/**
+ * A log with the required array fields, so `predict` sees a real record.
+ * @param {string} date
+ * @param {Record<string, any>} [patch]
+ */
+const logOn = (date, patch = {}) => ({
+  date, symptoms: [], moods: [], discharge: [], activity: [], other: [],
+  sex: [], custom: [], ...patch,
+});
+
+test('a positive pregnancy test stops the app counting down to a period', () => {
+  /*
+    `testPregnancy` was written by the diary and read by nothing but the CSV
+    export, so logging a positive result changed no screen: the app went on
+    reporting a date for her next period, a fertile window, and high
+    confidence, having been handed direct evidence against the assumption all
+    three are derived from.
+  */
+  const days = history('2026-01-05', 28, 6);
+  const today = addDays('2026-01-05', 28 * 5 + 30);
+
+  const before = predict({ periodDays: days, settings: settings({ showFertility: true }), today, logs: {} });
+  assert.ok(before.nextStart, 'the fixture should normally produce a forecast');
+  assert.ok(before.fertileWindow);
+
+  const after = predict({
+    periodDays: days,
+    settings: settings({ showFertility: true }),
+    today,
+    logs: { [today]: logOn(today, { testPregnancy: 'positive' }) },
+  });
+
+  assert.equal(after.expecting, true);
+  assert.equal(after.pregnancyTest, 'positive');
+  assert.equal(after.nextStart, null, 'still naming a date for her next period');
+  assert.equal(after.nextPeriod, null);
+  assert.equal(after.startWindow, null);
+  assert.equal(after.daysUntilPeriod, null);
+  assert.equal(after.fertileWindow, null, 'still drawing a fertile window');
+  assert.equal(after.ovulation, null);
+  assert.equal(after.confidence, 'none');
+  assert.equal(after.isLate, false, 'she is not late for a period that is not coming');
+
+  // The day count is an observation, not a forecast, and it is the figure a
+  // clinician asks for — so it survives.
+  assert.equal(after.cycleDay, before.cycleDay);
+});
+
+test('a negative test leaves the forecast alone', () => {
+  const days = history('2026-01-05', 28, 6);
+  const today = addDays('2026-01-05', 28 * 5 + 30);
+  const p = predict({
+    periodDays: days,
+    settings: settings({ showFertility: true }),
+    today,
+    logs: { [today]: logOn(today, { testPregnancy: 'negative' }) },
+  });
+  assert.equal(p.expecting, false);
+  assert.ok(p.nextStart);
+});
+
+test('retesting negative after a positive resumes the forecast', () => {
+  // The latest test of the cycle wins, so she never has to clear anything.
+  const days = history('2026-01-05', 28, 6);
+  const today = addDays('2026-01-05', 28 * 5 + 30);
+  const p = predict({
+    periodDays: days,
+    settings: settings({ showFertility: true }),
+    today,
+    logs: {
+      [addDays(today, -3)]: logOn(addDays(today, -3), { testPregnancy: 'positive' }),
+      [today]: logOn(today, { testPregnancy: 'negative' }),
+    },
+  });
+  assert.equal(p.expecting, false);
+  assert.ok(p.nextStart);
+});
+
+test('a positive test from an earlier cycle does not pause anything', () => {
+  /*
+    The scope is the current cycle, and that scope is what makes this need no
+    reset button: once she logs a period the test falls into a closed cycle and
+    the forecast resumes by itself — correct for a continuing pregnancy and for
+    an early loss alike.
+  */
+  const days = history('2026-01-05', 28, 6);
+  const today = addDays('2026-01-05', 28 * 5 + 30);
+  const longAgo = addDays('2026-01-05', 40);
+  const p = predict({
+    periodDays: days,
+    settings: settings({ showFertility: true }),
+    today,
+    logs: { [longAgo]: logOn(longAgo, { testPregnancy: 'positive' }) },
+  });
+  assert.equal(p.expecting, false);
+  assert.ok(p.nextStart);
+});
+
+test('a nonsense test result from an imported file is ignored', () => {
+  const days = history('2026-01-05', 28, 6);
+  const today = addDays('2026-01-05', 28 * 5 + 30);
+  const p = predict({
+    periodDays: days,
+    settings: settings({ showFertility: true }),
+    today,
+    logs: { [today]: logOn(today, { testPregnancy: 'maybe' }) },
+  });
+  assert.equal(p.expecting, false);
+  assert.equal(p.pregnancyTest, null);
+  assert.ok(p.nextStart);
+});
+
+/* ── a positive test, everywhere it reaches ──────────────────────────────── */
+
+test('a positive test names no cycle phase', () => {
+  /*
+    The forecast was paused, but phases are decided from the fertile window,
+    and with that off they fell through to "follicular — oestrogen is climbing
+    as your body prepares an egg" at day forty.
+  */
+  const days = history('2026-01-05', 28, 6);
+  const today = addDays('2026-01-05', 28 * 5 + 39);
+  const prediction = predict({
+    periodDays: days, settings: settings({ showFertility: true }), today,
+    logs: { [today]: logOn(today, { testPregnancy: 'positive' }) },
+  });
+  const phase = phaseFor({ date: today, cycles: buildCycles(new Set(days)), prediction });
+  assert.equal(phase.id, 'expecting');
+  assert.doesNotMatch(phase.summary, /egg|ovulat|period was expected/i);
+});
+
+test('at sixteen weeks she is not told her period is overdue, and keeps her day count', () => {
+  // Past ninety days the gap counts as stale, which used to blank the day
+  // count and swap the phase for "past your expected date".
+  const days = history('2026-01-05', 28, 6);
+  const lastStart = addDays('2026-01-05', 28 * 5);
+  const today = addDays(lastStart, 111);
+  const prediction = predict({
+    periodDays: days, settings: settings({}), today,
+    logs: { [addDays(lastStart, 41)]: logOn(addDays(lastStart, 41), { testPregnancy: 'positive' }) },
+  });
+  assert.equal(prediction.stale, true, 'the fixture is past the staleness line');
+  assert.equal(prediction.expecting, true);
+  assert.equal(prediction.cycleDay, 112, 'the day count a midwife dates from survives');
+  assert.equal(phaseFor({ date: today, cycles: buildCycles(new Set(days)), prediction }).id, 'expecting');
+});
+
+test('the pause ends on its own once a pregnancy would be over', () => {
+  /*
+    With no limit, she logs a positive test, has the baby, stops opening the
+    app, and comes back two years later to "Predictions are paused · Day 800".
+  */
+  const days = history('2026-01-05', 28, 6);
+  const lastStart = addDays('2026-01-05', 28 * 5);
+  const logs = { [addDays(lastStart, 41)]: logOn(addDays(lastStart, 41), { testPregnancy: 'positive' }) };
+
+  const lastDay = predict({ periodDays: days, settings: settings({}), logs,
+    today: addDays(lastStart, PREGNANCY_HOLD_DAYS) });
+  assert.equal(lastDay.expecting, true);
+
+  const after = predict({ periodDays: days, settings: settings({}), logs,
+    today: addDays(lastStart, PREGNANCY_HOLD_DAYS + 1) });
+  assert.equal(after.expecting, false);
+  assert.equal(after.pregnancyTest, 'positive', 'the test is still reported, only the hold ended');
+  assert.equal(after.stale, true, 'and the ordinary long-gap handling takes over');
+});
+
+test('with fertility switched off, the second half of the cycle is still luteal', () => {
+  /*
+    Hiding the fertile window is a choice about what she sees, not a gap in
+    the data. This used to say "follicular — energy and mood often pick up"
+    for everything between periods, PMS days included.
+  */
+  const days = history('2026-01-05', 28, 6);
+  const lastStart = addDays('2026-01-05', 28 * 5);
+  const cycles = buildCycles(new Set(days));
+  const off = (today) => predict({ periodDays: days, settings: settings({ showFertility: false }), today });
+
+  const day24 = addDays(lastStart, 23);
+  assert.equal(phaseFor({ date: day24, cycles, prediction: off(day24) }).id, 'luteal');
+  const day9 = addDays(lastStart, 8);
+  assert.equal(phaseFor({ date: day9, cycles, prediction: off(day9) }).id, 'follicular');
+
+  // The ovulatory band she opted out of is not named anywhere — words or ring.
+  for (let d = 5; d < 28; d += 1) {
+    const date = addDays(lastStart, d);
+    assert.notEqual(phaseFor({ date, cycles, prediction: off(date) }).id, 'ovulatory');
+  }
+  const ring = ringSegments(off(day24)).map((s) => s.id);
+  assert.deepEqual(ring, ['menstrual', 'follicular', 'luteal']);
 });

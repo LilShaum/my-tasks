@@ -18,9 +18,22 @@
  *   2. Mood, which is the whole of the mood-by-phase chart.
  *   3. Symptoms, which is the whole of pattern detection.
  *
- * Nothing else is asked. Temperature, weight, sleep, water and the rest live
- * in the full diary, one tap away at the end, because asking about them daily
- * would turn a fifteen-second habit into a form.
+ * Nothing else is asked by default. Temperature, weight, sleep, water and the
+ * rest live in the full diary, one tap away at the end, because asking about
+ * them daily would turn a fifteen-second habit into a form.
+ *
+ * ── The rule for adding a daily question
+ *
+ * Only ask what she can answer from where she is standing, right now, without
+ * fetching anything. Flow, mood and symptoms pass: she knows them. A scale
+ * reading, a step count or a thermometer reading do not pass for everyone —
+ * they need a device she may not own, or a moment (first thing in the
+ * morning) that may already be over. A question she cannot answer is worse
+ * than no question: it teaches her the check-in is something to dismiss.
+ *
+ * So a measurement only joins the check-in once she has shown she has it to
+ * hand — logged on three of the last thirty days, see `habitualMeasures` — and
+ * even then it can always be left blank without explanation.
  *
  * @typedef {import('../utils/date.js').DateKey} DateKey
  * @typedef {import('../domain/model.js').DayLog} DayLog
@@ -28,20 +41,34 @@
 
 import { el, haptic, announce } from '../utils/dom.js';
 import { todayKey, fmtRelative, addDays } from '../utils/date.js';
-import { CATEGORIES, DEFAULT_CHIPS, labelFor } from '../data/taxonomy.js';
+import { CATEGORIES, DEFAULT_CHIPS, MEASURES, labelFor } from '../data/taxonomy.js';
 import { openSheet, closeSheet } from '../ui/sheet.js';
 import { severityBlock } from '../ui/severity.js';
 import { pruneSeverity } from '../domain/model.js';
 import { openLogSheet } from './log.js';
+import { measureRow } from '../ui/measure.js';
 import { burst } from '../ui/particles.js';
 import { mascotReact } from '../ui/mascot.js';
-import { loggingStreak } from '../domain/stats.js';
+import { loggingStreak, habitualMeasures } from '../domain/stats.js';
 import { STREAK_MARKS } from '../domain/response.js';
 import { earnedIds, newlyEarned } from '../domain/stickers.js';
 import { stickerContext } from './stickers.js';
 import { toast } from '../ui/toast.js';
 import { getTheme } from '../data/themes.js';
 import * as store from '../state/store.js';
+
+/**
+ * The measurements the check-in may ask for, even when she keeps them.
+ *
+ * The rule for a daily question is that she can answer it from where she is
+ * standing, without fetching anything. A temperature passes once she has shown
+ * she takes one — and it is the reading that changes a prediction. Sleep passes:
+ * she knows roughly how long she slept. Weight needs a scale, and steps needs
+ * another app opened to read a number off; asking either at bedtime is asking
+ * her to go and get something, which is how a fifteen-second habit becomes a
+ * chore. They stay one tap away in the full diary, and in Insights.
+ */
+const CHECKIN_MEASURES = ['bbt', 'sleep'];
 
 /**
  * The moods offered.
@@ -144,7 +171,17 @@ export function openCheckin(date = todayKey()) {
   const whenPhrase = when === 'Yesterday' ? 'yesterday' : `on ${when}`;
 
   let step = 0;
+
+  /*
+    The fourth question exists only for someone who has shown she wants it.
+    Everyone else still gets three, which is the whole promise of this screen.
+  */
+  const measureIds = habitualMeasures(store.getState().logs, todayKey(), CHECKIN_MEASURES, addDays);
   const steps = [flowStep, moodStep, symptomStep];
+  if (measureIds.length) {
+    steps.push((/** @type {() => boolean} */ stale) =>
+      measureStep(measureIds, draft, store.getState().settings, stale, next, true));
+  }
 
   const sheet = openSheet({
     title: when,
@@ -443,7 +480,7 @@ export function openCheckin(date = todayKey()) {
             : toggle(draft.symptoms, id, (l) => { draft.symptoms = l; })),
         };
       }),
-      lastStep: true,
+      lastStep: measureIds.length === 0,
       onNext: next,
       onMore: () => {
         // Straight into the full diary, carrying everything answered so far so
@@ -496,6 +533,93 @@ function toggle(list, id, set) {
  * @param {boolean} [opts.lastStep]
  * @param {() => void} [opts.onNext]
  * @param {() => void} [opts.onMore]
+ */
+/**
+ * The measurements she already keeps, asked in the daily fifteen seconds.
+ *
+ * `habitualMeasures` decides which — see the reasoning there. The short version
+ * is that a woman charting her temperature every morning was being asked how
+ * she felt and then left to go and find the one field that actually sharpens
+ * her fertile window, four taps into a drawer, every single day. The question
+ * follows the habit rather than being offered to everyone, so it costs nothing
+ * to someone with no thermometer.
+ *
+ * Built on `question` with no options, because the frame — the heading that
+ * takes focus, the stale-token guard, the Done button — is the part worth
+ * sharing, and the answer here is a number rather than a chip.
+ *
+ * @param {string[]} ids
+ * @param {DayLog} draft
+ * @param {import('../domain/model.js').Settings} settings
+ * @param {() => boolean} stale
+ * @param {() => void} onNext
+ * @param {boolean} lastStep
+ */
+function measureStep(ids, draft, settings, stale, onNext, lastStep) {
+  /*
+    The same row the full diary uses, so a reading entered here obeys the same
+    plausible range and the same units. This step first shipped with its own
+    copy of the input that stored any number at all — a dropped decimal point
+    became 366 °C in the database, which is the bug the diary's row was written
+    to stop.
+  */
+  const rows = el('div', { class: 'checkin-measures' }, ids
+    .map((id) => MEASURES.find((m) => m.id === id))
+    .filter((measure) => measure != null)
+    .map((measure) => measureRow({
+      measure: /** @type {typeof MEASURES[number]} */ (measure),
+      settings,
+      get: () => /** @type {any} */ (draft)[/** @type {any} */ (measure).id],
+      set: (value) => {
+        if (stale()) return;
+        /** @type {any} */ (draft)[/** @type {any} */ (measure).id] = value;
+      },
+    })));
+
+  return question({
+    stale,
+    title: ids.length === 1 && ids[0] === 'bbt' ? 'This morning’s temperature' : 'Your numbers',
+    /*
+      A morning temperature is only answerable in the morning. Checked in at
+      night without having taken it, she cannot give it — so the screen says
+      plainly that blank is a fine answer, rather than leaving her staring at an
+      empty field wondering if Done will accept it.
+    */
+    hint: ids.includes('bbt')
+      ? (ids.length === 1
+        ? 'Didn’t take it today? Leave it blank and tap Done — that’s fine.'
+        : 'Leave blank anything you didn’t measure today — that’s fine.')
+      : 'Leave blank anything you didn’t measure today — that’s fine.',
+    multi: true,
+    options: [],
+    extra: rows,
+    lastStep,
+    onNext,
+  });
+}
+
+/**
+ * One question on its own screen.
+ *
+ * The parameter was an untyped destructure, which meant its shape was whatever
+ * the existing call sites happened to agree on — so adding a caller that did
+ * not pass `shortcut` or `onMore` broke the other three. Written down, the
+ * optional parts are optional.
+ *
+ * @param {Object} spec
+ * @param {string} spec.title
+ * @param {string} spec.hint
+ * @param {{id: string, label: string, selected: boolean, onPick: () => void,
+ *   note?: string, wide?: boolean}[]} spec.options
+ * @param {() => boolean} spec.stale   true once this question has been left
+ * @param {{label: string, onPick: () => void}|null} [spec.shortcut]
+ * @param {boolean} [spec.multi]       answers accumulate; show a Next button
+ * @param {() => string[]} [spec.current]
+ * @param {Node|null|false} [spec.extra]
+ * @param {() => void} [spec.onChange]
+ * @param {boolean} [spec.lastStep]    label the button Done rather than Next
+ * @param {() => void} [spec.onNext]
+ * @param {() => void} [spec.onMore]   open the full diary instead
  */
 function question({ title, hint, options, stale, shortcut, multi, current, extra, onChange,
   lastStep, onNext, onMore }) {

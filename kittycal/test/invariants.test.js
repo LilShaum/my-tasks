@@ -29,7 +29,7 @@ import {
 } from '../js/domain/cycles.js';
 import {
   predict, upcomingPeriods, upcomingFertile, conceptionChance,
-  CYCLE_MIN_CLAMP, CYCLE_STATED_MIN, CYCLE_STATED_MAX,
+  CYCLE_STATED_MIN, CYCLE_STATED_MAX,
 } from '../js/domain/predict.js';
 import { normalizeSettings, defaultSettings } from '../js/domain/model.js';
 import { addDays, daysBetween } from '../js/utils/date.js';
@@ -139,9 +139,8 @@ test('the forecast never contradicts itself, whatever it is given', () => {
     const p = predict({ periodDays, settings, today: TODAY, logs: {} });
     const ok = (cond, msg) => assert.ok(cond, `${msg}\n  ${where()}`);
 
-    ok(p.avgCycleLength >= Math.min(CYCLE_MIN_CLAMP, settings.avgCycleLength)
-      && p.avgCycleLength <= Math.max(45, settings.avgCycleLength),
-    `cycle length ${p.avgCycleLength} escaped its bounds`);
+    ok(p.avgCycleLength >= CYCLE_LENGTH_FLOOR && p.avgCycleLength <= CYCLE_LENGTH_CEIL,
+      `cycle length ${p.avgCycleLength} is not a plausible cycle`);
     ok(p.avgPeriodLength >= 1 && p.avgPeriodLength <= 14,
       `period length ${p.avgPeriodLength} escaped its bounds`);
 

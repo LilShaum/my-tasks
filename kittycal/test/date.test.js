@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  toKey, fromKey, addDays, daysBetween, range, makeKey, daysInMonth,
+  toKey, fromKey, addDays, daysBetween, range, makeKey, daysInMonth, dayNumber, keyOfDay,
   gridColumn, rotateDow, fmtDayCount, isBetween, DOW_MIN,
 } from '../js/utils/date.js';
 
@@ -126,4 +126,42 @@ test('fmtDayCount reads naturally and pluralises', () => {
   assert.equal(fmtDayCount(5), 'in 5 days');
   assert.equal(fmtDayCount(-1), '1 day ago');
   assert.equal(fmtDayCount(-3), '3 days ago');
+});
+
+/* ── day numbers ─────────────────────────────────────────────────────────── */
+
+test('day numbers are the plain Gregorian calendar', () => {
+  assert.equal(dayNumber('1970-01-01'), 0);
+  assert.equal(dayNumber('1970-01-02'), 1);
+  assert.equal(dayNumber('1969-12-31'), -1);
+  assert.equal(dayNumber('2000-03-01') - dayNumber('2000-02-28'), 2, '2000 is a leap year');
+  assert.equal(dayNumber('1900-03-01') - dayNumber('1900-02-28'), 1, '1900 is not');
+  assert.equal(dayNumber('2024-03-01') - dayNumber('2024-02-28'), 2);
+});
+
+test('keyOfDay undoes dayNumber, across four centuries', () => {
+  for (let n = dayNumber('1900-01-01'); n <= dayNumber('2300-01-01'); n += 1) {
+    assert.equal(dayNumber(keyOfDay(n)), n);
+  }
+});
+
+test('addDays and daysBetween agree with each other and with the calendar', () => {
+  /*
+    These were Date-based and are now integer arithmetic, because they are the
+    most-called functions in the app and parsing dates was the largest share of
+    its own work. Compared against the Date version across 1900–2300 in five
+    time zones, including half-hour daylight saving, before switching.
+  */
+  for (const [from, days, to] of [
+    ['2026-01-31', 1, '2026-02-01'], ['2026-02-28', 1, '2026-03-01'],
+    ['2028-02-28', 1, '2028-02-29'], ['2026-12-31', 1, '2027-01-01'],
+    ['2026-03-29', 1, '2026-03-30'], ['2026-10-25', 1, '2026-10-26'],
+    ['2026-01-01', -1, '2025-12-31'], ['2026-01-01', 365, '2027-01-01'],
+  ]) {
+    assert.equal(addDays(from, days), to, `${from} + ${days}`);
+    assert.equal(daysBetween(from, to), days, `${from} → ${to}`);
+  }
+  assert.deepEqual(range('2028-02-27', '2028-03-01'),
+    ['2028-02-27', '2028-02-28', '2028-02-29', '2028-03-01']);
+  assert.deepEqual(range('2026-03-02', '2026-03-01'), []);
 });

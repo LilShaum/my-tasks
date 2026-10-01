@@ -22,7 +22,8 @@ import { todayKey, fmtDayMonth, fmtRelative, daysBetween, addDays, dow, dayOfMon
 import { plural, listJoin } from '../utils/fmt.js';
 import { labelFor, labelOf, CATEGORIES, DEFAULT_CHIPS } from '../data/taxonomy.js';
 import { pick } from '../data/tips.js';
-import { loggedIds, spottingBetweenPeriods } from '../domain/stats.js';
+import { loggedIds, spottingBetweenPeriods, MIN_CYCLES_FOR_PATTERN } from '../domain/stats.js';
+import { premenstrualPatterns, headsUpToday } from '../domain/heads-up.js';
 import { nothingRecorded } from '../domain/model.js';
 import { buildRecap, cluster } from '../domain/recap.js';
 import { respondToCheckin } from '../domain/response.js';
@@ -131,7 +132,9 @@ export function renderToday(host) {
       eyebrow: prediction.cycleDay != null ? `Day ${prediction.cycleDay}` : undefined,
     }),
 
-    phaseLine(phase),
+    // While expecting, the paused card below says everything the phase line
+    // would, and saying it twice on one screen reads as the app repeating itself.
+    prediction.expecting ? null : phaseLine(phase),
     logButton(logs[today], today, logs, cycles),
     weekStrip(logs, periodDays, today),
 
@@ -160,26 +163,33 @@ export function renderToday(host) {
     el('div', { class: 'section stagger' }, [
       ...(settings.mode === 'conceive' && prediction.showFertility
         ? [
-            prediction.ovulation ? fertileCard(prediction, today) : null,
+            prediction.ovulation ? fertileCard(prediction, today, 'conceive') : null,
             ovulationSignalCard(logs, cycles, today),
-            prediction.stale ? staleCard(prediction)
-              : prediction.isLate ? lateCard(prediction)
-                : prediction.withinWindow ? dueCard(prediction)
-                  : nextPeriodCard(prediction),
+            prediction.expecting ? expectingCard(prediction)
+              : prediction.stale ? staleCard(prediction)
+                : prediction.isLate ? lateCard(prediction)
+                  : prediction.withinWindow ? dueCard(prediction)
+                    : nextPeriodCard(prediction),
+            headsUpCard(logs, cycles, prediction),
           ]
         : [
-            prediction.stale ? staleCard(prediction)
-              : prediction.isLate ? lateCard(prediction)
-                : prediction.withinWindow ? dueCard(prediction)
-                  : nextPeriodCard(prediction),
+            prediction.expecting ? expectingCard(prediction)
+              : prediction.stale ? staleCard(prediction)
+                : prediction.isLate ? lateCard(prediction)
+                  : prediction.withinWindow ? dueCard(prediction)
+                    : nextPeriodCard(prediction),
+            headsUpCard(logs, cycles, prediction),
             prediction.showFertility && prediction.ovulation
-              ? fertileCard(prediction, today) : null,
+              ? fertileCard(prediction, today, 'cycle') : null,
           ]),
       packCard(settings, logs, today),
       ...acogCards(cycles, today, prediction, logs),
     ]),
 
-    tipsRow({ phase, prediction, log: logs[today], today }),
+    /* Tips teach how a cycle works — "a late period usually means ovulation
+       came late", "a single unusual month means very little". After a
+       positive test none of that is about her. */
+    prediction.expecting ? null : tipsRow({ phase, prediction, log: logs[today], today }),
     installCard,
     installCard ? null : backupPrompt({ logs, periodDays, settings, today }),
     disclaimerNote(),
@@ -685,6 +695,10 @@ function greeting(name, today) {
  * @param {import('../domain/predict.js').Prediction} prediction
  */
 function ringHeadline(prediction) {
+  // Not "not enough data", which is what this fell through to: there is
+  // plenty of data, and the forecast has been stopped on purpose.
+  if (prediction.expecting) return { value: '—', caption: 'predictions paused' };
+
   /*
     Nothing to count down to. What goes in the middle depends on why.
 
@@ -785,6 +799,7 @@ function tipsRow({ phase, prediction, log, today }) {
     loggedToday,
     showFertility: prediction.showFertility,
     dateSeed: today,
+    patternsReady: prediction.cyclesLogged >= MIN_CYCLES_FOR_PATTERN,
   });
 
   if (!tips.length) return null;
@@ -874,6 +889,82 @@ function confidenceLine(prediction) {
     class: `confidence confidence-${prediction.confidence}`,
     text: copy[prediction.confidence],
   });
+}
+
+/**
+ * What she usually gets before her period, while it is still ahead of her.
+ *
+ * The Patterns card in Insights already knew this, and it stayed there: true,
+ * and only ever read by someone who went looking. This puts it on the screen
+ * she opens, in the few days when it is useful — see `heads-up.js` for when a
+ * pattern counts and why it is counted back from the period.
+ *
+ * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
+ * @param {import('../domain/cycles.js').Cycle[]} cycles
+ * @param {import('../domain/predict.js').Prediction} prediction
+ */
+function headsUpCard(logs, cycles, prediction) {
+  if (prediction.stale || prediction.expecting) return null;
+  const due = headsUpToday(premenstrualPatterns(logs, cycles), prediction).slice(0, 3);
+  if (!due.length) return null;
+
+  /** @param {import('../domain/heads-up.js').PremenstrualPattern} p */
+  const name = (p) => (p.kind === 'custom' ? p.id : labelFor(p.kind, p.id));
+
+  return el('div', { class: 'card data-zone' }, [
+    el('h3', { text: 'Coming up for you' }),
+    el('ul', { class: 'heads-up-list' }, due.map((p) => el('li', {}, [
+      el('strong', { text: name(p) }),
+      el('span', { class: 'hint-sm', text:
+        ` — usually from about ${plural(p.typicalBefore, 'day')} before your period, `
+        + `in ${p.cyclesWith} of your last ${p.cyclesTotal} cycles.` }),
+    ]))),
+    el('p', { class: 'hint-sm', text:
+      'From what you have logged, not a prediction about this month in particular.' }),
+  ]);
+}
+
+/**
+ * What the app says once she has logged a positive pregnancy test.
+ *
+ * The forecast is suppressed upstream, and something has to stand where it
+ * was — a card that simply vanishes reads as the app breaking at the exact
+ * moment she is paying most attention to it.
+ *
+ * Three rules for the words here. It does not tell her she is pregnant: a home
+ * test is her information and a clinician's to confirm, not an app's to
+ * announce. It does not congratulate her, because a positive test is not
+ * always good news and a tracker cannot know which this is. And it does not ask
+ * her to confirm, change a mode, or clear anything — logging a period is the
+ * only action in the app, and it already works, for a continuing pregnancy and
+ * for an early loss alike.
+ *
+ * What is left is the plain mechanical fact: the countdown is built on a period
+ * coming, so it has stopped.
+ *
+ * @param {import('../domain/predict.js').Prediction} prediction
+ */
+function expectingCard(prediction) {
+  return el('div', { class: 'card data-zone' }, [
+    el('h3', { text: 'Predictions are paused' }),
+    prediction.cycleDay != null
+      ? el('p', { class: 'big-value num', text: `Day ${prediction.cycleDay}` })
+      : null,
+    el('p', { class: 'hint-sm', text:
+      'You logged a positive pregnancy test this cycle. Every date Kittycal '
+      + 'shows is worked out from your next period arriving, so it has stopped '
+      + 'saying when that is rather than counting down to something it can no '
+      + 'longer stand behind.' }),
+    el('p', { class: 'hint-sm', text:
+      prediction.cycleDay != null
+        ? 'The day count above is measured from your last period, which is the '
+          + 'figure a doctor or midwife will ask for. A test at home is worth '
+          + 'confirming with them.'
+        : 'A test at home is worth confirming with a doctor or midwife.' }),
+    el('p', { class: 'hint-sm', text:
+      'Keep logging whatever you want to keep. If you mark a period, the '
+      + 'forecast picks back up on its own.' }),
+  ]);
 }
 
 /**
@@ -1026,8 +1117,9 @@ function lateCard(prediction) {
 /**
  * @param {import('../domain/predict.js').Prediction} prediction
  * @param {DateKey} today
+ * @param {'cycle'|'conceive'} mode
  */
-function fertileCard(prediction, today) {
+function fertileCard(prediction, today, mode) {
   if (!prediction.fertileWindow || !prediction.ovulation) return null;
   const chance = conceptionChance(prediction, today);
 
@@ -1059,10 +1151,40 @@ function fertileCard(prediction, today) {
       because "measured from your own cycles" and "we assumed fourteen" deserve
       different amounts of trust, and only one of them was ever on offer.
     */
-    prediction.lutealMeasured && el('p', { class: 'hint-sm', text:
+    prediction.lutealMeasured ? el('p', { class: 'hint-sm', text:
       `Ovulation is placed ${plural(prediction.lutealDays, 'day')} before your `
       + `period, measured from ${plural(prediction.lutealSamples, 'cycle')} where `
-      + 'a test or your temperature confirmed it.' }),
+      + 'a test or your temperature confirmed it.' })
+      /*
+        Where the number came from, when it was not measured.
+
+        The card used to say this only when the luteal length had been measured,
+        and nothing in the common case where it was the population average —
+        so the silence belonged to the guess, and silence on a card like this
+        reads as confidence. Luteal phases run from about ten to sixteen days;
+        at eleven, both of the window's peak days are wrong.
+
+        One line, in both modes. This card used to carry the whole pitch — two
+        paragraphs and two buttons — every day, which in conceive mode sat
+        directly above the "Has ovulation happened?" card saying the same thing
+        in different words, and in cycle mode asked someone who is not trying
+        to conceive to start buying ovulation tests. The pitch lives with the
+        card it belongs to now (`ovulationSignalCard`), and cycle mode gets a
+        single quiet way in.
+      */
+      : el('div', {}, [
+        el('p', { class: 'hint-sm', text: prediction.lutealSamples === 1
+          ? `Placed ${plural(prediction.lutealDays, 'day')} before your period — still the `
+            + 'average. One cycle of yours is measured; one more and Kittycal uses yours.'
+          : `Placed ${plural(prediction.lutealDays, 'day')} before your period — an `
+            + 'average, not measured from you, so yours could sit a few days either side.' }),
+        mode === 'cycle' && el('button', {
+          type: 'button',
+          class: 'btn-link',
+          text: 'Track your temperature',
+          onclick: () => { haptic(); openLogSheet(today, { openSection: 'Measurements' }); },
+        }),
+      ]),
 
     prediction.fertileWidened && el('div', { class: 'alert alert-warn', style: { marginTop: 'var(--sp-3)' } }, [
       el('span', { class: 'alert-icon', text: '!', 'aria-hidden': 'true' }),
@@ -1104,12 +1226,32 @@ function ovulationSignalCard(logs, cycles, today) {
   // Nothing recorded yet this cycle. Say what would answer it rather than
   // showing an empty card.
   if (!confirmed && !eggWhite) {
+    /*
+      The one place the ask lives in conceive mode, and it can be acted on
+      here. It said what would date ovulation and then left her to find the
+      fields: four taps, in a drawer called Measurements, behind "Add more".
+    */
     return el('div', { class: 'card data-zone' }, [
       el('h3', { text: 'Has ovulation happened?' }),
       el('p', { class: 'hint-sm', text:
         'Nothing recorded this cycle that can date it yet. A positive ovulation ' +
-        'test, or a temperature taken each morning, is what turns the estimate ' +
-        'above into an observation.' }),
+        'test, or a temperature taken each morning, turns the estimate above ' +
+        'into an observation — and after two cycles, Kittycal places your ' +
+        'window from your own body instead of the average.' }),
+      el('div', { class: 'card-actions' }, [
+        el('button', {
+          type: 'button',
+          class: 'btn btn-secondary',
+          text: 'Add a temperature',
+          onclick: () => { haptic(); openLogSheet(today, { openSection: 'Measurements' }); },
+        }),
+        el('button', {
+          type: 'button',
+          class: 'btn btn-secondary',
+          text: 'Add a test result',
+          onclick: () => { haptic(); openLogSheet(today, { openSection: 'Tests' }); },
+        }),
+      ]),
     ]);
   }
 
@@ -1237,6 +1379,7 @@ function acogCards(cycles, today, prediction, logs) {
     periodLengths: periodLengths(cycles, today),
     daysSinceLastPeriod: prediction.lastStart ? daysBetween(prediction.lastStart, today) : null,
     spotting: spottingBetweenPeriods(logs, cycles),
+    explained: prediction.pregnancyTest === 'positive',
   });
 
   if (!flags.length) return [];

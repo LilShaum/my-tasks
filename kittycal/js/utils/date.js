@@ -17,7 +17,6 @@
  * @typedef {string} DateKey  'YYYY-MM-DD' in local time
  */
 
-const MS_DAY = 86400000;
 
 export const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -55,6 +54,65 @@ export function fromKey(key) {
   return new Date(y, m - 1, d, 12, 0, 0, 0);
 }
 
+/*
+  Calendar arithmetic without Date objects.
+
+  `addDays` and `daysBetween` are the most-called functions in the app — every
+  cycle, phase, window and chart is built from them — and each call used to
+  split the key, build one or two Dates at local noon, and format a new string.
+  On a phone with three years of daily logs that put Today at about 360 ms to
+  draw, with date parsing the largest share of the app's own time.
+
+  A day number (days since 1970-01-01 on the proleptic Gregorian calendar,
+  Howard Hinnant's days_from_civil) makes both plain integer arithmetic. It is
+  also immune to time zones and daylight saving by construction rather than by
+  the noon trick, because no clock time is ever involved.
+*/
+
+/** Parsed day numbers, by key. Keys repeat constantly and there are only a few
+ *  thousand distinct ones in a lifetime of use, so this never grows large. */
+const dayCache = new Map();
+
+/**
+ * @param {DateKey} key
+ * @returns {number} days since 1970-01-01; NaN for a malformed key
+ */
+export function dayNumber(key) {
+  const hit = dayCache.get(key);
+  if (hit !== undefined) return hit;
+
+  let y = Number(key.slice(0, 4));
+  const m = Number(key.slice(5, 7));
+  const d = Number(key.slice(8, 10));
+  y -= m <= 2 ? 1 : 0;
+  const era = Math.floor(y / 400);
+  const yoe = y - era * 400;
+  const doy = Math.floor((153 * ((m + 9) % 12) + 2) / 5) + d - 1;
+  const doe = yoe * 365 + Math.floor(yoe / 4) - Math.floor(yoe / 100) + doy;
+  const n = era * 146097 + doe - 719468;
+
+  if (dayCache.size < 20000) dayCache.set(key, n);
+  return n;
+}
+
+/**
+ * The inverse of `dayNumber`.
+ * @param {number} n days since 1970-01-01
+ * @returns {DateKey}
+ */
+export function keyOfDay(n) {
+  const z = n + 719468;
+  const era = Math.floor(z / 146097);
+  const doe = z - era * 146097;
+  const yoe = Math.floor((doe - Math.floor(doe / 1460) + Math.floor(doe / 36524)
+    - Math.floor(doe / 146096)) / 365);
+  const doy = doe - (365 * yoe + Math.floor(yoe / 4) - Math.floor(yoe / 100));
+  const mp = Math.floor((5 * doy + 2) / 153);
+  const d = doy - Math.floor((153 * mp + 2) / 5) + 1;
+  const m = mp < 10 ? mp + 3 : mp - 9;
+  return makeKey(yoe + era * 400 + (m <= 2 ? 1 : 0), m - 1, d);
+}
+
 /** @returns {DateKey} today, local */
 export function todayKey() {
   return toKey(new Date());
@@ -77,9 +135,7 @@ export function makeKey(y, m, d) {
  * @returns {DateKey}
  */
 export function addDays(key, days) {
-  const d = fromKey(key);
-  d.setDate(d.getDate() + days);
-  return toKey(d);
+  return keyOfDay(dayNumber(key) + days);
 }
 
 /**
@@ -91,7 +147,7 @@ export function addDays(key, days) {
  * @returns {number}
  */
 export function daysBetween(a, b) {
-  return Math.round((fromKey(b).getTime() - fromKey(a).getTime()) / MS_DAY);
+  return dayNumber(b) - dayNumber(a);
 }
 
 /**
@@ -106,8 +162,9 @@ export const isBetween = (key, start, end) => key >= start && key <= end;
 export function range(start, end) {
   /** @type {DateKey[]} */
   const out = [];
-  const n = daysBetween(start, end);
-  for (let i = 0; i <= n; i++) out.push(addDays(start, i));
+  const first = dayNumber(start);
+  const last = dayNumber(end);
+  for (let day = first; day <= last; day++) out.push(keyOfDay(day));
   return out;
 }
 
