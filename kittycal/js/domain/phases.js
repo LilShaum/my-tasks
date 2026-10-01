@@ -19,7 +19,7 @@
 import { isPeriodDay } from './cycles.js';
 import { addDays } from '../utils/date.js';
 
-/** @typedef {'menstrual'|'follicular'|'ovulatory'|'luteal'|'unknown'|'overdue'|'suppressed'} PhaseId */
+/** @typedef {'menstrual'|'follicular'|'ovulatory'|'luteal'|'unknown'|'overdue'|'suppressed'|'expecting'} PhaseId */
 
 /**
  * @typedef {Object} PhaseInfo
@@ -109,6 +109,23 @@ export const PHASES = {
       'luteal phases do not apply. Bleeding is still tracked as normal.',
     token: '--line-soft',
   },
+  /*
+    After a positive pregnancy test there is no cycle phase to be in. The
+    forecast was paused, but `phaseFor` decides phases from the fertile window,
+    and with that switched off it fell through to its last line and called a
+    pregnant woman "follicular — oestrogen is climbing as your body prepares an
+    egg", and at sixteen weeks "past your expected date — logging it when it
+    arrives puts everything back on track".
+  */
+  expecting: {
+    id: 'expecting',
+    name: 'Predictions paused',
+    heading: 'Predictions paused',
+    summary:
+      'After a positive pregnancy test there is no cycle phase to name, so ' +
+      'Kittycal is not naming one.',
+    token: '--line-soft',
+  },
   overdue: {
     id: 'overdue',
     name: 'Past your expected date',
@@ -186,6 +203,10 @@ export function phaseFor({ date, cycles, prediction }) {
 
   if (!prediction.lastStart || date < prediction.lastStart) return PHASES.unknown;
 
+  // Before staleness: at sixteen weeks the gap is long enough to count as
+  // stale, and "past your expected date" is the wrong thing to tell her.
+  if (prediction.expecting) return PHASES.expecting;
+
   /*
     Once the history has gone stale there is no cycle to be at a point in.
     Naming a phase here asserted things like "luteal phase" 431 days after the
@@ -228,8 +249,23 @@ export function phaseFor({ date, cycles, prediction }) {
     return PHASES.follicular;
   }
 
-  // No fertility output: everything between periods is follicular-ish. Say
-  // "follicular" rather than inventing a luteal boundary we can't locate.
+  /*
+    Fertility switched off in Settings. That is a choice about what she wants
+    to see, not a gap in the data — the boundary it hides is still knowable.
+
+    This used to say "follicular" for everything between periods, on the
+    reasoning that a luteal boundary could not be located. It can: it is the
+    same next-period-minus-luteal-length every other screen uses. So someone
+    who turned the fertile window off, often because she is not trying and
+    finds it noise, was told "oestrogen is climbing, energy and mood often
+    pick up" on day 26 with PMS — for half of every cycle.
+
+    The ovulatory band stays unnamed, which is the part she opted out of. The
+    luteal phase is named, because that is where her symptoms live.
+  */
+  if (nextStart && date >= addDays(nextStart, -prediction.lutealDays)) {
+    return date < nextStart ? PHASES.luteal : PHASES.follicular;
+  }
   return PHASES.follicular;
 }
 
@@ -263,6 +299,12 @@ export function ringSegments(prediction) {
     }
     segments.push({ id: 'ovulatory', from: frac(fertileStart), to: frac(fertileEnd) });
     segments.push({ id: 'luteal', from: frac(fertileEnd), to: 1 });
+  } else if (prediction.nextStart && !prediction.onHormonal) {
+    // Fertility hidden by choice: follicular, then luteal, with no ovulatory
+    // band — matching `phaseFor`, so the ring and the words agree.
+    const lutealFrom = Math.max(periodEnd, total - prediction.lutealDays);
+    segments.push({ id: 'follicular', from: frac(periodEnd), to: frac(lutealFrom) });
+    segments.push({ id: 'luteal', from: frac(lutealFrom), to: 1 });
   } else {
     segments.push({ id: 'follicular', from: frac(periodEnd), to: 1 });
   }

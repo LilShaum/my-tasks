@@ -131,7 +131,9 @@ export function renderToday(host) {
       eyebrow: prediction.cycleDay != null ? `Day ${prediction.cycleDay}` : undefined,
     }),
 
-    phaseLine(phase),
+    // While expecting, the paused card below says everything the phase line
+    // would, and saying it twice on one screen reads as the app repeating itself.
+    prediction.expecting ? null : phaseLine(phase),
     logButton(logs[today], today, logs, cycles),
     weekStrip(logs, periodDays, today),
 
@@ -181,7 +183,10 @@ export function renderToday(host) {
       ...acogCards(cycles, today, prediction, logs),
     ]),
 
-    tipsRow({ phase, prediction, log: logs[today], today }),
+    /* Tips teach how a cycle works — "a late period usually means ovulation
+       came late", "a single unusual month means very little". After a
+       positive test none of that is about her. */
+    prediction.expecting ? null : tipsRow({ phase, prediction, log: logs[today], today }),
     installCard,
     installCard ? null : backupPrompt({ logs, periodDays, settings, today }),
     disclaimerNote(),
@@ -687,6 +692,10 @@ function greeting(name, today) {
  * @param {import('../domain/predict.js').Prediction} prediction
  */
 function ringHeadline(prediction) {
+  // Not "not enough data", which is what this fell through to: there is
+  // plenty of data, and the forecast has been stopped on purpose.
+  if (prediction.expecting) return { value: '—', caption: 'predictions paused' };
+
   /*
     Nothing to count down to. What goes in the middle depends on why.
 
@@ -1326,6 +1335,7 @@ function acogCards(cycles, today, prediction, logs) {
     periodLengths: periodLengths(cycles, today),
     daysSinceLastPeriod: prediction.lastStart ? daysBetween(prediction.lastStart, today) : null,
     spotting: spottingBetweenPeriods(logs, cycles),
+    explained: prediction.pregnancyTest === 'positive',
   });
 
   if (!flags.length) return [];

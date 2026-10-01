@@ -84,6 +84,18 @@ export const ACTIVE_WITHIN_DAYS = 30;
  * in 2023 is enough — so what the data infers is held to the range that covers
  * almost everybody.
  */
+/**
+ * How long a positive test holds the forecast, counted from her last period.
+ *
+ * Without a limit the pause had no end: she logs a positive test, has the
+ * baby, stops opening the app, and comes back two years later to "Predictions
+ * are paused · Day 800". Forty-three weeks covers a pregnancy that runs late
+ * with room to spare; past it, a positive test from that cycle is history, and
+ * the ordinary rules for a long gap take over — which ask her to mark her most
+ * recent period, exactly what someone returning after a baby needs to do.
+ */
+export const PREGNANCY_HOLD_DAYS = 43 * 7;
+
 export const CYCLE_MIN_CLAMP = 21;
 export const CYCLE_MAX_CLAMP = 45;
 
@@ -453,7 +465,8 @@ export function predict({ periodDays, settings, today, logs }) {
     it can no longer stand behind.
   */
   const pregnancyTest = latestPregnancyTest(logs, lastStart, today);
-  const expecting = pregnancyTest === 'positive';
+  const expecting = pregnancyTest === 'positive'
+    && daysSinceStart != null && daysSinceStart <= PREGNANCY_HOLD_DAYS;
 
   const stale = noRecentPeriod;
   /** @type {'dormant'|'absent'|null} */
@@ -550,9 +563,14 @@ export function predict({ periodDays, settings, today, logs }) {
     stale,
     staleReason,
     daysSinceStart,
-    cycleDay: stale || daysSinceStart == null ? null : daysSinceStart + 1,
-    // Kept while expecting: what day of the cycle she is on is an
-    // observation, not a forecast, and it is the figure a clinician asks for.
+    /*
+      Kept while expecting, even past the point a long gap would normally
+      blank it: days since her last period is an observation rather than a
+      forecast, and from about three months on it is the number a midwife
+      dates everything from. It used to vanish at day 91 — exactly when it
+      starts to matter most.
+    */
+    cycleDay: (stale && !expecting) || daysSinceStart == null ? null : daysSinceStart + 1,
     pregnancyTest,
     expecting,
     spread: stats.spread,

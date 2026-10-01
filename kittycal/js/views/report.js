@@ -61,6 +61,7 @@ function buildReport() {
     periodLengths: periods,
     daysSinceLastPeriod: prediction.lastStart ? daysBetween(prediction.lastStart, today) : null,
     spotting: spottingBetweenPeriods(logs, cycles),
+    explained: prediction.pregnancyTest === 'positive',
   });
 
   // Only symptoms logged inside the covered window.

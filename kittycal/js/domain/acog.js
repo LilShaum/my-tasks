@@ -60,9 +60,11 @@ export const SPOTTING_MIN_DAYS = 3;
  * @param {number|null} stats.daysSinceLastPeriod
  * @param {{days: number, cycles: number}} [stats.spotting] bleeding logged
  *   outside a period, and how many cycles it spanned
+ * @param {boolean} [stats.explained] a positive pregnancy test since the last
+ *   period, so an absence of periods is not a finding
  * @returns {Flag[]}
  */
-export function evaluate({ cycleLengths, periodLengths, daysSinceLastPeriod, spotting }) {
+export function evaluate({ cycleLengths, periodLengths, daysSinceLastPeriod, spotting, explained = false }) {
   /** @type {Flag[]} */
   const flags = [];
 
@@ -135,7 +137,14 @@ export function evaluate({ cycleLengths, periodLengths, daysSinceLastPeriod, spo
     }
   }
 
-  if (daysSinceLastPeriod != null && daysSinceLastPeriod >= AMENORRHEA_DAYS) {
+  /*
+    Not when she has logged a positive pregnancy test since that period. The
+    flag's own text says "when you are not pregnant", and it fired anyway at
+    sixteen weeks — advising a pregnant woman to book an appointment about her
+    periods stopping. `explained` stays true after the forecast's pregnancy
+    hold lapses, because postpartum is a reason for no periods too.
+  */
+  if (!explained && daysSinceLastPeriod != null && daysSinceLastPeriod >= AMENORRHEA_DAYS) {
     flags.push({
       id: 'no-period',
       title: `It has been ${daysSinceLastPeriod} days since your last logged period`,

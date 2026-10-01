@@ -183,6 +183,16 @@ console.log('\na positive pregnancy test stops the countdown');
     'but does point at someone who can confirm it');
   check(/Day \d+/.test(today),
     'and keeps the cycle day, which is the figure a clinician asks for');
+
+  /* The rest of the screen has to agree with the card. Phases are decided from
+     the fertile window, and with that switched off they fell through to
+     "Follicular — oestrogen is climbing as your body prepares an egg", under a
+     ring captioned "not enough data". */
+  check(!/Follicular|Ovulatory|Luteal|prepares an egg/i.test(today),
+    'and no cycle phase is named anywhere on the screen', today.slice(0, 160));
+  check(!/not enough data/i.test(today), 'nor is she told there is not enough data');
+  check(!/ovulation came late|single unusual month/i.test(today),
+    'and the cycle tips step aside, because none of them are about her now');
   await ctx.close();
 }
 
