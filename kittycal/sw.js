@@ -83,6 +83,7 @@ const PRECACHE = [
   'js/views/notes.js',
   'js/views/stickers.js',
   'js/ui/severity.js',
+  'js/ui/measure.js',
   'js/views/help.js',
   'js/views/checkin.js',
   'js/data/icons.js',

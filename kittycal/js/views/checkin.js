@@ -40,13 +40,13 @@
  */
 
 import { el, haptic, announce } from '../utils/dom.js';
-import { cToF, fToC, kgToLb, lbToKg } from '../utils/fmt.js';
 import { todayKey, fmtRelative, addDays } from '../utils/date.js';
 import { CATEGORIES, DEFAULT_CHIPS, MEASURES, labelFor } from '../data/taxonomy.js';
 import { openSheet, closeSheet } from '../ui/sheet.js';
 import { severityBlock } from '../ui/severity.js';
 import { pruneSeverity } from '../domain/model.js';
 import { openLogSheet } from './log.js';
+import { measureRow } from '../ui/measure.js';
 import { burst } from '../ui/particles.js';
 import { mascotReact } from '../ui/mascot.js';
 import { loggingStreak, habitualMeasures } from '../domain/stats.js';
@@ -545,64 +545,25 @@ function toggle(list, id, set) {
  * @param {boolean} lastStep
  */
 function measureStep(ids, draft, settings, stale, onNext, lastStep) {
-  const rows = el('div', { class: 'checkin-measures' });
-
-  for (const id of ids) {
-    const measure = MEASURES.find((m) => m.id === id);
-    if (!measure) continue;
-
-    /*
-      Stored in Celsius and kilograms whatever she is shown, so the unit she
-      reads in can change without rewriting her history. The same rule the full
-      diary follows; getting it wrong here would silently corrupt every reading
-      taken through the fast path.
-    */
-    const unit = measure.unitSetting === 'unitTemp' ? settings.unitTemp
-      : measure.unitSetting === 'unitWeight' ? settings.unitWeight : null;
-    const toShown = (/** @type {number} */ v) => {
-      if (measure.id === 'bbt' && unit === 'F') return Number(cToF(v).toFixed(1));
-      if (measure.id === 'weight' && unit === 'lb') return Number(kgToLb(v).toFixed(1));
-      return Number(v.toFixed(measure.decimals ?? 1));
-    };
-    const toStored = (/** @type {number} */ v) => {
-      if (measure.id === 'bbt' && unit === 'F') return fToC(v);
-      if (measure.id === 'weight' && unit === 'lb') return lbToKg(v);
-      return v;
-    };
-    const suffix = measure.id === 'bbt' ? `°${unit}`
-      : measure.id === 'weight' ? String(unit)
-        : measure.id === 'sleep' ? 'hours' : '';
-
-    const current = /** @type {any} */ (draft)[measure.id];
-    const input = el('input', {
-      type: 'number',
-      class: 'input num',
-      inputmode: 'decimal',
-      step: String(measure.step ?? 0.1),
-      min: String(toShown(measure.min)),
-      max: String(toShown(measure.max)),
-      id: `checkin-${measure.id}`,
-      value: current != null ? String(toShown(current)) : '',
-      oninput: (/** @type {any} */ ev) => {
+  /*
+    The same row the full diary uses, so a reading entered here obeys the same
+    plausible range and the same units. This step first shipped with its own
+    copy of the input that stored any number at all — a dropped decimal point
+    became 366 °C in the database, which is the bug the diary's row was written
+    to stop.
+  */
+  const rows = el('div', { class: 'checkin-measures' }, ids
+    .map((id) => MEASURES.find((m) => m.id === id))
+    .filter((measure) => measure != null)
+    .map((measure) => measureRow({
+      measure: /** @type {typeof MEASURES[number]} */ (measure),
+      settings,
+      get: () => /** @type {any} */ (draft)[/** @type {any} */ (measure).id],
+      set: (value) => {
         if (stale()) return;
-        const raw = ev.target.value;
-        if (raw === '') { /** @type {any} */ (draft)[measure.id] = null; return; }
-        const n = Number(raw);
-        // Out-of-range is left alone rather than clamped: clamping as she types
-        // rewrites 3 into 35 before she has reached the 6.
-        if (!Number.isFinite(n)) return;
-        /** @type {any} */ (draft)[measure.id] = toStored(n);
+        /** @type {any} */ (draft)[/** @type {any} */ (measure).id] = value;
       },
-    });
-
-    rows.append(el('div', { class: 'checkin-measure' }, [
-      el('label', { class: 'checkin-measure-label', for: `checkin-${measure.id}` }, [
-        el('span', { text: measure.name }),
-        suffix && el('span', { class: 'hint-sm', text: suffix }),
-      ]),
-      input,
-    ]));
-  }
+    })));
 
   return question({
     stale,
@@ -614,8 +575,10 @@ function measureStep(ids, draft, settings, stale, onNext, lastStep) {
       empty field wondering if Done will accept it.
     */
     hint: ids.includes('bbt')
-      ? 'Didn’t take it today? Leave it blank and tap Done — that’s fine.'
-      : 'Leave any you don’t have to hand blank.',
+      ? (ids.length === 1
+        ? 'Didn’t take it today? Leave it blank and tap Done — that’s fine.'
+        : 'Leave blank anything you didn’t measure today — that’s fine.')
+      : 'Leave blank anything you didn’t measure today — that’s fine.',
     multi: true,
     options: [],
     extra: rows,

@@ -242,6 +242,24 @@ console.log('\nthe daily check-in carries the measurements she already keeps');
       // eslint-disable-next-line no-await-in-loop
       const hint = await page.evaluate(() => document.querySelector('.sheet .hint')?.textContent ?? '');
       check(/leave it blank/i.test(hint), 'and says plainly that she can leave it blank', hint);
+      /* A dropped decimal point. The check-in first shipped with its own input
+         that stored any number, so this became 366 °C in the database — the
+         bug the diary's row had already been fixed for. */
+      // eslint-disable-next-line no-await-in-loop
+      await field.fill('366');
+      // eslint-disable-next-line no-await-in-loop
+      await field.blur();
+      // eslint-disable-next-line no-await-in-loop
+      await page.waitForTimeout(300);
+      // eslint-disable-next-line no-await-in-loop
+      const refused = await page.evaluate(() => ({
+        told: !document.querySelector('.sheet .measure-problem')?.hidden,
+        text: document.querySelector('.sheet .measure-problem')?.textContent ?? '',
+        cleared: document.querySelector('.sheet input[type=number]')?.value === '',
+      }));
+      check(refused.told && refused.cleared,
+        'an impossible reading is refused and she is told why', JSON.stringify(refused));
+
       // eslint-disable-next-line no-await-in-loop
       await field.fill('36.60');
       // eslint-disable-next-line no-await-in-loop

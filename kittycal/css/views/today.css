@@ -625,39 +625,6 @@
 
 .checkin-option[aria-pressed="true"] .checkin-option-note { color: inherit; }
 
-/*
-  The measurements question in the check-in.
-
-  A short stack of labelled numbers rather than a grid, because there are at
-  most four of them and each needs its name and its unit read together — a
-  temperature typed into the weight field is the kind of mistake that is
-  invisible afterwards and poisons a chart for a month.
-*/
-.checkin-measures {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-  margin-top: var(--sp-4);
-}
-
-.checkin-measure {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-3);
-}
-
-.checkin-measure-label {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  text-align: left;
-}
-
-/* Wide enough for "36.55" without the caret riding the edge, and no wider —
-   the label beside it is what the eye needs to read first. */
-.checkin-measure .input {
-  width: 7.5rem;
-  min-height: var(--tap);
-  text-align: right;
-}
+/* The measurements question reuses the diary's measure rows (ui/measure.js);
+   this only spaces them under the question. */
+.checkin-measures { margin-top: var(--sp-4); }
