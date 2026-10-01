@@ -916,8 +916,8 @@ function headsUpCard(logs, cycles, prediction) {
     el('ul', { class: 'heads-up-list' }, due.map((p) => el('li', {}, [
       el('strong', { text: name(p) }),
       el('span', { class: 'hint-sm', text:
-        ` — usually from about ${plural(p.typicalBefore, 'day')} before your period, `
-        + `in ${p.cyclesWith} of your last ${p.cyclesTotal} cycles.` }),
+        `Usually from about ${plural(p.typicalBefore, 'day')} before your period · `
+        + `${p.cyclesWith} of your last ${p.cyclesTotal} cycles` }),
     ]))),
     el('p', { class: 'hint-sm', text:
       'From what you have logged, not a prediction about this month in particular.' }),
