@@ -246,8 +246,9 @@ function stepAge() {
     content: [
       el('h2', { text: 'Which year were you born?' }),
       el('p', { class: 'hint', text:
-        'Cycles shift over a lifetime, so this helps Kittycal know what is ' +
-        'typical for you. Skip it if you would rather not.' }),
+        'In the first years of having periods, cycles run longer — up to 45 ' +
+        'days is typical under 18 — so this decides which range yours are ' +
+        'measured against. Skip it if you would rather not.' }),
       el('div', { class: 'field' }, [
         el('label', { class: 'label', for: 'onb-year', text: 'Birth year (optional)' }),
         input,

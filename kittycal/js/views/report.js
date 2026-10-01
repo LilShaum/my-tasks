@@ -62,6 +62,7 @@ function buildReport() {
     daysSinceLastPeriod: prediction.lastStart ? daysBetween(prediction.lastStart, today) : null,
     spotting: spottingBetweenPeriods(logs, cycles),
     explained: prediction.pregnancyTest === 'positive',
+    age: acog.ageFrom(settings.birthYear, today),
   });
 
   // Only symptoms logged inside the covered window.
@@ -136,7 +137,7 @@ function buildReport() {
           ))
         : el('p', { text:
             `Nothing recorded falls outside the typical ranges used here ` +
-            `(cycles ${acog.CYCLE_MIN}–${acog.CYCLE_MAX} days, bleeding ` +
+            `(cycles ${acog.CYCLE_MIN}–${acog.cycleMaxFor(acog.ageFrom(settings.birthYear, today))} days, bleeding ` +
             `${acog.PERIOD_MIN}–${acog.PERIOD_MAX} days).` }),
     ]),
 

@@ -371,6 +371,7 @@ function cycleRows(settings) {
         min: 1, max: 14, unit: 'days',
         onChange: (v) => store.updateSettings({ avgPeriodLength: v }),
       }),
+      birthYearRow(settings.birthYear),
       numberRow({
         label: 'Luteal phase length',
         value: settings.lutealLength,
@@ -1057,6 +1058,50 @@ function selectRow({ label, value, options, onChange }) {
         selected: option.value === value || null,
       }),
     )),
+  ]);
+}
+
+/**
+ * Birth year, which may be blank.
+ *
+ * Onboarding was the only place it could ever be entered, so someone who
+ * skipped it there had no way back — and it now decides which typical cycle
+ * range she is held to (see `cycleMaxFor` in acog.js). Blank stays blank
+ * rather than being clamped to a year, because "no answer" is an answer.
+ *
+ * @param {number|null} value
+ */
+function birthYearRow(value) {
+  const thisYear = new Date().getFullYear();
+  return el('div', { class: 'row' }, [
+    el('div', { class: 'row-label-group' }, [
+      el('label', { class: 'row-label', for: 'set-birth-year', text: 'Year of birth' }),
+      el('span', { class: 'row-hint', text:
+        'Optional. Under 18, cycles up to 45 days count as typical rather than '
+        + 'being flagged. Also printed on the report for a doctor.' }),
+    ]),
+    el('input', {
+      class: 'input num',
+      id: 'set-birth-year',
+      type: 'number',
+      inputmode: 'numeric',
+      placeholder: '—',
+      value: value ? String(value) : '',
+      min: String(thisYear - 80),
+      max: String(thisYear - 8),
+      style: { width: '96px', textAlign: 'center' },
+      onchange: (/** @type {Event} */ e) => {
+        const input = /** @type {HTMLInputElement} */ (e.target);
+        if (input.value.trim() === '') { store.updateSettings({ birthYear: null }); return; }
+        const parsed = Math.round(Number(input.value));
+        if (!Number.isFinite(parsed) || parsed < thisYear - 80 || parsed > thisYear - 8) {
+          input.value = value ? String(value) : '';
+          toast(`Enter a year between ${thisYear - 80} and ${thisYear - 8}.`);
+          return;
+        }
+        store.updateSettings({ birthYear: parsed });
+      },
+    }),
   ]);
 }
 

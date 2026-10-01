@@ -36,7 +36,7 @@ import { openCheckin } from './checkin.js';
 import { buildCycles, cycleLengths, periodLengths } from '../domain/cycles.js';
 import { predict, conceptionChance } from '../domain/predict.js';
 import { phaseFor } from '../domain/phases.js';
-import { evaluate } from '../domain/acog.js';
+import { evaluate, ageFrom } from '../domain/acog.js';
 import { packPosition, describePack, unmarkedDays } from '../domain/pill.js';
 import { cycleSignals } from '../domain/ovulation.js';
 import { cycleRing } from '../ui/ring.js';
@@ -1380,6 +1380,7 @@ function acogCards(cycles, today, prediction, logs) {
     daysSinceLastPeriod: prediction.lastStart ? daysBetween(prediction.lastStart, today) : null,
     spotting: spottingBetweenPeriods(logs, cycles),
     explained: prediction.pregnancyTest === 'positive',
+    age: ageFrom(store.getState().settings.birthYear, today),
   });
 
   if (!flags.length) return [];

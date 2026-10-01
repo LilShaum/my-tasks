@@ -91,7 +91,7 @@ export function renderInsights(host) {
       thisCycleCard(logs, cycles, today),
     ]],
     ['Your cycle', [
-      cycleLengthCard(lengthPoints, prediction),
+      cycleLengthCard(lengthPoints, prediction, acog.ageFrom(settings.birthYear, today)),
       periodLengthCard(periodPoints),
       cycleListCard(logs, cycles, prediction),
       accuracyCard(cycles),
@@ -236,8 +236,9 @@ const CHART_MIN = 3;
 /**
  * @param {{start: DateKey, length: number}[]} points
  * @param {import('../domain/predict.js').Prediction} prediction
+ * @param {number|null} age years old, which sets the typical range
  */
-function cycleLengthCard(points, prediction) {
+function cycleLengthCard(points, prediction, age) {
   if (!points.length) return null;
 
   const stats = summarize(points.map((p) => p.length));
@@ -249,9 +250,9 @@ function cycleLengthCard(points, prediction) {
       el('p', { text: `${points.length === 1 ? 'Your first cycle was' : 'Your cycles so far:'} ` +
         `${listJoin(points.map((p) => `${p.length} days`))}.` }),
       el('p', { class: 'hint-sm', text:
-        points.every((p) => acog.isCycleTypical(p.length))
-          ? `That is inside the typical ${acog.CYCLE_MIN}–${acog.CYCLE_MAX} days.`
-          : `Typical is ${acog.CYCLE_MIN}–${acog.CYCLE_MAX} days.` }),
+        points.every((p) => acog.isCycleTypical(p.length, age))
+          ? `That is inside the typical ${acog.CYCLE_MIN}–${acog.cycleMaxFor(age)} days.`
+          : `Typical is ${acog.CYCLE_MIN}–${acog.cycleMaxFor(age)} days.` }),
     ]);
   }
 
@@ -260,7 +261,7 @@ function cycleLengthCard(points, prediction) {
     // number; "Mar" is a thing she can remember.
     label: fmtMonth(point.start),
     value: point.length,
-    flagged: !acog.isCycleTypical(point.length),
+    flagged: !acog.isCycleTypical(point.length, age),
   }));
 
   const outside = data.filter((d) => d.flagged).length;
@@ -277,11 +278,11 @@ function cycleLengthCard(points, prediction) {
     el('h3', { text: 'Cycle length' }),
     el('p', { class: 'hint-sm', text:
       `One dot per cycle, oldest first. Inside the shaded band is the typical ` +
-      `${acog.CYCLE_MIN}–${acog.CYCLE_MAX} days.` }),
+      `${acog.CYCLE_MIN}–${acog.cycleMaxFor(age)} days.` }),
     trendChart({
       data,
       average: stats.mean ?? undefined,
-      normalBand: [acog.CYCLE_MIN, acog.CYCLE_MAX],
+      normalBand: [acog.CYCLE_MIN, acog.cycleMaxFor(age)],
       unit: 'd',
       summary: `Your last ${recent.length} cycle lengths, from ${stats.min} to ` +
         `${stats.max} days, averaging ${Math.round(stats.mean ?? 0)}. ` +

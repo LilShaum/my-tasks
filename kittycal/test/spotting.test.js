@@ -12,7 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { spottingBetweenPeriods } from '../js/domain/stats.js';
-import { evaluate, SPOTTING_MIN_CYCLES, SPOTTING_MIN_DAYS } from '../js/domain/acog.js';
+import { evaluate, SPOTTING_MIN_CYCLES, SPOTTING_MIN_DAYS, ageFrom, cycleMaxFor, isCycleTypical } from '../js/domain/acog.js';
 import { buildCycles } from '../js/domain/cycles.js';
 import { addDays, range } from '../js/utils/date.js';
 
@@ -113,4 +113,31 @@ test('no doctor flag about periods stopping after a positive pregnancy test', ()
   assert.ok(evaluate(base).some((f) => f.id === 'no-period'), 'fires without a test');
   assert.ok(!evaluate({ ...base, explained: true }).some((f) => f.id === 'no-period'),
     'and stays quiet with one');
+});
+
+test('a teenager is not flagged for cycles that are typical at her age', () => {
+  /*
+    ACOG's adolescent guidance gives the typical cycle as 21–45 days, against
+    21–35 for adults (Committee Opinion No. 651, Table 1). Held to the adult
+    range, a fifteen-year-old with normal 40-day cycles was told they were
+    "worth raising at an appointment".
+  */
+  const lengths = { cycleLengths: [40, 42, 38, 41], periodLengths: [5, 5, 5, 5], daysSinceLastPeriod: 10 };
+  assert.ok(evaluate({ ...lengths, age: 30 }).some((f) => f.id === 'cycle-long'), 'an adult is flagged');
+  assert.ok(!evaluate({ ...lengths, age: 15 }).some((f) => f.id === 'cycle-long'), 'a teenager is not');
+  assert.ok(evaluate(lengths).some((f) => f.id === 'cycle-long'), 'no birth year keeps the adult range');
+
+  // Past 45 is still worth mentioning at any age.
+  const longer = { ...lengths, cycleLengths: [50, 52, 49] };
+  const teen = evaluate({ ...longer, age: 15 }).find((f) => f.id === 'cycle-long');
+  assert.ok(teen && /45 days/.test(teen.title) && /first years of having periods/.test(teen.detail));
+});
+
+test('age comes from birth year, and only ever widens the range for the young', () => {
+  assert.equal(ageFrom(2010, '2026-10-01'), 16);
+  assert.equal(ageFrom(null, '2026-10-01'), null);
+  assert.equal(cycleMaxFor(16), 45);
+  assert.equal(cycleMaxFor(18), 35);
+  assert.equal(cycleMaxFor(null), 35);
+  assert.ok(isCycleTypical(42, 16) && !isCycleTypical(42, 30));
 });

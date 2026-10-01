@@ -19,6 +19,45 @@
 export const CYCLE_MIN = 21;
 export const CYCLE_MAX = 35;
 
+/**
+ * The upper end of a typical cycle is younger-older, not one number.
+ *
+ * In the first years of having periods, cycles run longer and vary more while
+ * ovulation settles: ACOG's guidance on adolescent menstruation gives the
+ * typical interval as 21–45 days (Committee Opinion No. 651, Table 1;
+ * doi:10.1097/AOG.0000000000001215), against 21–35 for adults. Holding a
+ * fifteen-year-old to the adult range flags a perfectly normal 40-day cycle as
+ * "worth raising at an appointment" — a false alarm, to the age group most
+ * likely to be alarmed by one, on an app whose themes are Hello Kitty.
+ *
+ * Age comes from birth year, which onboarding asked for on the claim that it
+ * "helps Kittycal know what is typical for you" while nothing but the printed
+ * report ever read it. Eighteen is a conservative proxy for "the first few
+ * years after menarche": it can only widen the range for the young, never
+ * narrow it for anyone.
+ */
+export const ADOLESCENT_UNDER = 18;
+export const ADOLESCENT_CYCLE_MAX = 45;
+
+/**
+ * Whole years old this calendar year, or null without a birth year.
+ * @param {number|null|undefined} birthYear
+ * @param {string} today a DateKey
+ */
+export function ageFrom(birthYear, today) {
+  if (!birthYear) return null;
+  return Number(today.slice(0, 4)) - birthYear;
+}
+
+/** The longest typical cycle at this age. @param {number|null} [age] */
+export const cycleMaxFor = (age) =>
+  (age != null && age < ADOLESCENT_UNDER ? ADOLESCENT_CYCLE_MAX : CYCLE_MAX);
+
+/** How the typical range is described at this age. @param {number|null} [age] */
+export const typicalCycleText = (age) => (cycleMaxFor(age) === CYCLE_MAX
+  ? `A typical adult cycle runs ${CYCLE_MIN}–${CYCLE_MAX} days.`
+  : `In the first years of having periods, a typical cycle runs ${CYCLE_MIN}–${ADOLESCENT_CYCLE_MAX} days.`);
+
 /** Typical bleed duration. */
 export const PERIOD_MIN = 2;
 export const PERIOD_MAX = 7;
@@ -62,9 +101,10 @@ export const SPOTTING_MIN_DAYS = 3;
  *   outside a period, and how many cycles it spanned
  * @param {boolean} [stats.explained] a positive pregnancy test since the last
  *   period, so an absence of periods is not a finding
+ * @param {number|null} [stats.age] years old, for the typical cycle range
  * @returns {Flag[]}
  */
-export function evaluate({ cycleLengths, periodLengths, daysSinceLastPeriod, spotting, explained = false }) {
+export function evaluate({ cycleLengths, periodLengths, daysSinceLastPeriod, spotting, explained = false, age = null }) {
   /** @type {Flag[]} */
   const flags = [];
 
@@ -93,7 +133,8 @@ export function evaluate({ cycleLengths, periodLengths, daysSinceLastPeriod, spo
 
   if (cycleLengths.length >= 3) {
     const short = cycleLengths.filter((n) => n < CYCLE_MIN).length;
-    const long = cycleLengths.filter((n) => n > CYCLE_MAX).length;
+    const longest = cycleMaxFor(age);
+    const long = cycleLengths.filter((n) => n > longest).length;
     const min = Math.min(...cycleLengths);
     const max = Math.max(...cycleLengths);
 
@@ -101,15 +142,15 @@ export function evaluate({ cycleLengths, periodLengths, daysSinceLastPeriod, spo
       flags.push({
         id: 'cycle-short',
         title: `${short} of your cycles were shorter than ${CYCLE_MIN} days`,
-        detail: `A typical adult cycle runs ${CYCLE_MIN}–${CYCLE_MAX} days. ` +
+        detail: `${typicalCycleText(age)} ` +
           'Consistently shorter cycles are something a doctor can look into.',
       });
     }
     if (long >= 2) {
       flags.push({
         id: 'cycle-long',
-        title: `${long} of your cycles were longer than ${CYCLE_MAX} days`,
-        detail: `A typical adult cycle runs ${CYCLE_MIN}–${CYCLE_MAX} days. ` +
+        title: `${long} of your cycles were longer than ${longest} days`,
+        detail: `${typicalCycleText(age)} ` +
           'Consistently longer cycles are worth raising at an appointment.',
       });
     }
@@ -160,7 +201,8 @@ export function evaluate({ cycleLengths, periodLengths, daysSinceLastPeriod, spo
  * Is a single cycle length inside the typical range?
  * @param {number} days
  */
-export const isCycleTypical = (days) => days >= CYCLE_MIN && days <= CYCLE_MAX;
+/** @param {number} days @param {number|null} [age] */
+export const isCycleTypical = (days, age = null) => days >= CYCLE_MIN && days <= cycleMaxFor(age);
 
 /**
  * @param {number} days
