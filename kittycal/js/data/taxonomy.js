@@ -482,6 +482,56 @@ const SYNONYMS = {
 };
 
 /**
+ * What people call the parts of the diary that are not chips.
+ *
+ * Search only ever looked at chip labels and their synonyms, so everything that
+ * is a field rather than a chip was unfindable by its own name. "temperature",
+ * "bbt", "ovulation test", "pregnancy test" and — for someone on the pill —
+ * "pill" all came back "Nothing matches that", while "weight", "water" and
+ * "sleep" found Gym, Watery discharge and Insomnia instead of the fields. Once
+ * a failed search offered to create a symptom by that name, it became a trap:
+ * the most valuable input in the app could be logged as a symptom chip called
+ * "temperature" that stores no number and dates nothing.
+ *
+ * Keyed by the `data-field` the diary stamps on each row or section.
+ *
+ * @type {Record<string, string[]>}
+ */
+export const FIELD_TERMS = {
+  flow: ['period', 'bleeding', 'menstruation', 'menstrual', 'flow', 'blood'],
+  bbt: ['temperature', 'temp', 'bbt', 'basal body temperature', 'thermometer',
+    'morning temperature'],
+  weight: ['weight', 'weigh', 'scale', 'kg', 'kilos', 'lbs', 'pounds'],
+  sleep: ['sleep', 'slept', 'hours of sleep', 'bedtime'],
+  steps: ['steps', 'step count', 'pedometer'],
+  water: ['water', 'drink', 'hydration', 'glasses of water', 'fluids'],
+  testPregnancy: ['pregnancy test', 'pregnant', 'hcg', 'home test', 'test'],
+  testOvulation: ['ovulation test', 'ovulation kit', 'opk', 'lh', 'lh surge', 'test'],
+  pill: ['pill', 'pill taken', 'birth control', 'contraception', 'contraceptive',
+    'pack', 'tablet'],
+  notes: ['notes', 'note', 'diary', 'journal', 'write'],
+};
+
+/**
+ * Whether a field answers to a query: a term starts with it, or every word of
+ * the query starts a word of the term — so "pill taken" and "lh surge" match
+ * as phrases and "temp" matches "temperature".
+ *
+ * @param {string} field a key of FIELD_TERMS
+ * @param {string} query already normalised
+ */
+export function fieldMatches(field, query) {
+  if (!query) return true;
+  const words = query.split(/\s+/);
+  return (FIELD_TERMS[field] ?? []).some((term) => {
+    const normalized = normalizeQuery(term);
+    if (normalized.startsWith(query)) return true;
+    const termWords = normalized.split(/[\s-]+/);
+    return words.every((word) => termWords.some((t) => t.startsWith(word)));
+  });
+}
+
+/**
  * Does an option match a search query?
  *
  * Matches on any word boundary rather than only the start of the label, so

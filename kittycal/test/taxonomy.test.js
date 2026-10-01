@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 import {
   CATEGORIES, TESTS, labelOf, labelFor, labelIndexEntries, optionCount,
   optionMatches, normalizeQuery,
+  fieldMatches, FIELD_TERMS, MEASURES,
 } from '../js/data/taxonomy.js';
 import { loggedIds } from '../js/domain/stats.js';
 import { ICONS, ICONS_BY_CATEGORY, iconFor } from '../js/data/icons.js';
@@ -178,4 +179,47 @@ test('no mark carries its own colour', () => {
     if (/stroke="(?!currentColor")/.test(markup)) offenders.push(`${key}: overrides stroke`);
   }
   assert.deepEqual(offenders, []);
+});
+
+/* ── searching for fields, not just chips ────────────────────────────────── */
+
+test('every field in the diary can be found by the word she would use', () => {
+  /*
+    Search only knew chip labels, so "temperature", "bbt", "ovulation test",
+    "pregnancy test" and "pill" all came back empty — and a failed search
+    offers to create a symptom by that name, which would log the app's most
+    valuable reading as a chip that stores no number.
+  */
+  const cases = {
+    bbt: ['temperature', 'temp', 'bbt', 'thermometer'],
+    weight: ['weight', 'scale'],
+    sleep: ['sleep'],
+    steps: ['steps'],
+    water: ['water', 'hydration'],
+    testPregnancy: ['pregnancy test', 'pregnant', 'test'],
+    testOvulation: ['ovulation test', 'opk', 'lh surge', 'test'],
+    pill: ['pill', 'pill taken', 'birth control'],
+    notes: ['notes', 'diary', 'journal'],
+    flow: ['period', 'bleeding'],
+  };
+  for (const [field, queries] of Object.entries(cases)) {
+    for (const query of queries) {
+      assert.ok(fieldMatches(field, query), `"${query}" should find ${field}`);
+    }
+  }
+});
+
+test('field words do not leak into unrelated fields', () => {
+  assert.ok(!fieldMatches('weight', 'temperature'));
+  assert.ok(!fieldMatches('bbt', 'weight'));
+  assert.ok(!fieldMatches('notes', 'pill'));
+  // "fever" is a symptom chip, not the thermometer reading.
+  assert.ok(!fieldMatches('bbt', 'fever'));
+});
+
+test('every measurement and test has search words', () => {
+  // A new field added without terms would be unfindable again.
+  for (const id of [...MEASURES.map((m) => m.id), ...TESTS.map((t) => t.id), 'water']) {
+    assert.ok(FIELD_TERMS[id]?.length, `${id} has no search terms`);
+  }
 });

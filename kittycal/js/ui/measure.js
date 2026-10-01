@@ -139,7 +139,7 @@ export function measureRow({ measure, settings, get, set }) {
     },
   }));
 
-  return el('div', { class: 'measure-row' }, [
+  return el('div', { class: 'measure-row', dataset: { field: measure.id } }, [
     el('label', { class: 'measure-label' }, [
       el('span', { text: measure.name }),
       measure.hint && el('span', { class: 'hint-sm', text: measure.hint }),

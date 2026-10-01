@@ -369,6 +369,35 @@ console.log('\na search that finds nothing offers to make the thing');
 
   check(await search('cramps') === null,
     'a search that finds something does not offer to duplicate it');
+
+  /*
+    Fields, not just chips. Search only knew chip labels, so these all came
+    back "Nothing matches that" — and the offer below then proposed creating a
+    symptom called "temperature", which would log the most valuable reading
+    in the app as a chip that stores no number and dates nothing.
+  */
+  for (const [query, field] of [['temperature', 'bbt'], ['bbt', 'bbt'],
+    ['ovulation test', 'testOvulation'], ['pregnancy test', 'testPregnancy'], ['water', 'water']]) {
+    // eslint-disable-next-line no-await-in-loop
+    const offeredFor = await search(query);
+    // eslint-disable-next-line no-await-in-loop
+    const shown = await page.evaluate((f) => {
+      const row = document.querySelector(`.sheet [data-field="${f}"]`);
+      return !!row && !row.hidden && !row.closest('.log-section')?.hidden;
+    }, field);
+    check(shown && offeredFor === null,
+      `"${query}" finds the real field and offers no fake symptom`,
+      JSON.stringify({ shown, offeredFor }));
+  }
+  // eslint-disable-next-line no-await-in-loop
+  const onlyThatRow = await (async () => {
+    await search('temperature');
+    return page.evaluate(() => [...document.querySelectorAll('.sheet .measure-row[data-field]')]
+      .filter((r) => !r.hidden && !r.closest('.log-section')?.hidden)
+      .map((r) => r.getAttribute('data-field')));
+  })();
+  check(onlyThatRow.length === 1 && onlyThatRow[0] === 'bbt',
+    'and "temperature" shows that one field, not the whole drawer', onlyThatRow.join(','));
   const offered = await search('sore feet');
   check(offered != null && offered.includes('sore feet'),
     'a search that finds nothing offers it back in her own words', String(offered));

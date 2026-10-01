@@ -17,7 +17,7 @@ import { el, svg, haptic, announce } from '../utils/dom.js';
 import { fmtRelative, fmtLong, todayKey } from '../utils/date.js';
 import {
   CATEGORIES, TESTS, MEASURES, WATER_GLASS_ML, WATER_GOAL_ML, labelFor,
-  optionMatches, normalizeQuery, DEFAULT_CHIPS, severityLabel,
+  optionMatches, fieldMatches, FIELD_TERMS, normalizeQuery, DEFAULT_CHIPS, severityLabel,
 } from '../data/taxonomy.js';
 import { nothingRecorded, isBleeding } from '../domain/model.js';
 import { openSheet, closeSheet } from '../ui/sheet.js';
@@ -380,8 +380,8 @@ function searchBar(onCreate) {
       for (const section of sections) {
         section.hidden = false;
         /** @type {HTMLDetailsElement} */ (section).open = wasOpen.get(section) ?? false;
-        for (const chip of section.querySelectorAll('.chip')) {
-          /** @type {HTMLElement} */ (chip).hidden = false;
+        for (const node of section.querySelectorAll('.chip, [data-field]')) {
+          /** @type {HTMLElement} */ (node).hidden = false;
         }
       }
       searching = false;
@@ -392,20 +392,29 @@ function searchBar(onCreate) {
     let hits = 0;
 
     for (const section of sections) {
+      const field = section.dataset.field;
+      const rows = /** @type {HTMLElement[]} */ ([...section.querySelectorAll('[data-field]')]);
       const chips = /** @type {HTMLElement[]} */ ([...section.querySelectorAll('.chip')]);
 
-      // Sections without chips (notes, water, temperature) can't be searched
-      // by label, so match them on their own title instead.
-      if (!chips.length) {
-        const title = section.querySelector('.log-section-title')?.textContent ?? '';
-        const match = normalizeQuery(title).includes(query);
-        section.hidden = !match;
-        if (match) { hits++; /** @type {HTMLDetailsElement} */ (section).open = true; }
+      // The section itself is what she named — "period", "pill", "notes" —
+      // so show all of it rather than filtering inside it.
+      if (field && fieldMatches(field, query)) {
+        for (const node of [...rows, ...chips]) node.hidden = false;
+        section.hidden = false;
+        /** @type {HTMLDetailsElement} */ (section).open = true;
+        hits += 1;
         continue;
       }
 
       let sectionHits = 0;
+
+      // Fields named directly: "temperature" finds the temperature row,
+      // "test" finds both tests.
+      const namedRows = new Set(rows.filter((row) => fieldMatches(row.dataset.field ?? '', query)));
+      sectionHits += namedRows.size;
+
       for (const chip of chips) {
+        const insideNamed = [...namedRows].some((row) => row.contains(chip));
         /*
           `dataset.label`, not `textContent`.
 
@@ -413,20 +422,20 @@ function searchBar(onCreate) {
           the mark was an emoji this came back as "\u{1F922}Nausea", which
           normalises to something starting with neither the query nor any word
           in it: searching for an option by its own name matched nothing, for
-          all 104 of them, from the day the search was added. The mark is an
-          inline SVG now and contributes no text, but reading the label out of
-          `dataset` rather than the DOM is what makes that a detail of how the
-          chip is drawn rather than something search depends on.
-
-          It looked like it worked because roughly twenty options also carry
-          hand-written synonyms, and those are clean strings — so "sore boobs"
-          found tender breasts while "tender" did not.
+          all 104 of them, from the day the search was added.
         */
         const label = chip.dataset.label ?? chip.textContent ?? '';
         const id = chip.dataset.opt ?? '';
-        const match = optionMatches({ id, label }, query);
+        const match = insideNamed || optionMatches({ id, label }, query);
         chip.hidden = !match;
-        if (match) sectionHits++;
+        if (match && !insideNamed) sectionHits += 1;
+      }
+
+      // A row stays if it was named, or if a chip inside it matched ("peak"
+      // keeps the ovulation test row, showing only that chip).
+      for (const row of rows) {
+        row.hidden = !namedRows.has(row)
+          && ![...row.querySelectorAll('.chip')].some((chip) => !/** @type {HTMLElement} */ (chip).hidden);
       }
 
       hits += sectionHits;
@@ -526,6 +535,7 @@ function categorySection(cat, draft, settings, chips) {
 
   // Flow leads and stays open — it's the reason most people open this sheet.
   const node = section(cat.name, cat.hint, [row, rating], {
+    field: cat.id,
     open: cat.id === 'flow',
     count: selectionCount(cat, draft),
   });
@@ -937,7 +947,7 @@ function testsSection(draft, chips) {
       row.append(chip);
     }
 
-    return el('div', { class: 'measure-row measure-row-block' }, [
+    return el('div', { class: 'measure-row measure-row-block', dataset: { field: test.id } }, [
       el('div', { class: 'measure-label' }, [
         el('span', { text: test.name }),
         /** @type {any} */ (test).hint
@@ -1027,7 +1037,7 @@ function waterRow(draft, settings, chips) {
 
   paint();
 
-  return el('div', { class: 'measure-row measure-row-block' }, [
+  return el('div', { class: 'measure-row measure-row-block', dataset: { field: 'water' } }, [
     el('div', { class: 'measure-label' }, [
       el('span', { text: 'Water' }),
       el('span', { class: 'hint-sm', text:
@@ -1063,7 +1073,7 @@ function pillSection(draft) {
       el('span', { class: 'row-label', text: 'Taken today' }),
       toggleBtn,
     ]),
-  ], { count: draft.pillTaken ? 1 : 0 });
+  ], { count: draft.pillTaken ? 1 : 0, field: 'pill' });
 }
 
 /* ── Notes ──────────────────────────────────────────────────────────────── */
@@ -1083,7 +1093,7 @@ function notesSection(draft) {
         draft.notes = /** @type {HTMLTextAreaElement} */ (e.target).value;
       },
     }),
-  ], { count: draft.notes.trim() ? 1 : 0 });
+  ], { count: draft.notes.trim() ? 1 : 0, field: 'notes' });
 }
 
 /* ── Layout helper ──────────────────────────────────────────────────────── */
@@ -1103,10 +1113,12 @@ function notesSection(draft) {
  * @param {string} title
  * @param {string|null|undefined} hint
  * @param {(Node|string|null|false)[]} children
- * @param {{open?: boolean, count?: number}} [opts]
+ * @param {{open?: boolean, count?: number, field?: string|null}} [opts] `field`
+ *   is a key of FIELD_TERMS, when the section itself is something she might
+ *   search for by name
  */
 function section(title, hint, children, opts = {}) {
-  const { open = false, count = 0 } = opts;
+  const { open = false, count = 0, field = null } = opts;
 
   // Always built, shown only when non-zero. The badge has to be able to appear
   // and disappear as she edits — a category can now be changed from the quick
@@ -1118,7 +1130,11 @@ function section(title, hint, children, opts = {}) {
     hidden: count === 0,
   });
 
-  return el('details', { class: 'log-section', open: open || count > 0 || null }, [
+  return el('details', {
+    class: 'log-section',
+    open: open || count > 0 || null,
+    dataset: field && FIELD_TERMS[field] ? { field } : undefined,
+  }, [
     el('summary', { class: 'log-section-head' }, [
       el('span', { class: 'log-section-title', text: title }),
       badge,
