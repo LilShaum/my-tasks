@@ -22,6 +22,7 @@ import { detectPatterns, symptomFrequency, daysLogged, severitySummary,
   spottingBetweenPeriods } from '../domain/stats.js';
 import { labelFor, labelOf, isMood, severityLabel } from '../data/taxonomy.js';
 import * as acog from '../domain/acog.js';
+import { premenstrualPatterns } from '../domain/heads-up.js';
 import * as store from '../state/store.js';
 
 const MONTHS_COVERED = 6;
@@ -180,6 +181,19 @@ function recurringSection(logs, cycles, kind) {
     : new Map();
   const anyGraded = [...graded.values()].some((s) => s.rated > 0);
 
+  /*
+    Timing against the period, not just against day 1.
+
+    What a clinician asks about premenstrual symptoms is how long before the
+    period they start — the assessment of PMS and PMDD is framed around the
+    week before menses. "Day 22" alone drifts by days whenever cycle length
+    varies; "from about 4 days before" is the same fact stated the way it is
+    used. Only filled in where the same counting-back the Today heads-up uses
+    finds a consistent onset; otherwise the column says so.
+  */
+  const before = new Map(premenstrualPatterns(logs, cycles).map((p) => [p.id, p.typicalBefore]));
+  const anyBefore = patterns.some((p) => before.has(p.id));
+
   if (patterns.length) {
     out.push(el('p', { text:
       'Logged in the majority of complete cycles, with the cycle days on which ' +
@@ -191,9 +205,13 @@ function recurringSection(logs, cycles, kind) {
         // Blank rather than a guess: `peakDays` is empty unless the day
         // genuinely recurs, so there is nothing honest to put here.
         pattern.peakDays.length ? `day ${pattern.peakDays.join(', ')}` : 'no particular day',
+        ...(anyBefore ? [before.has(pattern.id)
+          ? `from about ${plural(/** @type {number} */ (before.get(pattern.id)), 'day')} before`
+          : '—'] : []),
         ...(anyGraded ? [severityCell(graded.get(pattern.id))] : []),
       ]),
       ['What was logged', 'Cycles affected', 'Typical cycle day',
+        ...(anyBefore ? ['Before a period'] : []),
         ...(anyGraded ? ['Severity, when graded'] : [])],
     ));
   }
