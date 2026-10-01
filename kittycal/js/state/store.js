@@ -95,6 +95,23 @@ function notify() {
 const dirty = { settings: false, periods: false, /** @type {Set<DateKey>} */ logs: new Set() };
 
 /**
+ * What this tab is in the middle of writing.
+ *
+ * `writeDirty` clears the dirty flags before it awaits, so a change made during
+ * the write re-dirties and goes out next pass. But that leaves a window where
+ * this tab's newest data is in memory, on its way to disk, and marked clean —
+ * and a message from another tab arriving then would read the older stored
+ * copy over it. Another tab's write is only adopted for slices this tab is
+ * neither holding unsaved nor currently saving.
+ */
+const writing = { settings: false, periods: false, /** @type {Set<DateKey>} */ logs: new Set() };
+
+/** True when this tab's own copy of a slice is newer than what is on disk. */
+const ownsSettings = () => dirty.settings || writing.settings;
+const ownsPeriods = () => dirty.periods || writing.periods;
+const ownsLog = (/** @type {DateKey} */ date) => dirty.logs.has(date) || writing.logs.has(date);
+
+/**
  * Told about a write that failed, so it can be shown rather than only logged.
  *
  * Registered by main.js. The store cannot reach for a toast itself without the
@@ -147,27 +164,35 @@ async function adoptRemote(msg) {
 
   let changed = false;
   try {
-    if (msg.settings && !dirty.settings) {
-      state.settings = await repo.loadSettings();
-      changed = true;
+    /*
+      Each slice is checked again *after* its read resolves, not only before.
+      Checking first and assigning after the await left a gap: an edit made
+      while the read was in flight was overwritten by the other tab's older
+      copy, and the dirty flag then wrote that older copy back to disk — a
+      silent loss inside the code written to prevent silent losses.
+    */
+    if (msg.settings && !ownsSettings()) {
+      const fresh = await repo.loadSettings();
+      if (!ownsSettings()) { state.settings = fresh; changed = true; }
     }
-    if (msg.periods && !dirty.periods) {
-      state.periodDays = await repo.loadPeriodDays();
-      changed = true;
+    if (msg.periods && !ownsPeriods()) {
+      const fresh = await repo.loadPeriodDays();
+      if (!ownsPeriods()) { state.periodDays = fresh; changed = true; }
     }
-    const dates = (msg.logs ?? []).filter((d) => !dirty.logs.has(d));
-    if (dates.length) {
+    const wanted = (msg.logs ?? []).filter((d) => !ownsLog(d));
+    if (wanted.length) {
       /*
         Reloads every log rather than the named dates, because the repo has no
         single-date read. Cheap enough: this runs only when another tab wrote,
         which is rare, and it is the same query the app already does at boot.
       */
       const fresh = await repo.loadLogs();
-      for (const date of dates) {
+      for (const date of wanted) {
+        if (ownsLog(date)) continue;
         if (fresh[date]) state.logs[date] = fresh[date];
         else delete state.logs[date];
+        changed = true;
       }
-      changed = true;
     }
   } catch (err) {
     // A failed re-read leaves this tab showing its own copy, which is the
@@ -203,6 +228,10 @@ async function writeDirty() {
   dirty.periods = false;
   dirty.logs.clear();
 
+  writing.settings = settings;
+  writing.periods = periods;
+  for (const date of dates) writing.logs.add(date);
+
   const jobs = [];
   if (settings) jobs.push(repo.saveSettings(state.settings));
   if (periods) jobs.push(repo.savePeriodDays(state.periodDays));
@@ -222,6 +251,11 @@ async function writeDirty() {
     console.error('kittycal: failed to save', err);
     saveErrorHandler?.(err);
     return false;
+  } finally {
+    // Writes are chained, so nothing else can be mid-write for these slices.
+    writing.settings = false;
+    writing.periods = false;
+    writing.logs.clear();
   }
 }
 
