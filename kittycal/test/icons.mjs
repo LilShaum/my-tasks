@@ -54,6 +54,25 @@ const RENDER_PX = 18;
 const LIMIT = 0.90;
 
 /**
+ * …unless the difference between them is large enough to see anyway.
+ *
+ * The ratio alone stopped being the right test once the set moved to Lucide.
+ * A face with a smile and a face with a frown share a head, so they score as
+ * 93% alike — and they are among the easiest pairs on the sheet to tell
+ * apart, because the part that differs is a whole mouth. What made Opus 5's
+ * set unreadable was not the ratio, it was that the difference was tiny:
+ * measured at 18px, "peak" and "high" differed by 1.5 pixels of ink, and its
+ * worst pairs all sat between 1.5 and 7.
+ *
+ * So a pair passes if it is under LIMIT alike, or if at least this much ink
+ * differs — about one full stroke, five pixels long, at the size a chip draws.
+ * Calibrated on what was looked at, not on what would pass: plus against
+ * minus differs by 8.3 and reads clearly; a flat-mouthed face against an
+ * annoyed one differed by 5.2 and read as the same face, so it was redrawn.
+ */
+const MIN_VISIBLE_DIFF = 8;
+
+/**
  * Marks that are deliberately the same picture in more than one category.
  *
  * "No bleeding", "None", "No sex" and "Didn't exercise" are all absences, and
@@ -166,13 +185,13 @@ const measured = await page.evaluate(async (size) => {
       if (!total) continue;
       const similarity = 1 - diff / total;
       if (a.category === b.category) {
-        within.push({ similarity, a: a.where, b: b.where });
+        within.push({ similarity, diff, a: a.where, b: b.where });
       } else if (similarity > 0.995) {
         identicalAcross.push({ keys: [a.key, b.key], a: a.where, b: b.where });
       }
     }
   }
-  within.sort((x, y) => y.similarity - x.similarity);
+  within.sort((x, y) => x.diff - y.diff);
   return { count: marks.length, blank, clipping, within: within.slice(0, 40), identicalAcross };
 }, RENDER_PX);
 
@@ -186,15 +205,16 @@ check(measured.clipping.length === 0,
 
 console.log('\nno two options in one category look the same');
 {
-  const over = measured.within.filter((pair) => pair.similarity > LIMIT);
+  const over = measured.within.filter((pair) => pair.similarity > LIMIT && pair.diff < MIN_VISIBLE_DIFF);
   check(over.length === 0,
-    `the closest pair in any category stays under ${LIMIT * 100}% alike`,
-    over.map((pair) => `${(pair.similarity * 100).toFixed(1)}%  ${pair.a}  vs  ${pair.b}`).join('\n          '));
+    `no pair in a category is both over ${LIMIT * 100}% alike and under ${MIN_VISIBLE_DIFF}px apart`,
+    over.map((pair) => `${(pair.similarity * 100).toFixed(1)}% alike, ${pair.diff.toFixed(1)}px apart  `
+      + `${pair.a}  vs  ${pair.b}`).join('\n          '));
 
   const worst = measured.within[0];
   if (worst) {
-    console.log(`        closest surviving pair: ${(worst.similarity * 100).toFixed(1)}%  `
-      + `${worst.a} vs ${worst.b}`);
+    console.log(`        smallest difference: ${worst.diff.toFixed(1)}px  `
+      + `(${(worst.similarity * 100).toFixed(1)}% alike)  ${worst.a} vs ${worst.b}`);
   }
 }
 

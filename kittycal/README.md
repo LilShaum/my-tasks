@@ -52,6 +52,8 @@ list of symptoms. It does not need a server, and it should not want one.
   Every print dialogue offers "Save as PDF".
 - **14 themes**, each in light and dark, with original mascot art — or use your
   own photos.
+- Diary icons are from [Lucide](https://lucide.dev) (ISC licence; notice kept in
+  `js/data/icons.js`), plus a few drawn for the app where no general icon fits.
 - **Passcode lock** — 4 digits, stored only as a PBKDF2 hash.
 - **Reminders** for period-soon, late, fertile window, birth control and logging.
 - **Export and erase** — a complete, readable JSON export, and a real delete.
