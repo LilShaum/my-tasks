@@ -757,3 +757,117 @@ test('the card headline is the start window, not the bleed', () => {
   assert.ok(p.startWindow.to > /** @type {string} */ (p.nextStart),
     'and closes after it');
 });
+
+/* ── predict: a positive pregnancy test ──────────────────────────────────── */
+
+/**
+ * A log with the required array fields, so `predict` sees a real record.
+ * @param {string} date
+ * @param {Record<string, any>} [patch]
+ */
+const logOn = (date, patch = {}) => ({
+  date, symptoms: [], moods: [], discharge: [], activity: [], other: [],
+  sex: [], custom: [], ...patch,
+});
+
+test('a positive pregnancy test stops the app counting down to a period', () => {
+  /*
+    `testPregnancy` was written by the diary and read by nothing but the CSV
+    export, so logging a positive result changed no screen: the app went on
+    reporting a date for her next period, a fertile window, and high
+    confidence, having been handed direct evidence against the assumption all
+    three are derived from.
+  */
+  const days = history('2026-01-05', 28, 6);
+  const today = addDays('2026-01-05', 28 * 5 + 30);
+
+  const before = predict({ periodDays: days, settings: settings({ showFertility: true }), today, logs: {} });
+  assert.ok(before.nextStart, 'the fixture should normally produce a forecast');
+  assert.ok(before.fertileWindow);
+
+  const after = predict({
+    periodDays: days,
+    settings: settings({ showFertility: true }),
+    today,
+    logs: { [today]: logOn(today, { testPregnancy: 'positive' }) },
+  });
+
+  assert.equal(after.expecting, true);
+  assert.equal(after.pregnancyTest, 'positive');
+  assert.equal(after.nextStart, null, 'still naming a date for her next period');
+  assert.equal(after.nextPeriod, null);
+  assert.equal(after.startWindow, null);
+  assert.equal(after.daysUntilPeriod, null);
+  assert.equal(after.fertileWindow, null, 'still drawing a fertile window');
+  assert.equal(after.ovulation, null);
+  assert.equal(after.confidence, 'none');
+  assert.equal(after.isLate, false, 'she is not late for a period that is not coming');
+
+  // The day count is an observation, not a forecast, and it is the figure a
+  // clinician asks for — so it survives.
+  assert.equal(after.cycleDay, before.cycleDay);
+});
+
+test('a negative test leaves the forecast alone', () => {
+  const days = history('2026-01-05', 28, 6);
+  const today = addDays('2026-01-05', 28 * 5 + 30);
+  const p = predict({
+    periodDays: days,
+    settings: settings({ showFertility: true }),
+    today,
+    logs: { [today]: logOn(today, { testPregnancy: 'negative' }) },
+  });
+  assert.equal(p.expecting, false);
+  assert.ok(p.nextStart);
+});
+
+test('retesting negative after a positive resumes the forecast', () => {
+  // The latest test of the cycle wins, so she never has to clear anything.
+  const days = history('2026-01-05', 28, 6);
+  const today = addDays('2026-01-05', 28 * 5 + 30);
+  const p = predict({
+    periodDays: days,
+    settings: settings({ showFertility: true }),
+    today,
+    logs: {
+      [addDays(today, -3)]: logOn(addDays(today, -3), { testPregnancy: 'positive' }),
+      [today]: logOn(today, { testPregnancy: 'negative' }),
+    },
+  });
+  assert.equal(p.expecting, false);
+  assert.ok(p.nextStart);
+});
+
+test('a positive test from an earlier cycle does not pause anything', () => {
+  /*
+    The scope is the current cycle, and that scope is what makes this need no
+    reset button: once she logs a period the test falls into a closed cycle and
+    the forecast resumes by itself — correct for a continuing pregnancy and for
+    an early loss alike.
+  */
+  const days = history('2026-01-05', 28, 6);
+  const today = addDays('2026-01-05', 28 * 5 + 30);
+  const longAgo = addDays('2026-01-05', 40);
+  const p = predict({
+    periodDays: days,
+    settings: settings({ showFertility: true }),
+    today,
+    logs: { [longAgo]: logOn(longAgo, { testPregnancy: 'positive' }) },
+  });
+  assert.equal(p.expecting, false);
+  assert.ok(p.nextStart);
+});
+
+test('a nonsense test result from an imported file is ignored', () => {
+  const days = history('2026-01-05', 28, 6);
+  const today = addDays('2026-01-05', 28 * 5 + 30);
+  const p = predict({
+    periodDays: days,
+    settings: settings({ showFertility: true }),
+    today,
+    logs: { [today]: logOn(today, { testPregnancy: 'maybe' }) },
+  });
+  assert.equal(p.expecting, false);
+  assert.equal(p.pregnancyTest, null);
+  assert.ok(p.nextStart);
+});

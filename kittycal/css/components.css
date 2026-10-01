@@ -766,3 +766,23 @@
 
 .mascot-bob   { animation: mascot-bob 620ms var(--ease-spring); }
 .mascot-cheer { animation: mascot-cheer 900ms var(--ease-spring); }
+
+/*
+  A row of secondary actions at the foot of a card.
+
+  Wraps rather than shrinking, because two buttons whose labels are whole
+  phrases do not fit side by side at 320px, and a card that offers a next step
+  must not make that step a two-character stub to fit. Each keeps the app's
+  tap target on its own line once it wraps.
+*/
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+
+.card-actions .btn {
+  flex: 1 1 auto;
+  min-height: var(--tap);
+}

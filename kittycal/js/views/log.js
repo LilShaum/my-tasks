@@ -58,9 +58,19 @@ const QUICK_MIN = 3;
 
 /**
  * Open the logging sheet for a date.
+ *
+ * `openSection` sends her to a named section with it already expanded, which
+ * is what turns a card that *says* something would help into one that can
+ * actually get her there. Today could tell her a morning temperature would
+ * sharpen her fertile window, and then leave her to find it: four taps, in a
+ * drawer called Measurements, behind a sheet reached from a button whose label
+ * is "Add more". Knowing a thing is useful and being able to do it are not the
+ * same feature, and this app only ever shipped the first half.
+ *
  * @param {DateKey} date
+ * @param {{openSection?: string}} [options] a section title to open and scroll to
  */
-export function openLogSheet(date) {
+export function openLogSheet(date, options = {}) {
   const settings = store.getState().settings;
 
   /** Working copy. Nothing is committed until Apply. */
@@ -121,6 +131,37 @@ export function openLogSheet(date) {
   });
 
   watcher = parkHeadingsUnderSearch();
+  if (options.openSection) revealSection(options.openSection);
+}
+
+/**
+ * Expand a named section and bring it into view.
+ *
+ * Matched on the visible title rather than an id, because that title is what
+ * the card that sent her here will have named — if the two ever drift apart it
+ * should fail by doing nothing, not by opening the wrong drawer.
+ *
+ * @param {string} title
+ */
+function revealSection(title) {
+  const head = [...document.querySelectorAll('.sheet-body .log-section-title')]
+    .find((node) => node.textContent?.trim() === title);
+  const details = head?.closest('details');
+  if (!(details instanceof HTMLDetailsElement)) return;
+
+  details.open = true;
+  /*
+    After paint, or the sticky search bar has not been measured yet and the
+    section lands underneath it.
+
+    Instant rather than smooth, for two reasons. She tapped a button that names
+    where she is going, so watching the journey tells her nothing she did not
+    just ask for — and a smooth scroll is animation, which is the thing the
+    reduced-motion setting is there to stop. Arriving is the point.
+  */
+  requestAnimationFrame(() => {
+    details.scrollIntoView({ block: 'start', behavior: 'auto' });
+  });
 }
 
 /**

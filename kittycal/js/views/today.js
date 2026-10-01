@@ -162,16 +162,18 @@ export function renderToday(host) {
         ? [
             prediction.ovulation ? fertileCard(prediction, today) : null,
             ovulationSignalCard(logs, cycles, today),
-            prediction.stale ? staleCard(prediction)
-              : prediction.isLate ? lateCard(prediction)
-                : prediction.withinWindow ? dueCard(prediction)
-                  : nextPeriodCard(prediction),
+            prediction.expecting ? expectingCard(prediction)
+              : prediction.stale ? staleCard(prediction)
+                : prediction.isLate ? lateCard(prediction)
+                  : prediction.withinWindow ? dueCard(prediction)
+                    : nextPeriodCard(prediction),
           ]
         : [
-            prediction.stale ? staleCard(prediction)
-              : prediction.isLate ? lateCard(prediction)
-                : prediction.withinWindow ? dueCard(prediction)
-                  : nextPeriodCard(prediction),
+            prediction.expecting ? expectingCard(prediction)
+              : prediction.stale ? staleCard(prediction)
+                : prediction.isLate ? lateCard(prediction)
+                  : prediction.withinWindow ? dueCard(prediction)
+                    : nextPeriodCard(prediction),
             prediction.showFertility && prediction.ovulation
               ? fertileCard(prediction, today) : null,
           ]),
@@ -877,6 +879,49 @@ function confidenceLine(prediction) {
 }
 
 /**
+ * What the app says once she has logged a positive pregnancy test.
+ *
+ * The forecast is suppressed upstream, and something has to stand where it
+ * was — a card that simply vanishes reads as the app breaking at the exact
+ * moment she is paying most attention to it.
+ *
+ * Three rules for the words here. It does not tell her she is pregnant: a home
+ * test is her information and a clinician's to confirm, not an app's to
+ * announce. It does not congratulate her, because a positive test is not
+ * always good news and a tracker cannot know which this is. And it does not ask
+ * her to confirm, change a mode, or clear anything — logging a period is the
+ * only action in the app, and it already works, for a continuing pregnancy and
+ * for an early loss alike.
+ *
+ * What is left is the plain mechanical fact: the countdown is built on a period
+ * coming, so it has stopped.
+ *
+ * @param {import('../domain/predict.js').Prediction} prediction
+ */
+function expectingCard(prediction) {
+  return el('div', { class: 'card data-zone' }, [
+    el('h3', { text: 'Predictions are paused' }),
+    prediction.cycleDay != null
+      ? el('p', { class: 'big-value num', text: `Day ${prediction.cycleDay}` })
+      : null,
+    el('p', { class: 'hint-sm', text:
+      'You logged a positive pregnancy test this cycle. Every date Kittycal '
+      + 'shows is worked out from your next period arriving, so it has stopped '
+      + 'saying when that is rather than counting down to something it can no '
+      + 'longer stand behind.' }),
+    el('p', { class: 'hint-sm', text:
+      prediction.cycleDay != null
+        ? 'The day count above is measured from your last period, which is the '
+          + 'figure a doctor or midwife will ask for. A test at home is worth '
+          + 'confirming with them.'
+        : 'A test at home is worth confirming with a doctor or midwife.' }),
+    el('p', { class: 'hint-sm', text:
+      'Keep logging whatever you want to keep. If you mark a period, the '
+      + 'forecast picks back up on its own.' }),
+  ]);
+}
+
+/**
  * What to say when the history has simply stopped.
  *
  * Every prediction hangs off the last period she logged, so once that is
@@ -1059,10 +1104,54 @@ function fertileCard(prediction, today) {
       because "measured from your own cycles" and "we assumed fourteen" deserve
       different amounts of trust, and only one of them was ever on offer.
     */
-    prediction.lutealMeasured && el('p', { class: 'hint-sm', text:
+    prediction.lutealMeasured ? el('p', { class: 'hint-sm', text:
       `Ovulation is placed ${plural(prediction.lutealDays, 'day')} before your `
       + `period, measured from ${plural(prediction.lutealSamples, 'cycle')} where `
-      + 'a test or your temperature confirmed it.' }),
+      + 'a test or your temperature confirmed it.' })
+      /*
+        The other half of that sentence, which was missing.
+
+        The card said where the number came from when it had been measured, and
+        said nothing at all when it had not — so the common case, a population
+        average of fourteen days applied to a stranger, was the silent one.
+        Silence on a card like this reads as confidence.
+
+        It matters more than a footnote. Luteal phases genuinely run from about
+        ten days to sixteen, and this number places the whole window: measured
+        against her own cycles, a woman whose luteal phase is eleven days is
+        shown a window whose two peak days are both wrong. The app can already
+        fix that by itself — `measuredLuteal` replaces the assumption with her
+        own median after two confirmed ovulations — and the only reason it
+        usually cannot is that nothing ever told her which two things to log.
+
+        So it says so, and then it opens the drawer, because telling her
+        without taking her there is the same dead end in a politer voice.
+      */
+      : el('div', {}, [
+        el('p', { class: 'hint-sm', text:
+          `Ovulation is placed ${plural(prediction.lutealDays, 'day')} before your `
+          + 'period — a population average rather than anything measured about '
+          + 'you. Yours could be a few days either side, which moves this whole '
+          + 'window.' }),
+        el('p', { class: 'hint-sm', text:
+          'Log a morning temperature, or an ovulation test, on the days around '
+          + 'ovulation. After two cycles Kittycal can date it from your own body '
+          + 'instead of the average.' }),
+        el('div', { class: 'card-actions' }, [
+          el('button', {
+            type: 'button',
+            class: 'btn btn-secondary',
+            text: 'Add a temperature',
+            onclick: () => { haptic(); openLogSheet(today, { openSection: 'Measurements' }); },
+          }),
+          el('button', {
+            type: 'button',
+            class: 'btn btn-secondary',
+            text: 'Add a test result',
+            onclick: () => { haptic(); openLogSheet(today, { openSection: 'Tests' }); },
+          }),
+        ]),
+      ]),
 
     prediction.fertileWidened && el('div', { class: 'alert alert-warn', style: { marginTop: 'var(--sp-3)' } }, [
       el('span', { class: 'alert-icon', text: '!', 'aria-hidden': 'true' }),

@@ -136,6 +136,10 @@ export const CYCLE_STATED_MAX = 60;
  * @property {boolean} withinWindow past the estimate, still inside her spread
  * @property {boolean} onHormonal   a method that suppresses ovulation
  * @property {boolean} stale        no forecast is supportable
+ * @property {'positive'|'negative'|null} pregnancyTest  the latest test of this
+ *   cycle, if she logged one
+ * @property {boolean} expecting    a positive test this cycle, so the forecast is
+ *   held rather than asserted
  * @property {'dormant'|'absent'|null} staleReason  she stopped logging, or she
  *   is still logging and simply has not bled
  * @property {number|null} daysSinceStart
@@ -257,6 +261,48 @@ export function lastActivity(logs, today) {
     if (date <= today && (latest == null || date > latest)) latest = date;
   }
   return latest == null ? null : daysBetween(latest, today);
+}
+
+/**
+ * The most recent pregnancy test of the cycle she is currently in.
+ *
+ * A period tracker that keeps counting down to her next period after she has
+ * logged a positive pregnancy test is not merely unhelpful, it is telling her
+ * something it has been given direct evidence against — and it was doing
+ * exactly that: `testPregnancy` was written by the diary and read by nothing
+ * but the CSV export, so a positive result changed no screen in the app.
+ *
+ * Scoped to the current cycle on purpose, and that scope does all the work.
+ * A positive test from eighteen months ago says nothing about today; a
+ * positive test since her last period is the most recent thing her body has
+ * told the app. If she goes on to log a period, that cycle closes, the test
+ * falls into a past one, and the forecast resumes on its own with nothing to
+ * reset — which is the right behaviour for an early loss as well as for a test
+ * that turned out to be wrong, and neither needs the app to ask her about it.
+ *
+ * The latest test wins, so a negative after a positive clears it.
+ *
+ * @param {Record<DateKey, import('./model.js').DayLog>|undefined} logs
+ * @param {DateKey|null} cycleStart
+ * @param {DateKey} today
+ * @returns {'positive'|'negative'|null}
+ */
+export function latestPregnancyTest(logs, cycleStart, today) {
+  if (!logs || !cycleStart) return null;
+
+  /** @type {DateKey|null} */
+  let latest = null;
+  for (const date of /** @type {DateKey[]} */ (Object.keys(logs))) {
+    if (date < cycleStart || date > today) continue;
+    if (!logs[date]?.testPregnancy) continue;
+    if (latest == null || date > latest) latest = date;
+  }
+  if (latest == null) return null;
+  // `DayLog.testPregnancy` is a bare string, so the two readings the taxonomy
+  // actually offers are checked rather than asserted — an imported file can
+  // carry anything, and "pregnant-ish" must not pause the forecast.
+  const result = logs[latest].testPregnancy;
+  return result === 'positive' || result === 'negative' ? result : null;
 }
 
 /**
@@ -399,11 +445,24 @@ export function predict({ periodDays, settings, today, logs }) {
   const sinceLogged = lastActivity(logs, today);
   const dormant = sinceLogged == null || sinceLogged > ACTIVE_WITHIN_DAYS;
 
+  /*
+    A positive test suppresses the forecast for the same reason staleness does:
+    every number downstream of it is derived from an assumption the app has
+    been given evidence against. It is not a claim that she is pregnant — the
+    app does not get to decide that — only a refusal to keep asserting a date
+    it can no longer stand behind.
+  */
+  const pregnancyTest = latestPregnancyTest(logs, lastStart, today);
+  const expecting = pregnancyTest === 'positive';
+
   const stale = noRecentPeriod;
   /** @type {'dormant'|'absent'|null} */
   const staleReason = !noRecentPeriod ? null : (dormant ? 'dormant' : 'absent');
 
-  const startWin = stale ? null : startWindow(nextStart, stats.spread, lengths.length);
+  // Everything the forecast asserts about what happens next.
+  const paused = stale || expecting;
+
+  const startWin = paused ? null : startWindow(nextStart, stats.spread, lengths.length);
 
   /*
     Late relative to what?
@@ -423,7 +482,7 @@ export function predict({ periodDays, settings, today, logs }) {
   */
   const dueBy = startWin ? startWin.to : nextStart;
 
-  if (!stale && dueBy) {
+  if (!paused && dueBy) {
     const past = daysBetween(dueBy, today);
     if (past > 0) {
       isLate = true;
@@ -432,11 +491,11 @@ export function predict({ periodDays, settings, today, logs }) {
   }
 
   // Past the estimate but still inside her own spread: due, not late.
-  const withinWindow = !stale && !isLate
+  const withinWindow = !paused && !isLate
     && daysUntilPeriod != null && daysUntilPeriod <= 0;
 
   /* ── Ovulation and the fertile window ────────────────────────────────── */
-  const showFertility = !onHormonal && settings.showFertility && !stale;
+  const showFertility = !onHormonal && settings.showFertility && !paused;
 
   /** @type {DateKey|null} */
   let ovulation = null;
@@ -473,18 +532,18 @@ export function predict({ periodDays, settings, today, logs }) {
     // A confident-sounding badge over a stale forecast is the most misleading
     // thing on the screen, so staleness overrides however many cycles are on
     // record.
-    confidence: stale ? 'none' : confidence,
+    confidence: paused ? 'none' : confidence,
     recalibrated,
     lastStart,
-    nextStart: stale ? null : nextStart,
-    nextPeriod: !stale && nextStart ? periodSpan(nextStart, avgPeriod) : null,
+    nextStart: paused ? null : nextStart,
+    nextPeriod: !paused && nextStart ? periodSpan(nextStart, avgPeriod) : null,
     startWindow: startWin,
     ovulation,
     fertileWindow,
     fertileWidened,
     showFertility,
     onHormonal,
-    daysUntilPeriod: stale ? null : daysUntilPeriod,
+    daysUntilPeriod: paused ? null : daysUntilPeriod,
     daysLate,
     isLate,
     withinWindow,
@@ -492,6 +551,10 @@ export function predict({ periodDays, settings, today, logs }) {
     staleReason,
     daysSinceStart,
     cycleDay: stale || daysSinceStart == null ? null : daysSinceStart + 1,
+    // Kept while expecting: what day of the cycle she is on is an
+    // observation, not a forecast, and it is the figure a clinician asks for.
+    pregnancyTest,
+    expecting,
     spread: stats.spread,
     regularity: stats.spread == null ? null : regularity(stats.spread),
     cyclesLogged: lengths.length,
