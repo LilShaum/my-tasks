@@ -48,7 +48,7 @@ const check = (cond, label, extra = '') => {
  * Six tidy cycles, with today sitting mid-cycle so a fertile window exists.
  * @param {{mode: string, log?: Record<string, any>}} opts
  */
-const seed = (opts) => async ({ mode, log }) => {
+const seed = (opts) => async ({ mode, log, bbtDays }) => {
   const db = await new Promise((res, rej) => {
     const r = indexedDB.open('kittycal', 1);
     r.onupgradeneeded = () => {
@@ -78,6 +78,14 @@ const seed = (opts) => async ({ mode, log }) => {
     } });
     tx.objectStore('meta').put({ key: 'periodDays', value: days });
     if (log) tx.objectStore('logs').put({ date: key(now), ...log });
+    for (let i = 1; i <= (bbtDays ?? 0); i += 1) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      tx.objectStore('logs').put({
+        date: key(d), bbt: 36.4 + i * 0.01, symptoms: [], moods: [],
+        discharge: [], activity: [], other: [], sex: [], custom: [],
+      });
+    }
     tx.oncomplete = () => res(undefined);
   });
 };
@@ -85,13 +93,13 @@ const seed = (opts) => async ({ mode, log }) => {
 const browser = await launchChromium();
 
 /** A fresh profile, seeded, with the day sheet dismissed. */
-async function open({ mode = 'cycle', log = null } = {}) {
+async function open({ mode = 'cycle', log = null, bbtDays = 0 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true,
   });
   const page = await ctx.newPage();
   await page.goto(BASE, { waitUntil: 'networkidle' });
-  await page.evaluate(seed({}), { mode, log });
+  await page.evaluate(seed({}), { mode, log, bbtDays });
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForTimeout(1700);
   if (await page.locator('.sheet[data-open="true"]').count()) {
@@ -176,6 +184,70 @@ console.log('\na positive pregnancy test stops the countdown');
   check(/Day \d+/.test(today),
     'and keeps the cycle day, which is the figure a clinician asks for');
   await ctx.close();
+}
+
+console.log('\nthe daily check-in carries the measurements she already keeps');
+{
+  /*
+    The three questions were fixed — flow, mood, symptoms — and the two inputs
+    that change a prediction were not among them. Rather than ask everyone about
+    temperature, which is useless to someone with no thermometer, the question
+    follows the habit she has already shown: three days in the last thirty.
+  */
+  for (const [bbtDays, wanted] of [[0, 3], [2, 3], [6, 4]]) {
+    // eslint-disable-next-line no-await-in-loop
+    const { ctx, page } = await open({ bbtDays });
+    // eslint-disable-next-line no-await-in-loop
+    await page.locator('button:has-text("Check in for today")').click();
+    // eslint-disable-next-line no-await-in-loop
+    await page.waitForTimeout(800);
+    // eslint-disable-next-line no-await-in-loop
+    const steps = await page.evaluate(() =>
+      Number((document.querySelector('.sheet')?.textContent?.match(/Step 1 of (\d+)/) ?? [])[1] ?? 0));
+    check(steps === wanted,
+      `${bbtDays} temperature readings in the last month gives ${wanted} questions`,
+      `got ${steps}`);
+
+    if (wanted === 4) {
+      // eslint-disable-next-line no-await-in-loop
+      await page.locator('.sheet button:has-text("No bleeding")').click();
+      // eslint-disable-next-line no-await-in-loop
+      await page.waitForTimeout(500);
+      // eslint-disable-next-line no-await-in-loop
+      await page.locator('.sheet button:has-text("Next")').click();
+      // eslint-disable-next-line no-await-in-loop
+      await page.waitForTimeout(500);
+      // eslint-disable-next-line no-await-in-loop
+      await page.locator('.sheet button').filter({ hasText: /^Next$|^Done$/ }).first().click();
+      // eslint-disable-next-line no-await-in-loop
+      await page.waitForTimeout(700);
+
+      // eslint-disable-next-line no-await-in-loop
+      const field = page.locator('.sheet input[type=number]');
+      // eslint-disable-next-line no-await-in-loop
+      check(await field.count() === 1, 'and the last question is a temperature field');
+      // eslint-disable-next-line no-await-in-loop
+      await field.fill('36.60');
+      // eslint-disable-next-line no-await-in-loop
+      await page.locator('.sheet button:has-text("Done")').click();
+      // eslint-disable-next-line no-await-in-loop
+      await page.waitForTimeout(1200);
+
+      /* Stored in Celsius whatever she reads in, like the full diary — getting
+         this wrong would silently corrupt every reading taken the fast way. */
+      // eslint-disable-next-line no-await-in-loop
+      const saved = await page.evaluate(async () => {
+        const store = await import('/js/state/store.js');
+        const t = new Date();
+        const k = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+        return store.getState().logs[k]?.bbt ?? null;
+      });
+      check(saved != null && Math.abs(saved - 36.6) < 0.01,
+        'and what she types there is saved', String(saved));
+    }
+    // eslint-disable-next-line no-await-in-loop
+    await ctx.close();
+  }
 }
 
 await browser.close();

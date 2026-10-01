@@ -27,15 +27,16 @@
  */
 
 import { el, haptic, announce } from '../utils/dom.js';
+import { cToF, fToC, kgToLb, lbToKg } from '../utils/fmt.js';
 import { todayKey, fmtRelative, addDays } from '../utils/date.js';
-import { CATEGORIES, DEFAULT_CHIPS, labelFor } from '../data/taxonomy.js';
+import { CATEGORIES, DEFAULT_CHIPS, MEASURES, labelFor } from '../data/taxonomy.js';
 import { openSheet, closeSheet } from '../ui/sheet.js';
 import { severityBlock } from '../ui/severity.js';
 import { pruneSeverity } from '../domain/model.js';
 import { openLogSheet } from './log.js';
 import { burst } from '../ui/particles.js';
 import { mascotReact } from '../ui/mascot.js';
-import { loggingStreak } from '../domain/stats.js';
+import { loggingStreak, habitualMeasures } from '../domain/stats.js';
 import { STREAK_MARKS } from '../domain/response.js';
 import { earnedIds, newlyEarned } from '../domain/stickers.js';
 import { stickerContext } from './stickers.js';
@@ -144,7 +145,19 @@ export function openCheckin(date = todayKey()) {
   const whenPhrase = when === 'Yesterday' ? 'yesterday' : `on ${when}`;
 
   let step = 0;
+
+  /*
+    The fourth question exists only for someone who has shown she wants it.
+    Everyone else still gets three, which is the whole promise of this screen.
+  */
+  const measureIds = habitualMeasures(
+    store.getState().logs, todayKey(), MEASURES.map((m) => m.id), addDays,
+  );
   const steps = [flowStep, moodStep, symptomStep];
+  if (measureIds.length) {
+    steps.push((/** @type {() => boolean} */ stale) =>
+      measureStep(measureIds, draft, store.getState().settings, stale, next, true));
+  }
 
   const sheet = openSheet({
     title: when,
@@ -443,7 +456,7 @@ export function openCheckin(date = todayKey()) {
             : toggle(draft.symptoms, id, (l) => { draft.symptoms = l; })),
         };
       }),
-      lastStep: true,
+      lastStep: measureIds.length === 0,
       onNext: next,
       onMore: () => {
         // Straight into the full diary, carrying everything answered so far so
@@ -496,6 +509,124 @@ function toggle(list, id, set) {
  * @param {boolean} [opts.lastStep]
  * @param {() => void} [opts.onNext]
  * @param {() => void} [opts.onMore]
+ */
+/**
+ * The measurements she already keeps, asked in the daily fifteen seconds.
+ *
+ * `habitualMeasures` decides which — see the reasoning there. The short version
+ * is that a woman charting her temperature every morning was being asked how
+ * she felt and then left to go and find the one field that actually sharpens
+ * her fertile window, four taps into a drawer, every single day. The question
+ * follows the habit rather than being offered to everyone, so it costs nothing
+ * to someone with no thermometer.
+ *
+ * Built on `question` with no options, because the frame — the heading that
+ * takes focus, the stale-token guard, the Done button — is the part worth
+ * sharing, and the answer here is a number rather than a chip.
+ *
+ * @param {string[]} ids
+ * @param {DayLog} draft
+ * @param {import('../domain/model.js').Settings} settings
+ * @param {() => boolean} stale
+ * @param {() => void} onNext
+ * @param {boolean} lastStep
+ */
+function measureStep(ids, draft, settings, stale, onNext, lastStep) {
+  const rows = el('div', { class: 'checkin-measures' });
+
+  for (const id of ids) {
+    const measure = MEASURES.find((m) => m.id === id);
+    if (!measure) continue;
+
+    /*
+      Stored in Celsius and kilograms whatever she is shown, so the unit she
+      reads in can change without rewriting her history. The same rule the full
+      diary follows; getting it wrong here would silently corrupt every reading
+      taken through the fast path.
+    */
+    const unit = measure.unitSetting === 'unitTemp' ? settings.unitTemp
+      : measure.unitSetting === 'unitWeight' ? settings.unitWeight : null;
+    const toShown = (/** @type {number} */ v) => {
+      if (measure.id === 'bbt' && unit === 'F') return Number(cToF(v).toFixed(1));
+      if (measure.id === 'weight' && unit === 'lb') return Number(kgToLb(v).toFixed(1));
+      return Number(v.toFixed(measure.decimals ?? 1));
+    };
+    const toStored = (/** @type {number} */ v) => {
+      if (measure.id === 'bbt' && unit === 'F') return fToC(v);
+      if (measure.id === 'weight' && unit === 'lb') return lbToKg(v);
+      return v;
+    };
+    const suffix = measure.id === 'bbt' ? `°${unit}`
+      : measure.id === 'weight' ? String(unit)
+        : measure.id === 'sleep' ? 'hours' : '';
+
+    const current = /** @type {any} */ (draft)[measure.id];
+    const input = el('input', {
+      type: 'number',
+      class: 'input num',
+      inputmode: 'decimal',
+      step: String(measure.step ?? 0.1),
+      min: String(toShown(measure.min)),
+      max: String(toShown(measure.max)),
+      id: `checkin-${measure.id}`,
+      value: current != null ? String(toShown(current)) : '',
+      oninput: (/** @type {any} */ ev) => {
+        if (stale()) return;
+        const raw = ev.target.value;
+        if (raw === '') { /** @type {any} */ (draft)[measure.id] = null; return; }
+        const n = Number(raw);
+        // Out-of-range is left alone rather than clamped: clamping as she types
+        // rewrites 3 into 35 before she has reached the 6.
+        if (!Number.isFinite(n)) return;
+        /** @type {any} */ (draft)[measure.id] = toStored(n);
+      },
+    });
+
+    rows.append(el('div', { class: 'checkin-measure' }, [
+      el('label', { class: 'checkin-measure-label', for: `checkin-${measure.id}` }, [
+        el('span', { text: measure.name }),
+        suffix && el('span', { class: 'hint-sm', text: suffix }),
+      ]),
+      input,
+    ]));
+  }
+
+  return question({
+    stale,
+    title: ids.length === 1 && ids[0] === 'bbt' ? 'This morning’s temperature' : 'Your numbers',
+    hint: ids.includes('bbt')
+      ? 'Taken before getting up. This is what lets Kittycal date ovulation from your own body rather than an average.'
+      : 'The ones you keep. Leave any of them blank.',
+    multi: true,
+    options: [],
+    extra: rows,
+    lastStep,
+    onNext,
+  });
+}
+
+/**
+ * One question on its own screen.
+ *
+ * The parameter was an untyped destructure, which meant its shape was whatever
+ * the existing call sites happened to agree on — so adding a caller that did
+ * not pass `shortcut` or `onMore` broke the other three. Written down, the
+ * optional parts are optional.
+ *
+ * @param {Object} spec
+ * @param {string} spec.title
+ * @param {string} spec.hint
+ * @param {{id: string, label: string, selected: boolean, onPick: () => void,
+ *   note?: string, wide?: boolean}[]} spec.options
+ * @param {() => boolean} spec.stale   true once this question has been left
+ * @param {{label: string, onPick: () => void}|null} [spec.shortcut]
+ * @param {boolean} [spec.multi]       answers accumulate; show a Next button
+ * @param {() => string[]} [spec.current]
+ * @param {Node|null|false} [spec.extra]
+ * @param {() => void} [spec.onChange]
+ * @param {boolean} [spec.lastStep]    label the button Done rather than Next
+ * @param {() => void} [spec.onNext]
+ * @param {() => void} [spec.onMore]   open the full diary instead
  */
 function question({ title, hint, options, stale, shortcut, multi, current, extra, onChange,
   lastStep, onNext, onMore }) {

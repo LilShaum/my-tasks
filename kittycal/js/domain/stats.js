@@ -471,3 +471,51 @@ export function loggingConsistency(logs, today, addDaysFn) {
  * @param {Record<DateKey, DayLog>} logs
  */
 export const daysLogged = (logs) => Object.keys(logs).length;
+
+/** A measurement has to appear this often in the window to count as a habit. */
+export const HABIT_MIN_DAYS = 3;
+
+/**
+ * Which measurements she actually keeps, so the daily question can carry them.
+ *
+ * The check-in asks three fixed questions — flow, mood, symptoms — and the
+ * reasoning given for that set was that they are "exactly the three things
+ * every derived screen in the app needs". That was not true. Mood feeds one
+ * chart and symptoms feed pattern detection, while the two inputs that change
+ * a *prediction* — a morning temperature and an ovulation test — were never
+ * asked for at all. They live in the full diary behind a drawer called
+ * Measurements, which means a woman charting her temperature every morning was
+ * being asked how she felt and then left to go and find the field that
+ * actually sharpens her fertile window, four taps away, every single day.
+ *
+ * Rather than ask everybody about temperature — which is a real commitment and
+ * useless to someone who does not own a thermometer — the question follows the
+ * habit she has already demonstrated. Three days out of the last thirty is the
+ * line: a single reading is curiosity or a doctor's appointment and should not
+ * reshape her daily routine, three in a month is something she is doing. It
+ * decays on the same evidence, so stopping for a month quietly removes the
+ * question again without her having to turn anything off.
+ *
+ * The effect is that the two halves meet. The fertile card tells her a
+ * temperature would replace the population average with her own figure and
+ * takes her to the field; once she has used it a few times, it joins the
+ * fifteen-second habit by itself and she never visits that drawer again.
+ *
+ * @param {Record<DateKey, DayLog>} logs
+ * @param {DateKey} today
+ * @param {string[]} ids the measurement fields to consider
+ * @param {(key: DateKey, days: number) => DateKey} [addDaysFn]
+ * @returns {string[]} those she logs regularly, in the order given
+ */
+export function habitualMeasures(logs, today, ids, addDaysFn = addDays) {
+  /** @type {Record<string, number>} */
+  const seen = {};
+  for (let i = 0; i < CONSISTENCY_WINDOW; i += 1) {
+    const log = logs[addDaysFn(today, -i)];
+    if (!log) continue;
+    for (const id of ids) {
+      if (/** @type {any} */ (log)[id] != null) seen[id] = (seen[id] ?? 0) + 1;
+    }
+  }
+  return ids.filter((id) => (seen[id] ?? 0) >= HABIT_MIN_DAYS);
+}
