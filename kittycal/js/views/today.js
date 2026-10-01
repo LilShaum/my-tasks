@@ -36,7 +36,7 @@ import { openCheckin } from './checkin.js';
 import { buildCycles, cycleLengths, periodLengths } from '../domain/cycles.js';
 import { predict, conceptionChance } from '../domain/predict.js';
 import { phaseFor } from '../domain/phases.js';
-import { evaluate } from '../domain/acog.js';
+import { evaluate, ageFrom } from '../domain/acog.js';
 import { packPosition, describePack, unmarkedDays } from '../domain/pill.js';
 import { cycleSignals } from '../domain/ovulation.js';
 import { cycleRing } from '../ui/ring.js';
@@ -916,8 +916,8 @@ function headsUpCard(logs, cycles, prediction) {
     el('ul', { class: 'heads-up-list' }, due.map((p) => el('li', {}, [
       el('strong', { text: name(p) }),
       el('span', { class: 'hint-sm', text:
-        ` — usually from about ${plural(p.typicalBefore, 'day')} before your period, `
-        + `in ${p.cyclesWith} of your last ${p.cyclesTotal} cycles.` }),
+        `Usually from about ${plural(p.typicalBefore, 'day')} before your period · `
+        + `${p.cyclesWith} of your last ${p.cyclesTotal} cycles` }),
     ]))),
     el('p', { class: 'hint-sm', text:
       'From what you have logged, not a prediction about this month in particular.' }),
@@ -1380,6 +1380,7 @@ function acogCards(cycles, today, prediction, logs) {
     daysSinceLastPeriod: prediction.lastStart ? daysBetween(prediction.lastStart, today) : null,
     spotting: spottingBetweenPeriods(logs, cycles),
     explained: prediction.pregnancyTest === 'positive',
+    age: ageFrom(store.getState().settings.birthYear, today),
   });
 
   if (!flags.length) return [];

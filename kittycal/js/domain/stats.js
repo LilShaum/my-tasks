@@ -88,27 +88,61 @@ export function symptomFrequency(logs) {
  * @returns {{cyclesWith: number, cyclesTotal: number, byDay: Map<number, number>, peakDays: number[]}}
  */
 export function symptomPattern(symptomId, logs, cycles) {
+  const { byId, total } = patternIndex(logs, cycles);
+  return summarize(byId.get(symptomId), total);
+}
+
+/**
+ * Every logged id's per-cycle-day counts, from one pass over the history.
+ *
+ * Patterns used to be found one id at a time: `detectPatterns` asked
+ * `symptomPattern` about each of fifteen-odd ids, and each of those walked every
+ * day of every complete cycle, rebuilding that day's id list to look for one
+ * entry. Insights then asked again for each pattern it drew. With three years
+ * of daily logs that was about sixteen passes over the whole history to paint
+ * one screen — the largest single cost on it. One pass collects the same
+ * counts for every id at once.
+ *
+ * @param {Record<DateKey, DayLog>} logs
+ * @param {Cycle[]} cycles
+ * @returns {{byId: Map<string, {byDay: Map<number, number>, cycles: number}>, total: number}}
+ */
+export function patternIndex(logs, cycles) {
   // Only completed cycles: the current one is still accumulating, and counting
   // it would understate how often a late-cycle symptom occurs.
   const complete = cycles.filter((c) => c.complete);
 
-  /** @type {Map<number, number>} */
-  const byDay = new Map();
-  let cyclesWith = 0;
+  /** @type {Map<string, {byDay: Map<number, number>, cycles: number}>} */
+  const byId = new Map();
 
   for (const cycle of complete) {
-    let seenInCycle = false;
-
+    /** @type {Set<string>} */
+    const seenInCycle = new Set();
     for (const date of range(cycle.start, cycleEnd(cycle))) {
       const log = logs[date];
-      if (!log || !loggedIds(log).includes(symptomId)) continue;
-      seenInCycle = true;
+      if (!log) continue;
       const day = daysBetween(cycle.start, date) + 1;
-      byDay.set(day, (byDay.get(day) ?? 0) + 1);
+      for (const id of new Set(loggedIds(log))) {
+        let entry = byId.get(id);
+        if (!entry) { entry = { byDay: new Map(), cycles: 0 }; byId.set(id, entry); }
+        entry.byDay.set(day, (entry.byDay.get(day) ?? 0) + 1);
+        seenInCycle.add(id);
+      }
     }
-
-    if (seenInCycle) cyclesWith++;
+    for (const id of seenInCycle) /** @type {any} */ (byId.get(id)).cycles += 1;
   }
+
+  return { byId, total: complete.length };
+}
+
+/**
+ * One id's counts, as the pattern the screens read.
+ * @param {{byDay: Map<number, number>, cycles: number}|undefined} entry
+ * @param {number} total complete cycles
+ */
+function summarize(entry, total) {
+  const byDay = entry?.byDay ?? new Map();
+  const cyclesWith = entry?.cycles ?? 0;
 
   /*
     The cycle days where this shows up most often — but only when "most often"
@@ -127,10 +161,10 @@ export function symptomPattern(symptomId, logs, cycles) {
   const max = Math.max(0, ...byDay.values());
   const tied = max < PEAK_MIN_CYCLES
     ? []
-    : [...byDay.entries()].filter(([, n]) => n === max).map(([day]) => day).sort((a, b) => a - b);
+    : [...byDay.entries()].filter(([, n]) => n === max).map(([day]) => day).sort((x, y) => x - y);
   const peakDays = tied.length > PEAK_MAX_TIED ? [] : tied;
 
-  return { cyclesWith, cyclesTotal: complete.length, byDay, peakDays };
+  return { cyclesWith, cyclesTotal: total, byDay, peakDays };
 }
 
 /**
@@ -139,6 +173,7 @@ export function symptomPattern(symptomId, logs, cycles) {
  * @property {number} cyclesWith
  * @property {number} cyclesTotal
  * @property {number[]} peakDays
+ * @property {Map<number, number>} byDay  how many cycles had it on each cycle day
  * @property {number} share    0..1
  */
 
@@ -158,11 +193,13 @@ export function detectPatterns(logs, cycles, limit = 8) {
   const complete = cycles.filter((c) => c.complete);
   if (complete.length < MIN_CYCLES_FOR_PATTERN) return [];
 
+  const { byId, total } = patternIndex(logs, cycles);
+
   /** @type {Pattern[]} */
   const found = [];
 
   for (const { id } of symptomFrequency(logs)) {
-    const pattern = symptomPattern(id, logs, cycles);
+    const pattern = summarize(byId.get(id), total);
     if (pattern.cyclesTotal === 0) continue;
     const share = pattern.cyclesWith / pattern.cyclesTotal;
     if (share < PATTERN_THRESHOLD) continue;
@@ -171,11 +208,12 @@ export function detectPatterns(logs, cycles, limit = 8) {
       cyclesWith: pattern.cyclesWith,
       cyclesTotal: pattern.cyclesTotal,
       peakDays: pattern.peakDays,
+      byDay: pattern.byDay,
       share,
     });
   }
 
-  return found.sort((a, b) => b.share - a.share || b.cyclesWith - a.cyclesWith).slice(0, limit);
+  return found.sort((x, y) => y.share - x.share || y.cyclesWith - x.cyclesWith).slice(0, limit);
 }
 
 /**

@@ -81,6 +81,34 @@ console.log('\nfour days before her period');
   check(/4 of your last 4 cycles/.test(card ?? ''), 'and says how often, from her own logs');
 }
 
+console.log('\nthe report for a doctor says the same thing the way a doctor asks it');
+{
+  /* Premenstrual symptoms are assessed by how long before the period they
+     start; "day 22" drifts with cycle length. */
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await ctx.newPage();
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.evaluate(SEED, { untilNext: 12 });
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(1500);
+  if (await page.locator('.sheet[data-open="true"]').count()) {
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+  }
+  await page.locator('[data-tab="insights"]').click();
+  await page.waitForTimeout(600);
+  await page.locator('button', { hasText: /report/i }).first().click();
+  await page.waitForTimeout(1200);
+  const rows = await page.evaluate(() => [...document.querySelectorAll('table tr')]
+    .map((r) => [...r.children].map((c) => (c.textContent ?? '').trim())));
+  const head = rows.find((r) => r.includes('Before a period'));
+  const bloating = rows.find((r) => r[0] === 'Bloating');
+  check(head != null, 'the recurring-symptoms table has a "Before a period" column');
+  check(bloating != null && bloating.includes('from about 4 days before'),
+    'and bloating reads "from about 4 days before"', JSON.stringify(bloating));
+  await ctx.close();
+}
+
 console.log('\ntwelve days before her period');
 {
   const card = await cardAt(12);

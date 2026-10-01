@@ -23,7 +23,7 @@ import { detectThermalShift } from '../domain/ovulation.js';
 import { predictionAccuracy, CLOSE_ENOUGH, MIN_SCORED } from '../domain/accuracy.js';
 import { phaseFor, PHASES } from '../domain/phases.js';
 import {
-  detectPatterns, symptomPattern, symptomFrequency, series, bbtForCycle, daysLogged,
+  detectPatterns, symptomFrequency, series, bbtForCycle, daysLogged,
   loggingConsistency, moodByPhase, severitySummary, cycleSummary, loggedIds,
   MIN_CYCLES_FOR_PATTERN,
 } from '../domain/stats.js';
@@ -91,7 +91,7 @@ export function renderInsights(host) {
       thisCycleCard(logs, cycles, today),
     ]],
     ['Your cycle', [
-      cycleLengthCard(lengthPoints, prediction),
+      cycleLengthCard(lengthPoints, prediction, acog.ageFrom(settings.birthYear, today)),
       periodLengthCard(periodPoints),
       cycleListCard(logs, cycles, prediction),
       accuracyCard(cycles),
@@ -99,7 +99,7 @@ export function renderInsights(host) {
     ['How you feel', [
       loggedMostCard(logs, patterns.length),
       patternsCard(logs, cycles, prediction, patterns),
-      moodCard(logs, cycles, settings),
+      moodCard(logs, cycles, prediction.lutealDays),
     ]],
     ['What you measure', [
       bbtCard(logs, cycles, settings),
@@ -236,8 +236,9 @@ const CHART_MIN = 3;
 /**
  * @param {{start: DateKey, length: number}[]} points
  * @param {import('../domain/predict.js').Prediction} prediction
+ * @param {number|null} age years old, which sets the typical range
  */
-function cycleLengthCard(points, prediction) {
+function cycleLengthCard(points, prediction, age) {
   if (!points.length) return null;
 
   const stats = summarize(points.map((p) => p.length));
@@ -249,9 +250,9 @@ function cycleLengthCard(points, prediction) {
       el('p', { text: `${points.length === 1 ? 'Your first cycle was' : 'Your cycles so far:'} ` +
         `${listJoin(points.map((p) => `${p.length} days`))}.` }),
       el('p', { class: 'hint-sm', text:
-        points.every((p) => acog.isCycleTypical(p.length))
-          ? `That is inside the typical ${acog.CYCLE_MIN}–${acog.CYCLE_MAX} days.`
-          : `Typical is ${acog.CYCLE_MIN}–${acog.CYCLE_MAX} days.` }),
+        points.every((p) => acog.isCycleTypical(p.length, age))
+          ? `That is inside the typical ${acog.CYCLE_MIN}–${acog.cycleMaxFor(age)} days.`
+          : `Typical is ${acog.CYCLE_MIN}–${acog.cycleMaxFor(age)} days.` }),
     ]);
   }
 
@@ -260,7 +261,7 @@ function cycleLengthCard(points, prediction) {
     // number; "Mar" is a thing she can remember.
     label: fmtMonth(point.start),
     value: point.length,
-    flagged: !acog.isCycleTypical(point.length),
+    flagged: !acog.isCycleTypical(point.length, age),
   }));
 
   const outside = data.filter((d) => d.flagged).length;
@@ -277,11 +278,11 @@ function cycleLengthCard(points, prediction) {
     el('h3', { text: 'Cycle length' }),
     el('p', { class: 'hint-sm', text:
       `One dot per cycle, oldest first. Inside the shaded band is the typical ` +
-      `${acog.CYCLE_MIN}–${acog.CYCLE_MAX} days.` }),
+      `${acog.CYCLE_MIN}–${acog.cycleMaxFor(age)} days.` }),
     trendChart({
       data,
       average: stats.mean ?? undefined,
-      normalBand: [acog.CYCLE_MIN, acog.CYCLE_MAX],
+      normalBand: [acog.CYCLE_MIN, acog.cycleMaxFor(age)],
       unit: 'd',
       summary: `Your last ${recent.length} cycle lengths, from ${stats.min} to ` +
         `${stats.max} days, averaging ${Math.round(stats.mean ?? 0)}. ` +
@@ -661,10 +662,17 @@ const MIN_DAYS_PER_PHASE = 3;
  *
  * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
  * @param {import('../domain/cycles.js').Cycle[]} cycles
- * @param {import('../domain/model.js').Settings} settings
+ * @param {number} lutealDays the luteal length the forecast uses
  */
-function moodCard(logs, cycles, settings) {
-  const byPhase = moodByPhase(logs, cycles, settings.lutealLength);
+function moodCard(logs, cycles, lutealDays) {
+  /*
+    The luteal length the forecast actually uses — her measured one once two
+    cycles have confirmed it. This read the Settings value, so after the app had
+    dated her ovulation from her own temperatures, Today and the calendar split
+    the cycle on her real number while this chart still split it on fourteen,
+    and the same day was luteal on one screen and ovulatory on the next.
+  */
+  const byPhase = moodByPhase(logs, cycles, lutealDays);
 
   // Drawn in cycle order rather than by size, so the card reads as a journey
   // through the month.
@@ -743,7 +751,7 @@ function patternsCard(logs, cycles, prediction, patterns) {
       `${plural(complete, 'complete cycle')}.` }),
 
     el('ul', { class: 'pattern-list' }, patterns.map((pattern) => {
-      const detail = symptomPattern(pattern.id, logs, cycles);
+      const detail = pattern;
       const max = Math.max(0, ...detail.byDay.values());
       const label = labelOf(pattern.id);
       const peaks = pattern.peakDays.slice(0, 3);

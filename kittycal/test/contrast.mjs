@@ -33,6 +33,8 @@ const CHECKS = [
   ['--ink', '--surface', 4.5, 'body text on surface'],
   ['--ink-2', '--surface', 4.5, 'secondary text on surface'],
   ['--ink', '--card', 4.5, 'body text on card'],
+  // Text links on cards — the app's links and the "Track your temperature" link.
+  ['--primary-deep', '--card', 4.5, 'link text on a card'],
   ['--ink-3', '--card', 3.0, 'tertiary text on card'],
   ['--line', '--surface', 3.0, 'border on surface'],
   // --primary is a fill and is deliberately not checked at 3:1; --primary-line
