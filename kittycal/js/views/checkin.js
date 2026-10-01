@@ -58,6 +58,19 @@ import { getTheme } from '../data/themes.js';
 import * as store from '../state/store.js';
 
 /**
+ * The measurements the check-in may ask for, even when she keeps them.
+ *
+ * The rule for a daily question is that she can answer it from where she is
+ * standing, without fetching anything. A temperature passes once she has shown
+ * she takes one — and it is the reading that changes a prediction. Sleep passes:
+ * she knows roughly how long she slept. Weight needs a scale, and steps needs
+ * another app opened to read a number off; asking either at bedtime is asking
+ * her to go and get something, which is how a fifteen-second habit becomes a
+ * chore. They stay one tap away in the full diary, and in Insights.
+ */
+const CHECKIN_MEASURES = ['bbt', 'sleep'];
+
+/**
  * The moods offered.
  *
  * Six of the nineteen. The full list belongs in the diary — a check-in that
@@ -163,9 +176,7 @@ export function openCheckin(date = todayKey()) {
     The fourth question exists only for someone who has shown she wants it.
     Everyone else still gets three, which is the whole promise of this screen.
   */
-  const measureIds = habitualMeasures(
-    store.getState().logs, todayKey(), MEASURES.map((m) => m.id), addDays,
-  );
+  const measureIds = habitualMeasures(store.getState().logs, todayKey(), CHECKIN_MEASURES, addDays);
   const steps = [flowStep, moodStep, symptomStep];
   if (measureIds.length) {
     steps.push((/** @type {() => boolean} */ stale) =>

@@ -48,7 +48,7 @@ const check = (cond, label, extra = '') => {
  * Six tidy cycles, with today sitting mid-cycle so a fertile window exists.
  * @param {{mode: string, log?: Record<string, any>}} opts
  */
-const seed = (opts) => async ({ mode, log, bbtDays }) => {
+const seed = (opts) => async ({ mode, log, bbtDays, weightDays }) => {
   const db = await new Promise((res, rej) => {
     const r = indexedDB.open('kittycal', 1);
     r.onupgradeneeded = () => {
@@ -78,6 +78,14 @@ const seed = (opts) => async ({ mode, log, bbtDays }) => {
     } });
     tx.objectStore('meta').put({ key: 'periodDays', value: days });
     if (log) tx.objectStore('logs').put({ date: key(now), ...log });
+    for (let i = 1; i <= (weightDays ?? 0); i += 1) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      tx.objectStore('logs').put({
+        date: key(d), weight: 60, symptoms: [], moods: [],
+        discharge: [], activity: [], other: [], sex: [], custom: [],
+      });
+    }
     for (let i = 1; i <= (bbtDays ?? 0); i += 1) {
       const d = new Date(now);
       d.setDate(d.getDate() - i);
@@ -93,13 +101,13 @@ const seed = (opts) => async ({ mode, log, bbtDays }) => {
 const browser = await launchChromium();
 
 /** A fresh profile, seeded, with the day sheet dismissed. */
-async function open({ mode = 'cycle', log = null, bbtDays = 0 } = {}) {
+async function open({ mode = 'cycle', log = null, bbtDays = 0, weightDays = 0 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true,
   });
   const page = await ctx.newPage();
   await page.goto(BASE, { waitUntil: 'networkidle' });
-  await page.evaluate(seed({}), { mode, log, bbtDays });
+  await page.evaluate(seed({}), { mode, log, bbtDays, weightDays });
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForTimeout(1700);
   if (await page.locator('.sheet[data-open="true"]').count()) {
@@ -336,6 +344,19 @@ console.log('\nthe daily check-in carries the measurements she already keeps');
     // eslint-disable-next-line no-await-in-loop
     await ctx.close();
   }
+}
+
+console.log('\nthe check-in never asks for something she would have to go and fetch');
+{
+  /* Weight needs a scale and steps needs another app; even for someone who
+     logs them daily, asking at bedtime is asking her to go and get something. */
+  const { ctx, page } = await open({ weightDays: 8 });
+  await page.locator('button:has-text("Check in for today")').click();
+  await page.waitForTimeout(700);
+  const steps = await page.evaluate(() =>
+    Number((document.querySelector('.sheet')?.textContent?.match(/Step 1 of (\d+)/) ?? [])[1] ?? 0));
+  check(steps === 3, 'a habitual weigher still gets three questions, not a scale reading', `got ${steps}`);
+  await ctx.close();
 }
 
 console.log('\na search that finds nothing offers to make the thing');
