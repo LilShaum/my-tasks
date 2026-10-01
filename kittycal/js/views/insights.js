@@ -14,7 +14,7 @@
 
 import { el, replace, haptic } from '../utils/dom.js';
 import { todayKey, fmtDayMonth, fmtMonth, addDays, range } from '../utils/date.js';
-import { plural, listJoin, fmtTemp, fmtWeight } from '../utils/fmt.js';
+import { plural, listJoin, fmtTemp, fmtWeight, fmtWater, mlToOz } from '../utils/fmt.js';
 import {
   buildCycles, cycleLengths, cycleLengthPoints, periodLengthPoints, summarize, currentCycle,
 } from '../domain/cycles.js';
@@ -856,7 +856,7 @@ function bbtCard(logs, cycles, settings) {
   ]);
 }
 
-/* ── Weight and sleep trends ────────────────────────────────────────────── */
+/* ── Numeric trends ─────────────────────────────────────────────────────── */
 
 /**
  * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
@@ -865,7 +865,28 @@ function bbtCard(logs, cycles, settings) {
 function trendCard(logs, settings) {
   const weights = series(logs, 'weight').slice(-30);
   const sleeps = series(logs, 'sleep').slice(-30);
-  if (weights.length < 3 && sleeps.length < 3) return null;
+  /*
+    Water and steps were collectable and unreadable.
+
+    Both have a row in the diary, both are stored on every log, and `series`
+    has always known how to extract them — but nothing ever called it for
+    either, so no screen in the app showed them back. Step count was the purer
+    case: the only thing that ever happened to a number she typed there was
+    that it appeared in that same day's summary line. Not a chart, not a
+    pattern, not a tip. She could enter it every morning for a year and the app
+    would never once mention it.
+
+    That is worse than not offering the field. A tracker asking for something
+    daily is an implicit promise that it is being used for something, and the
+    cost is paid by exactly the people most willing to give it data.
+
+    They join the same card rather than getting their own, because they are the
+    same kind of thing — a number over time — and four of them stacked is a
+    section rather than four competing cards.
+  */
+  const waters = series(logs, 'water').slice(-30);
+  const steps = series(logs, 'steps').slice(-30);
+  if (weights.length < 3 && sleeps.length < 3 && waters.length < 3 && steps.length < 3) return null;
 
   return el('div', { class: 'card' }, [
     el('h3', { text: 'Trends' }),
@@ -906,6 +927,45 @@ function trendCard(logs, settings) {
         decimals: 1,
         average: sleeps.reduce((a, s) => a + s.value, 0) / sleeps.length,
         summary: `Sleep hours over the last ${sleeps.length} nights.`,
+      }),
+    ]),
+
+    /*
+      Water is stored in millilitres and read in whatever she set, so the chart
+      is drawn in her unit rather than the storage one — a chart labelled "ml"
+      to someone who set ounces is the same number lying about its scale.
+    */
+    waters.length >= 3 && el('div', { style: { marginTop: 'var(--sp-4)' } }, [
+      el('p', { class: 'hint-sm', text:
+        `Water, last ${plural(waters.length, 'day')}. Average `
+        + `${fmtWater(waters.reduce((a, w) => a + w.value, 0) / waters.length, settings.unitWater)} a day.` }),
+      /*
+        Litres rather than millilitres, because `fmtWater` already switches to
+        litres past a thousand and a day's water is always past a thousand —
+        so the sentence above said "2.1 L a day" over an axis labelled in ml.
+        Same number, two scales, one card.
+      */
+      trendChart({
+        data: waters.map((point) => ({
+          label: fmtDayMonth(point.date),
+          value: settings.unitWater === 'oz' ? mlToOz(point.value) : point.value / 1000,
+        })),
+        height: 140,
+        decimals: settings.unitWater === 'oz' ? 0 : 1,
+        unit: settings.unitWater === 'oz' ? 'oz' : 'L',
+        summary: `Water drunk over the last ${waters.length} days.`,
+      }),
+    ]),
+
+    steps.length >= 3 && el('div', { style: { marginTop: 'var(--sp-4)' } }, [
+      el('p', { class: 'hint-sm', text:
+        `Steps, last ${plural(steps.length, 'day')}. Average `
+        + `${Math.round(steps.reduce((a, d) => a + d.value, 0) / steps.length).toLocaleString()} a day.` }),
+      trendChart({
+        data: steps.map((point) => ({ label: fmtDayMonth(point.date), value: point.value })),
+        height: 140,
+        decimals: 0,
+        summary: `Steps over the last ${steps.length} days.`,
       }),
     ]),
   ]);

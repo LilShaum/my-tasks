@@ -79,7 +79,16 @@ await page.evaluate(async () => {
   });
 
   for (let i = 0; i < 16; i += 1) {
-    logs.push({ ...base, date: shift(-16 + i), sleep: 6.5 + ((i % 4) * 0.6) });
+    logs.push({
+      ...base,
+      date: shift(-16 + i),
+      sleep: 6.5 + ((i % 4) * 0.6),
+      // Water and steps were storable and unreadable: `series` knew how to
+      // extract both and no screen ever called it, so a number she typed every
+      // morning appeared in that day's summary line and nowhere else again.
+      water: 1500 + (i % 5) * 200,
+      steps: 6000 + (i % 7) * 400,
+    });
   }
 
   await new Promise((res) => {
@@ -195,6 +204,32 @@ if (sleepLabels === null) {
     sleepLabels.length > 0 && sleepLabels.length <= 6, JSON.stringify(sleepLabels));
   ok('and no label is repeated',
     new Set(sleepLabels).size === sleepLabels.length, JSON.stringify(sleepLabels));
+}
+
+console.log('\nthe numbers she can type are numbers she can see again');
+{
+  const trends = await page.evaluate(() => {
+    const card = [...document.querySelectorAll('#view-insights .card')]
+      .find((c) => c.querySelector('h3')?.textContent === 'Trends');
+    return card ? (card.innerText ?? '') : null;
+  });
+  ok('the Trends card is there', trends != null);
+  ok('water comes back as a trend', /Water, last/.test(trends ?? ''), (trends ?? '').slice(0, 80));
+  ok('steps come back as a trend', /Steps, last/.test(trends ?? ''), (trends ?? '').slice(0, 80));
+
+  /*
+    The sentence and the axis have to be in the same unit. `fmtWater` switches
+    to litres past a thousand and a day's water is always past a thousand, so
+    the summary read "2.1 L a day" over an axis labelled in millilitres.
+  */
+  const water = (trends ?? '').match(/Water, last [^.]*\. Average ([\d.]+) (L|oz|ml)/);
+  ok('the water average names a unit', water != null, (trends ?? '').slice(0, 80));
+  if (water) {
+    const [, value, unit] = water;
+    ok('and the chart beside it is drawn on that same scale',
+      unit === 'L' ? Number(value) < 20 : Number(value) > 20,
+      `average ${value} ${unit}`);
+  }
 }
 
 console.log('\nand it is still described to a screen reader');
