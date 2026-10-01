@@ -23,7 +23,7 @@ import { detectThermalShift } from '../domain/ovulation.js';
 import { predictionAccuracy, CLOSE_ENOUGH, MIN_SCORED } from '../domain/accuracy.js';
 import { phaseFor, PHASES } from '../domain/phases.js';
 import {
-  detectPatterns, symptomPattern, symptomFrequency, series, bbtForCycle, daysLogged,
+  detectPatterns, symptomFrequency, series, bbtForCycle, daysLogged,
   loggingConsistency, moodByPhase, severitySummary, cycleSummary, loggedIds,
   MIN_CYCLES_FOR_PATTERN,
 } from '../domain/stats.js';
@@ -99,7 +99,7 @@ export function renderInsights(host) {
     ['How you feel', [
       loggedMostCard(logs, patterns.length),
       patternsCard(logs, cycles, prediction, patterns),
-      moodCard(logs, cycles, settings),
+      moodCard(logs, cycles, prediction.lutealDays),
     ]],
     ['What you measure', [
       bbtCard(logs, cycles, settings),
@@ -662,10 +662,17 @@ const MIN_DAYS_PER_PHASE = 3;
  *
  * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
  * @param {import('../domain/cycles.js').Cycle[]} cycles
- * @param {import('../domain/model.js').Settings} settings
+ * @param {number} lutealDays the luteal length the forecast uses
  */
-function moodCard(logs, cycles, settings) {
-  const byPhase = moodByPhase(logs, cycles, settings.lutealLength);
+function moodCard(logs, cycles, lutealDays) {
+  /*
+    The luteal length the forecast actually uses — her measured one once two
+    cycles have confirmed it. This read the Settings value, so after the app had
+    dated her ovulation from her own temperatures, Today and the calendar split
+    the cycle on her real number while this chart still split it on fourteen,
+    and the same day was luteal on one screen and ovulatory on the next.
+  */
+  const byPhase = moodByPhase(logs, cycles, lutealDays);
 
   // Drawn in cycle order rather than by size, so the card reads as a journey
   // through the month.
@@ -744,7 +751,7 @@ function patternsCard(logs, cycles, prediction, patterns) {
       `${plural(complete, 'complete cycle')}.` }),
 
     el('ul', { class: 'pattern-list' }, patterns.map((pattern) => {
-      const detail = symptomPattern(pattern.id, logs, cycles);
+      const detail = pattern;
       const max = Math.max(0, ...detail.byDay.values());
       const label = labelOf(pattern.id);
       const peaks = pattern.peakDays.slice(0, 3);
