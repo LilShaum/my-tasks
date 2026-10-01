@@ -786,3 +786,23 @@
   flex: 1 1 auto;
   min-height: var(--tap);
 }
+
+/*
+  A text link that is a button: for a secondary way in that should not compete
+  with the card it sits on. Keeps the full tap height even though it draws no
+  box, because a quiet control is still a control.
+*/
+.btn-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--primary-ink, var(--primary));
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}

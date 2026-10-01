@@ -162,7 +162,7 @@ export function renderToday(host) {
     el('div', { class: 'section stagger' }, [
       ...(settings.mode === 'conceive' && prediction.showFertility
         ? [
-            prediction.ovulation ? fertileCard(prediction, today) : null,
+            prediction.ovulation ? fertileCard(prediction, today, 'conceive') : null,
             ovulationSignalCard(logs, cycles, today),
             prediction.expecting ? expectingCard(prediction)
               : prediction.stale ? staleCard(prediction)
@@ -177,7 +177,7 @@ export function renderToday(host) {
                   : prediction.withinWindow ? dueCard(prediction)
                     : nextPeriodCard(prediction),
             prediction.showFertility && prediction.ovulation
-              ? fertileCard(prediction, today) : null,
+              ? fertileCard(prediction, today, 'cycle') : null,
           ]),
       packCard(settings, logs, today),
       ...acogCards(cycles, today, prediction, logs),
@@ -1080,8 +1080,9 @@ function lateCard(prediction) {
 /**
  * @param {import('../domain/predict.js').Prediction} prediction
  * @param {DateKey} today
+ * @param {'cycle'|'conceive'} mode
  */
-function fertileCard(prediction, today) {
+function fertileCard(prediction, today, mode) {
   if (!prediction.fertileWindow || !prediction.ovulation) return null;
   const chance = conceptionChance(prediction, today);
 
@@ -1118,48 +1119,34 @@ function fertileCard(prediction, today) {
       + `period, measured from ${plural(prediction.lutealSamples, 'cycle')} where `
       + 'a test or your temperature confirmed it.' })
       /*
-        The other half of that sentence, which was missing.
+        Where the number came from, when it was not measured.
 
-        The card said where the number came from when it had been measured, and
-        said nothing at all when it had not — so the common case, a population
-        average of fourteen days applied to a stranger, was the silent one.
-        Silence on a card like this reads as confidence.
+        The card used to say this only when the luteal length had been measured,
+        and nothing in the common case where it was the population average —
+        so the silence belonged to the guess, and silence on a card like this
+        reads as confidence. Luteal phases run from about ten to sixteen days;
+        at eleven, both of the window's peak days are wrong.
 
-        It matters more than a footnote. Luteal phases genuinely run from about
-        ten days to sixteen, and this number places the whole window: measured
-        against her own cycles, a woman whose luteal phase is eleven days is
-        shown a window whose two peak days are both wrong. The app can already
-        fix that by itself — `measuredLuteal` replaces the assumption with her
-        own median after two confirmed ovulations — and the only reason it
-        usually cannot is that nothing ever told her which two things to log.
-
-        So it says so, and then it opens the drawer, because telling her
-        without taking her there is the same dead end in a politer voice.
+        One line, in both modes. This card used to carry the whole pitch — two
+        paragraphs and two buttons — every day, which in conceive mode sat
+        directly above the "Has ovulation happened?" card saying the same thing
+        in different words, and in cycle mode asked someone who is not trying
+        to conceive to start buying ovulation tests. The pitch lives with the
+        card it belongs to now (`ovulationSignalCard`), and cycle mode gets a
+        single quiet way in.
       */
       : el('div', {}, [
-        el('p', { class: 'hint-sm', text:
-          `Ovulation is placed ${plural(prediction.lutealDays, 'day')} before your `
-          + 'period — a population average rather than anything measured about '
-          + 'you. Yours could be a few days either side, which moves this whole '
-          + 'window.' }),
-        el('p', { class: 'hint-sm', text:
-          'Log a morning temperature, or an ovulation test, on the days around '
-          + 'ovulation. After two cycles Kittycal can date it from your own body '
-          + 'instead of the average.' }),
-        el('div', { class: 'card-actions' }, [
-          el('button', {
-            type: 'button',
-            class: 'btn btn-secondary',
-            text: 'Add a temperature',
-            onclick: () => { haptic(); openLogSheet(today, { openSection: 'Measurements' }); },
-          }),
-          el('button', {
-            type: 'button',
-            class: 'btn btn-secondary',
-            text: 'Add a test result',
-            onclick: () => { haptic(); openLogSheet(today, { openSection: 'Tests' }); },
-          }),
-        ]),
+        el('p', { class: 'hint-sm', text: prediction.lutealSamples === 1
+          ? `Placed ${plural(prediction.lutealDays, 'day')} before your period — still the `
+            + 'average. One cycle of yours is measured; one more and Kittycal uses yours.'
+          : `Placed ${plural(prediction.lutealDays, 'day')} before your period — an `
+            + 'average, not measured from you, so yours could sit a few days either side.' }),
+        mode === 'cycle' && el('button', {
+          type: 'button',
+          class: 'btn-link',
+          text: 'Use your own instead',
+          onclick: () => { haptic(); openLogSheet(today, { openSection: 'Measurements' }); },
+        }),
       ]),
 
     prediction.fertileWidened && el('div', { class: 'alert alert-warn', style: { marginTop: 'var(--sp-3)' } }, [
@@ -1202,12 +1189,32 @@ function ovulationSignalCard(logs, cycles, today) {
   // Nothing recorded yet this cycle. Say what would answer it rather than
   // showing an empty card.
   if (!confirmed && !eggWhite) {
+    /*
+      The one place the ask lives in conceive mode, and it can be acted on
+      here. It said what would date ovulation and then left her to find the
+      fields: four taps, in a drawer called Measurements, behind "Add more".
+    */
     return el('div', { class: 'card data-zone' }, [
       el('h3', { text: 'Has ovulation happened?' }),
       el('p', { class: 'hint-sm', text:
         'Nothing recorded this cycle that can date it yet. A positive ovulation ' +
-        'test, or a temperature taken each morning, is what turns the estimate ' +
-        'above into an observation.' }),
+        'test, or a temperature taken each morning, turns the estimate above ' +
+        'into an observation — and after two cycles, Kittycal places your ' +
+        'window from your own body instead of the average.' }),
+      el('div', { class: 'card-actions' }, [
+        el('button', {
+          type: 'button',
+          class: 'btn btn-secondary',
+          text: 'Add a temperature',
+          onclick: () => { haptic(); openLogSheet(today, { openSection: 'Measurements' }); },
+        }),
+        el('button', {
+          type: 'button',
+          class: 'btn btn-secondary',
+          text: 'Add a test result',
+          onclick: () => { haptic(); openLogSheet(today, { openSection: 'Tests' }); },
+        }),
+      ]),
     ]);
   }
 

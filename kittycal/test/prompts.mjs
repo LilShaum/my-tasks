@@ -121,13 +121,28 @@ for (const mode of ['cycle', 'conceive']) {
 
   const card = await cardWith(page, 'Fertile window');
   check(card != null, 'the fertile card is on screen');
-  check(/population average/i.test(card ?? ''),
+  check(/average/i.test(card ?? ''),
     'and admits the placement is an average rather than hers', (card ?? '').slice(0, 90));
-  check(/temperature/i.test(card ?? '') && /ovulation test/i.test(card ?? ''),
-    'and names both things that would replace it');
 
-  // The offer has to be reachable, not merely described.
-  for (const [label, section] of [['Add a temperature', 'Measurements'], ['Add a test result', 'Tests']]) {
+  /*
+    Said once per screen. Opus 5 first put the whole pitch on the fertile card
+    in both modes, which in conceive mode sat directly above "Has ovulation
+    happened?" saying the same thing in other words — and in cycle mode asked
+    someone who is not trying to conceive to buy ovulation tests, every day.
+  */
+  const pitches = await page.evaluate(() => (document.querySelector('#view-today')?.textContent ?? '')
+    .match(/ovulation test/gi)?.length ?? 0);
+  check(pitches <= 1, 'the how-to-measure pitch appears at most once on the screen', `${pitches} times`);
+  if (mode === 'cycle') {
+    check(!/ovulation test/i.test(card ?? ''),
+      'and someone not trying to conceive is not asked to buy ovulation tests');
+  }
+
+  // Whatever offers a way in has to land her there, not describe it.
+  const offers = mode === 'cycle'
+    ? [['Use your own instead', 'Measurements']]
+    : [['Add a temperature', 'Measurements'], ['Add a test result', 'Tests']];
+  for (const [label, section] of offers) {
     const button = page.locator(`#view-today button:has-text("${label}")`).first();
     // eslint-disable-next-line no-await-in-loop
     check(await button.count() === 1, `"${label}" is a button, not a sentence`);
