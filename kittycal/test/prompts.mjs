@@ -250,6 +250,69 @@ console.log('\nthe daily check-in carries the measurements she already keeps');
   }
 }
 
+console.log('\na search that finds nothing offers to make the thing');
+{
+  /*
+    The app lets her track anything she names. The control is a chip reading
+    "+ Add your own", ninth of thirteen collapsed sections in a sheet reached
+    from a button called "Add more", with nothing anywhere pointing at it. So
+    someone looking for a symptom the app does not carry searches, reads
+    "Nothing matches that", and concludes it cannot be done — the feature
+    exists and is, for her, not there.
+
+    A failed search is the one moment she has said in her own words what she
+    wants and been told no.
+  */
+  const { ctx, page } = await open({ log: {
+    flow: 'none', symptoms: [], moods: [], discharge: [], activity: [],
+    other: [], sex: [], custom: [],
+  } });
+  await page.locator('button:has-text("Add more")').first().click();
+  await page.waitForTimeout(900);
+
+  const search = async (query) => {
+    await page.locator('.sheet .search-input').fill(query);
+    await page.waitForTimeout(350);
+    return page.evaluate(() => {
+      const node = document.querySelector('.search-offer');
+      return node && !node.hidden ? (node.textContent ?? '') : null;
+    });
+  };
+
+  check(await search('cramps') === null,
+    'a search that finds something does not offer to duplicate it');
+  const offered = await search('sore feet');
+  check(offered != null && offered.includes('sore feet'),
+    'a search that finds nothing offers it back in her own words', String(offered));
+  check(await search('x') === null, 'a single stray character is a typo, not a name');
+  check(await search('a'.repeat(60)) === null, 'and neither is a pasted paragraph');
+
+  await search('sore feet');
+  await page.locator('.search-offer').click();
+  await page.waitForTimeout(900);
+
+  const after = await page.evaluate(async () => {
+    const store = await import('/js/state/store.js');
+    const chips = [...document.querySelectorAll('.sheet .chip')]
+      .filter((c) => /sore feet/i.test(c.textContent ?? ''));
+    return {
+      saved: store.getState().settings.customSymptoms,
+      chips: chips.length,
+      pressed: chips[0]?.getAttribute('aria-pressed'),
+      box: document.querySelector('.search-input')?.value,
+    };
+  });
+  check(after.saved.includes('sore feet'), 'taking it saves the symptom');
+  check(after.chips === 1 && after.pressed === 'true',
+    'and ticks it for today, so the tap that made it also logged it');
+  check(after.box === '',
+    'and clears the search, or the section it was added to stays hidden');
+
+  check(await search('Sore Feet') === null,
+    'offering the same name again does not make a second one');
+  await ctx.close();
+}
+
 await browser.close();
 console.log(`\nprompts: ${checks - failures}/${checks} checks passed\n`);
 process.exit(failures ? 1 : 0);

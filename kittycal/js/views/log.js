@@ -83,9 +83,10 @@ export function openLogSheet(date, options = {}) {
   // A day with no saved log has never been answered — see chipRegistry.
   chips.setFlowAnswered(store.getState().logs[date] != null);
 
+  const custom = customSection(draft, settings, chips);
   const sections = [
     ...CATEGORIES.map((cat) => categorySection(cat, draft, settings, chips)),
-    customSection(draft, settings, chips),
+    custom.node,
     testsSection(draft, chips),
     measurementsSection(draft, settings, chips),
     pillSection(draft),
@@ -103,7 +104,7 @@ export function openLogSheet(date, options = {}) {
     ]),
 
     quickRow(draft, settings, chips),
-    searchBar(),
+    searchBar(custom.add),
     ...sections,
   ];
 
@@ -294,13 +295,37 @@ function daySummary(date, log) {
  * Operates on the rendered DOM rather than re-rendering, so nothing already
  * selected in the draft is disturbed by searching.
  */
-function searchBar() {
+/**
+ * @param {(name: string) => boolean} onCreate makes a custom symptom by name
+ */
+function searchBar(onCreate) {
   /** Remembers which sections were open before a search, to restore after. */
   /** @type {WeakMap<HTMLElement, boolean>} */
   const wasOpen = new WeakMap();
   let searching = false;
 
   const count = el('span', { class: 'search-count hint-sm', 'aria-live': 'polite' });
+
+  /*
+    What to do when the answer is "we don't have that".
+
+    The app lets her track anything she names, and the control for it is a chip
+    reading "+ Add your own" inside a section called "Anything else" — ninth of
+    thirteen, collapsed, below eight other collapsed sections. Nothing points at
+    it. Someone looking for a symptom the app does not carry searches for it,
+    reads "Nothing matches that", and reasonably concludes the app cannot do
+    this; the feature exists and is, for her, not there.
+
+    A failed search is the one moment she has said in her own words what she
+    wants and been told no — so that is where the offer belongs. It costs
+    nothing to anyone whose search succeeds, and it needs no explaining,
+    because she has just typed the name.
+  */
+  const offer = el('button', {
+    type: 'button',
+    class: 'btn btn-secondary search-offer',
+    hidden: true,
+  });
 
   const input = /** @type {HTMLInputElement} */ (el('input', {
     class: 'input search-input',
@@ -411,9 +436,36 @@ function searchBar() {
     count.textContent = hits === 0
       ? 'Nothing matches that'
       : `${hits} ${hits === 1 ? 'match' : 'matches'}`;
+
+    /*
+      Offered only for something that could be a name. A stray character or a
+      paragraph pasted in is a mistyped search rather than a thing she wants to
+      track for the next five years, and 40 is the limit the naming sheet
+      already enforces.
+    */
+    const name = raw.trim();
+    const offerable = hits === 0 && name.length >= 2 && name.length <= 40;
+    offer.hidden = !offerable;
+    if (offerable) offer.textContent = `Track “${name}” yourself`;
   }
 
-  return el('div', { class: 'search-wrap' }, [input, clear, count]);
+  offer.addEventListener('click', () => {
+    const name = input.value.trim();
+    if (!onCreate(name)) return;
+    haptic();
+    // Clearing the box is what makes the new chip visible: a search matching
+    // nothing has every section hidden, including the one it was just added to.
+    input.value = '';
+    apply('');
+    const section = [...document.querySelectorAll('.sheet-body .log-section-title')]
+      .find((node) => node.textContent?.trim() === 'Anything else')?.closest('details');
+    if (section instanceof HTMLDetailsElement) {
+      section.open = true;
+      section.scrollIntoView({ block: 'start', behavior: 'auto' });
+    }
+  });
+
+  return el('div', { class: 'search-wrap' }, [input, clear, count, offer]);
 }
 
 /**
@@ -758,6 +810,8 @@ function toggle(cat, draft, id, single) {
  * @param {DayLog} draft
  * @param {import('../domain/model.js').Settings} settings
  * @param {ReturnType<typeof sheetState>} chips
+ * @returns {{node: HTMLElement, add: (name: string) => boolean}} `add` is what
+ *   the search offers when nothing matched — see `searchBar`.
  */
 function customSection(draft, settings, chips) {
   const row = el('div', { class: 'chip-row' });
@@ -808,27 +862,48 @@ function customSection(draft, settings, chips) {
           },
         });
         if (!name) return;
-
-        const existing = store.getState().settings.customSymptoms;
-        store.updateSettings({ customSymptoms: [...existing, name] });
-        draft.custom.push(name);
-        paint();
-        // A symptom she has just created is selected, so it wants a rating row
-        // straight away rather than after the next unrelated tap.
-        chips.sync();
-        announce(`Added ${name}`);
+        add(name);
       },
     }));
   };
 
+  /**
+   * Create one and tick it for today.
+   *
+   * Shared with the search, which offers this when a query matched nothing —
+   * so the rule about what a name may be lives in one place rather than being
+   * written twice and drifting.
+   *
+   * @param {string} raw
+   * @returns {boolean} false when the name is unusable or already taken
+   */
+  function add(raw) {
+    const name = raw.trim().slice(0, 40);
+    if (!name) return false;
+
+    const existing = store.getState().settings.customSymptoms;
+    if (existing.some((one) => one.toLowerCase() === name.toLowerCase())) return false;
+
+    store.updateSettings({ customSymptoms: [...existing, name] });
+    if (!draft.custom.includes(name)) draft.custom.push(name);
+    paint();
+    // A symptom she has just created is selected, so it wants a rating row
+    // straight away rather than after the next unrelated tap.
+    chips.sync();
+    announce(`Added ${name}`);
+    return true;
+  }
+
   paint();
 
-  return section(
+  const node = section(
     'Anything else',
     'Track whatever you like — it shows up in your patterns alongside everything else.',
     [row, symptomSeverity(draft, chips, 'custom')],
     { count: draft.custom.length },
   );
+
+  return { node, add };
 }
 
 /* ── Tests ──────────────────────────────────────────────────────────────── */
