@@ -28,6 +28,7 @@
 import { addDays, daysBetween } from '../utils/date.js';
 import {
   buildCycles, cycleLengths, periodLengths, currentCycle, summarize, periodSpan,
+  CYCLE_LENGTH_FLOOR, CYCLE_LENGTH_CEIL,
 } from './cycles.js';
 import { HORMONAL_BIRTH_CONTROL } from './model.js';
 import { measuredLuteal } from './ovulation.js';
@@ -77,14 +78,6 @@ export const STALE_AFTER_DAYS = 90;
 export const ACTIVE_WITHIN_DAYS = 30;
 
 /**
- * The range a *derived* cycle length is allowed to fall in.
- *
- * These bound the model, not her testimony. A weighted average pulled out of
- * logged data can be wrong in ways she would never claim — one mis-tapped date
- * in 2023 is enough — so what the data infers is held to the range that covers
- * almost everybody.
- */
-/**
  * How long a positive test holds the forecast, counted from her last period.
  *
  * Without a limit the pause had no end: she logs a positive test, has the
@@ -96,30 +89,13 @@ export const ACTIVE_WITHIN_DAYS = 30;
  */
 export const PREGNANCY_HOLD_DAYS = 43 * 7;
 
-export const CYCLE_MIN_CLAMP = 21;
-export const CYCLE_MAX_CLAMP = 45;
-
 /**
  * The range she is allowed to *state*, which must match the steppers in
  * onboarding and Settings — both import these so the three cannot drift.
  *
- * Onboarding asks how long her cycle usually is and accepts anything up to
- * sixty days. The forecast then clamped that answer to forty-five, so stating
- * 50, 55 or 60 produced one identical prediction: the app asked a question,
- * offered the answer, and discarded it without a word. For long cycles — PCOS
- * is the common reason, and it is not rare — that is the same ten-day error
- * every cycle, on the first screen she ever sees, forever.
- *
- * So the clamp widens to take in whatever she has told us. Below the stated
- * number the data is still held to `CYCLE_MIN_CLAMP`…`CYCLE_MAX_CLAMP`; a
- * woman who says her cycles run to fifty-five has also said that a fifty-day
- * observation is signal rather than a logging slip. Once she has three logged
- * cycles the weighted average takes over regardless, so a mis-tapped stepper
- * corrects itself rather than sticking.
- *
- * Values outside this range can still arrive from an imported or hand-edited
- * file (`normalizeSettings` allows 15…90 so an import is never silently
- * dropped), and those do not get to widen anything.
+ * Values outside it can still arrive from an imported or hand-edited file
+ * (`normalizeSettings` allows 15…90 so an import is never silently dropped);
+ * those are brought inside it before being used as a prior.
  */
 export const CYCLE_STATED_MIN = 15;
 export const CYCLE_STATED_MAX = 60;
@@ -387,7 +363,8 @@ export function predict({ periodDays, settings, today, logs }) {
   const confidence = rateConfidence(lengths.length, stats.spread);
 
   /* ── Which cycle length do we use? ───────────────────────────────────── */
-  let avg = settings.avgCycleLength;
+  const stated = clamp(settings.avgCycleLength, CYCLE_STATED_MIN, CYCLE_STATED_MAX);
+  let avg = stated;
   let recalibrated = false;
 
   if (lengths.length >= MIN_CYCLES_FOR_MODEL) {
@@ -403,16 +380,30 @@ export function predict({ periodDays, settings, today, logs }) {
     // One or two cycles: blend what we've seen with her stated prior rather
     // than swinging fully onto a single observation.
     const observed = lengths.reduce((a, b) => a + b, 0) / lengths.length;
-    avg = (observed + settings.avgCycleLength) / 2;
+    avg = (observed + stated) / 2;
   }
 
-  // Widened to include her own stated cycle length — see CYCLE_STATED_MAX.
-  const stated = clamp(settings.avgCycleLength, CYCLE_STATED_MIN, CYCLE_STATED_MAX);
-  avg = clamp(
-    Math.round(avg),
-    Math.min(CYCLE_MIN_CLAMP, stated),
-    Math.max(CYCLE_MAX_CLAMP, stated),
-  );
+  /*
+    Bounded by what counts as a cycle at all, not by what is typical.
+
+    This used to clamp to 21…45 — a "typical" range — and then, after the
+    stated-length fix, to that range widened to include whatever she typed.
+    Neither let her own data speak. Six logged 50-day cycles forecast 45, five
+    days early every time; six logged 18-day cycles forecast 21; and someone
+    who answered "not sure" at onboarding, which stores 28, was capped at 45
+    forever however long her cycles really ran. Long cycles are common enough
+    — PCOS is the usual reason — for that to be a lot of people.
+
+    The cap was meant to stop one bad date dragging the average somewhere
+    absurd, but it was not doing that: `cycleLengths` already drops anything
+    outside 15…90 days, the average is weighted towards recent cycles, and
+    recalibration needs three in a row. A 28-day regular with one period never
+    logged forecasts 36 under the cap and without it. What it actually did was
+    overrule months of consistent evidence. The averages of lengths that are
+    each a plausible cycle are kept to the same plausible range, and the
+    confidence and spread lines say how far to trust them.
+  */
+  avg = clamp(Math.round(avg), CYCLE_LENGTH_FLOOR, CYCLE_LENGTH_CEIL);
 
   const avgPeriod = periods.length
     ? clamp(Math.round(periods.reduce((a, b) => a + b, 0) / periods.length), 1, 14)

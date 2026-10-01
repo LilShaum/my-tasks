@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import {
   predict, weightedAverage, detectRecalibration, rateConfidence,
   upcomingPeriods, upcomingFertile, conceptionChance,
-  CYCLE_MIN_CLAMP, CYCLE_MAX_CLAMP, CYCLE_STATED_MIN, CYCLE_STATED_MAX,
+  CYCLE_STATED_MIN, CYCLE_STATED_MAX,
   STALE_AFTER_DAYS, startWindow, lastActivity, PREGNANCY_HOLD_DAYS,
 } from '../js/domain/predict.js';
 // Moved to its own module so that a prediction can depend on measured
@@ -21,7 +21,7 @@ import {
 import { detectThermalShift } from '../js/domain/ovulation.js';
 import { defaultSettings, emptyLog } from '../js/domain/model.js';
 import { phaseFor, PHASES, ringSegments } from '../js/domain/phases.js';
-import { buildCycles } from '../js/domain/cycles.js';
+import { buildCycles, CYCLE_LENGTH_FLOOR, CYCLE_LENGTH_CEIL } from '../js/domain/cycles.js';
 import { range, addDays, daysBetween } from '../js/utils/date.js';
 
 const period = (start, len) => range(start, addDays(start, len - 1));
@@ -236,7 +236,7 @@ test('every cycle length the app offers her is the one it forecasts from', () =>
   /*
     The regression this guards is a silent one. Onboarding and Settings both
     accept up to CYCLE_STATED_MAX days, and the forecast used to clamp that
-    answer to CYCLE_MAX_CLAMP — so 50, 55 and 60 produced one identical
+    answer to 45 — so 50, 55 and 60 produced one identical
     prediction. Long cycles are common enough (PCOS being the usual reason)
     that this was a permanent ten-day error for the women it applied to, set
     on the first screen they ever saw.
@@ -253,22 +253,43 @@ test('every cycle length the app offers her is the one it forecasts from', () =>
   }
 });
 
-test('a derived average is still held to the physiological range', () => {
+test('months of her own long or short cycles are believed, not capped', () => {
   /*
-    Widening the clamp to admit her stated length must not widen it for numbers
-    the data produced. She says 28; the logged history says something absurd;
-    the forecast stays inside CYCLE_MIN_CLAMP…CYCLE_MAX_CLAMP.
+    The forecast was clamped to a "typical" 21…45 days, widened only for what
+    she typed. Six logged 50-day cycles forecast 45 — five days early, every
+    cycle — and someone who answered "not sure" at onboarding (which stores
+    28) could never get past 45 however long her cycles ran.
   */
-  const long = history('2024-01-01', 80, 8);   // 80-day "cycles"
-  const p = predict({ periodDays: long, settings: settings({}), today: addDays('2024-01-01', 80 * 7 + 10) });
-  assert.ok(p.avgCycleLength <= CYCLE_MAX_CLAMP,
-    `derived ${p.avgCycleLength} escaped the ceiling`);
-  assert.ok(p.avgCycleLength >= CYCLE_MIN_CLAMP);
+  const long = history('2025-01-06', 50, 7);
+  const p = predict({ periodDays: long, settings: settings({ avgCycleLength: 28 }),
+    today: addDays('2025-01-06', 50 * 6 + 3) });
+  assert.equal(p.avgCycleLength, 50);
 
-  const short = history('2024-01-01', 16, 8);  // 16-day "cycles"
-  const q = predict({ periodDays: short, settings: settings({}), today: addDays('2024-01-01', 16 * 7 + 5) });
-  assert.ok(q.avgCycleLength >= CYCLE_MIN_CLAMP,
-    `derived ${q.avgCycleLength} escaped the floor`);
+  const short = history('2025-01-06', 18, 7);
+  const q = predict({ periodDays: short, settings: settings({ avgCycleLength: 28 }),
+    today: addDays('2025-01-06', 18 * 6 + 3) });
+  assert.equal(q.avgCycleLength, 18);
+});
+
+test('the forecast never leaves the range of a plausible cycle', () => {
+  // The bound that remains: averages of lengths that each count as a cycle
+  // stay inside what counts as a cycle.
+  const long = history('2024-01-01', 80, 8);
+  const p = predict({ periodDays: long, settings: settings({}), today: addDays('2024-01-01', 80 * 7 + 10) });
+  assert.ok(p.avgCycleLength >= CYCLE_LENGTH_FLOOR && p.avgCycleLength <= CYCLE_LENGTH_CEIL,
+    String(p.avgCycleLength));
+});
+
+test('one period that was never logged moves the forecast the same as before', () => {
+  // What the old cap was meant to guard against. It never did: this was 36
+  // with the cap and is 36 without it.
+  const lens = [28, 28, 28, 28, 28, 56];
+  const days = [];
+  let start = '2025-01-06';
+  for (const len of lens) { days.push(...period(start, 5)); start = addDays(start, len); }
+  days.push(...period(start, 5));
+  const p = predict({ periodDays: days, settings: settings({}), today: addDays(start, 3) });
+  assert.equal(p.avgCycleLength, 36);
 });
 
 /* ── predict: lateness ───────────────────────────────────────────────────── */
