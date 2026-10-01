@@ -34,10 +34,20 @@ list of symptoms. It does not need a server, and it should not want one.
   discharge, sex, sex drive, activity, life events, pregnancy and ovulation
   tests, BBT, weight, sleep, steps, water, birth control, notes — plus unlimited
   custom symptoms.
-- **Insights** — cycle and period length against the ACOG typical range,
-  regularity, BBT charting with thermal-shift detection, weight and sleep
-  trends, and symptom patterns showing *where in the cycle* something lands
-  ("cramps, 10 of 10 cycles, most often on day 1 and 2").
+- **A daily check-in** of three quick questions — bleeding, mood, symptoms —
+  plus a morning temperature for anyone who already takes one.
+- **"Coming up for you"** — in the days before a period, Today names what she
+  usually gets and how far ahead ("Bloating, usually from about 4 days before
+  your period, 4 of your last 4 cycles").
+- **Insights** — cycle and period length against the ACOG typical range (the
+  adolescent range under 18, when a birth year is given), regularity, BBT
+  charting with thermal-shift detection, weight, sleep, water and step trends,
+  and symptom patterns showing *where in the cycle* something lands ("cramps,
+  10 of 10 cycles, most often on day 1 and 2").
+- **Ovulation dated from her own body** — two cycles with a temperature rise
+  or a positive ovulation test, and the fertile window moves from the
+  population average to her measured luteal phase. The app says which one it
+  is using.
 - **A printable report for a doctor** — six months of history as plain tables.
   Every print dialogue offers "Save as PDF".
 - **14 themes**, each in light and dark, with original mascot art — or use your
@@ -47,7 +57,8 @@ list of symptoms. It does not need a server, and it should not want one.
 - **Export and erase** — a complete, readable JSON export, and a real delete.
 - Fertility estimates are hidden when you're on hormonal birth control, because
   ovulation isn't happening and a guess dressed up as a prediction is worse than
-  nothing.
+  nothing. The same rule pauses every forecast after a positive pregnancy test,
+  until a period is logged.
 
 ### Not built, deliberately
 
