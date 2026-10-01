@@ -628,3 +628,12 @@
 /* The measurements question reuses the diary's measure rows (ui/measure.js);
    this only spaces them under the question. */
 .checkin-measures { margin-top: var(--sp-4); }
+
+/* "Coming up for you": a short list, the name carrying the weight. */
+.heads-up-list {
+  list-style: none;
+  margin: var(--sp-2) 0 var(--sp-3);
+  padding: 0;
+  display: grid;
+  gap: var(--sp-2);
+}

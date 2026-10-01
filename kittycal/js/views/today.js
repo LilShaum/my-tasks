@@ -22,7 +22,8 @@ import { todayKey, fmtDayMonth, fmtRelative, daysBetween, addDays, dow, dayOfMon
 import { plural, listJoin } from '../utils/fmt.js';
 import { labelFor, labelOf, CATEGORIES, DEFAULT_CHIPS } from '../data/taxonomy.js';
 import { pick } from '../data/tips.js';
-import { loggedIds, spottingBetweenPeriods } from '../domain/stats.js';
+import { loggedIds, spottingBetweenPeriods, MIN_CYCLES_FOR_PATTERN } from '../domain/stats.js';
+import { premenstrualPatterns, headsUpToday } from '../domain/heads-up.js';
 import { nothingRecorded } from '../domain/model.js';
 import { buildRecap, cluster } from '../domain/recap.js';
 import { respondToCheckin } from '../domain/response.js';
@@ -169,6 +170,7 @@ export function renderToday(host) {
                 : prediction.isLate ? lateCard(prediction)
                   : prediction.withinWindow ? dueCard(prediction)
                     : nextPeriodCard(prediction),
+            headsUpCard(logs, cycles, prediction),
           ]
         : [
             prediction.expecting ? expectingCard(prediction)
@@ -176,6 +178,7 @@ export function renderToday(host) {
                 : prediction.isLate ? lateCard(prediction)
                   : prediction.withinWindow ? dueCard(prediction)
                     : nextPeriodCard(prediction),
+            headsUpCard(logs, cycles, prediction),
             prediction.showFertility && prediction.ovulation
               ? fertileCard(prediction, today, 'cycle') : null,
           ]),
@@ -796,6 +799,7 @@ function tipsRow({ phase, prediction, log, today }) {
     loggedToday,
     showFertility: prediction.showFertility,
     dateSeed: today,
+    patternsReady: prediction.cyclesLogged >= MIN_CYCLES_FOR_PATTERN,
   });
 
   if (!tips.length) return null;
@@ -885,6 +889,39 @@ function confidenceLine(prediction) {
     class: `confidence confidence-${prediction.confidence}`,
     text: copy[prediction.confidence],
   });
+}
+
+/**
+ * What she usually gets before her period, while it is still ahead of her.
+ *
+ * The Patterns card in Insights already knew this, and it stayed there: true,
+ * and only ever read by someone who went looking. This puts it on the screen
+ * she opens, in the few days when it is useful — see `heads-up.js` for when a
+ * pattern counts and why it is counted back from the period.
+ *
+ * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
+ * @param {import('../domain/cycles.js').Cycle[]} cycles
+ * @param {import('../domain/predict.js').Prediction} prediction
+ */
+function headsUpCard(logs, cycles, prediction) {
+  if (prediction.stale || prediction.expecting) return null;
+  const due = headsUpToday(premenstrualPatterns(logs, cycles), prediction).slice(0, 3);
+  if (!due.length) return null;
+
+  /** @param {import('../domain/heads-up.js').PremenstrualPattern} p */
+  const name = (p) => (p.kind === 'custom' ? p.id : labelFor(p.kind, p.id));
+
+  return el('div', { class: 'card data-zone' }, [
+    el('h3', { text: 'Coming up for you' }),
+    el('ul', { class: 'heads-up-list' }, due.map((p) => el('li', {}, [
+      el('strong', { text: name(p) }),
+      el('span', { class: 'hint-sm', text:
+        ` — usually from about ${plural(p.typicalBefore, 'day')} before your period, `
+        + `in ${p.cyclesWith} of your last ${p.cyclesTotal} cycles.` }),
+    ]))),
+    el('p', { class: 'hint-sm', text:
+      'From what you have logged, not a prediction about this month in particular.' }),
+  ]);
 }
 
 /**
@@ -1144,7 +1181,7 @@ function fertileCard(prediction, today, mode) {
         mode === 'cycle' && el('button', {
           type: 'button',
           class: 'btn-link',
-          text: 'Use your own instead',
+          text: 'Track your temperature',
           onclick: () => { haptic(); openLogSheet(today, { openSection: 'Measurements' }); },
         }),
       ]),

@@ -93,6 +93,7 @@
  * @property {string[]} [whenLogged]   only if one of these ids was logged today
  * @property {number[]} [cycleDays]    only on these days of the cycle
  * @property {boolean} [needsFertility] skip when fertility output is hidden
+ * @property {boolean} [untilPatterns]  only while patterns cannot be shown yet
  */
 
 /** @type {Tip[]} */
@@ -244,6 +245,9 @@ export const TIPS = [
   },
   {
     id: 'any-log-more',
+    // Said to someone with three cycles on record, this told her she was not
+    // there yet while the Patterns card on the next screen was already full.
+    untilPatterns: true,
     title: 'Patterns need about three cycles',
     body: 'That is the point where Kittycal can tell a real pattern from a ' +
       'coincidence. Even a couple of taps a day is enough to get there.',
@@ -318,10 +322,11 @@ export const TIPS = [
  * @param {string[]} input.loggedToday   taxonomy ids logged today
  * @param {boolean} input.showFertility
  * @param {string} input.dateSeed        today's date key, for rotation
+ * @param {boolean} [input.patternsReady] enough complete cycles for patterns
  * @param {number} [input.limit]
  * @returns {Tip[]}
  */
-export function pick({ phase, cycleDay, loggedToday, showFertility, dateSeed, limit = 3 }) {
+export function pick({ phase, cycleDay, loggedToday, showFertility, dateSeed, patternsReady = false, limit = 3 }) {
   const logged = new Set(loggedToday);
 
   /** @type {{tip: Tip, score: number}[]} */
@@ -329,6 +334,7 @@ export function pick({ phase, cycleDay, loggedToday, showFertility, dateSeed, li
 
   for (const tip of TIPS) {
     if (tip.needsFertility && !showFertility) continue;
+    if (tip.untilPatterns && patternsReady) continue;
     if (tip.phases && !tip.phases.includes(phase)) continue;
     if (tip.cycleDays && (cycleDay == null || !tip.cycleDays.includes(cycleDay))) continue;
 

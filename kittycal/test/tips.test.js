@@ -126,3 +126,10 @@ test('tip ids are unique', () => {
   const ids = TIPS.map((t) => t.id);
   assert.equal(new Set(ids).size, ids.length, 'duplicate tip ids');
 });
+
+test('the "patterns need three cycles" tip stops once she has three', () => {
+  const base = { phase: 'follicular', cycleDay: 9, loggedToday: [], showFertility: true, limit: 50 };
+  const ids = (ready) => pick({ ...base, dateSeed: '2026-10-01', patternsReady: ready }).map((t) => t.id);
+  assert.ok(ids(false).includes('any-log-more'));
+  assert.ok(!ids(true).includes('any-log-more'));
+});

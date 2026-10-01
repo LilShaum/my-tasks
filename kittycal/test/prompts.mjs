@@ -148,7 +148,7 @@ for (const mode of ['cycle', 'conceive']) {
 
   // Whatever offers a way in has to land her there, not describe it.
   const offers = mode === 'cycle'
-    ? [['Use your own instead', 'Measurements']]
+    ? [['Track your temperature', 'Measurements']]
     : [['Add a temperature', 'Measurements'], ['Add a test result', 'Tests']];
   for (const [label, section] of offers) {
     const button = page.locator(`#view-today button:has-text("${label}")`).first();
