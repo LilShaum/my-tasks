@@ -226,6 +226,12 @@ console.log('\nthe daily check-in carries the measurements she already keeps');
       const field = page.locator('.sheet input[type=number]');
       // eslint-disable-next-line no-await-in-loop
       check(await field.count() === 1, 'and the last question is a temperature field');
+
+      /* A morning reading is only answerable in the morning, so the screen
+         promises blank is fine — and that promise has to be true. */
+      // eslint-disable-next-line no-await-in-loop
+      const hint = await page.evaluate(() => document.querySelector('.sheet .hint')?.textContent ?? '');
+      check(/leave it blank/i.test(hint), 'and says plainly that she can leave it blank', hint);
       // eslint-disable-next-line no-await-in-loop
       await field.fill('36.60');
       // eslint-disable-next-line no-await-in-loop
@@ -244,6 +250,45 @@ console.log('\nthe daily check-in carries the measurements she already keeps');
       });
       check(saved != null && Math.abs(saved - 36.6) < 0.01,
         'and what she types there is saved', String(saved));
+    }
+    if (wanted === 4) {
+      // Now the promise itself: blank, Done, and the check-in completes.
+      // eslint-disable-next-line no-await-in-loop
+      const again = await open({ bbtDays });
+      // eslint-disable-next-line no-await-in-loop
+      await again.page.locator('button:has-text("Check in for today")').click();
+      // eslint-disable-next-line no-await-in-loop
+      await again.page.waitForTimeout(700);
+      // eslint-disable-next-line no-await-in-loop
+      await again.page.locator('.sheet button:has-text("No bleeding")').click();
+      // eslint-disable-next-line no-await-in-loop
+      await again.page.waitForTimeout(500);
+      // eslint-disable-next-line no-await-in-loop
+      await again.page.locator('.sheet button:has-text("Next")').click();
+      // eslint-disable-next-line no-await-in-loop
+      await again.page.waitForTimeout(500);
+      // eslint-disable-next-line no-await-in-loop
+      await again.page.locator('.sheet button').filter({ hasText: /^Next$|^Done$/ }).first().click();
+      // eslint-disable-next-line no-await-in-loop
+      await again.page.waitForTimeout(600);
+      // eslint-disable-next-line no-await-in-loop
+      await again.page.locator('.sheet button:has-text("Done")').click();
+      // eslint-disable-next-line no-await-in-loop
+      await again.page.waitForTimeout(1000);
+      // eslint-disable-next-line no-await-in-loop
+      const done = await again.page.evaluate(async () => {
+        const store = await import('/js/state/store.js');
+        const t = new Date();
+        const k = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+        const log = store.getState().logs[k];
+        return { closed: !document.querySelector('.sheet[data-open="true"]'),
+          checkedIn: log?.checkedIn === true, bbt: log?.bbt ?? null };
+      });
+      check(done.closed && done.checkedIn && done.bbt == null,
+        'and left blank, Done still finishes the check-in without inventing a reading',
+        JSON.stringify(done));
+      // eslint-disable-next-line no-await-in-loop
+      await again.ctx.close();
     }
     // eslint-disable-next-line no-await-in-loop
     await ctx.close();

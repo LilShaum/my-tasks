@@ -18,9 +18,22 @@
  *   2. Mood, which is the whole of the mood-by-phase chart.
  *   3. Symptoms, which is the whole of pattern detection.
  *
- * Nothing else is asked. Temperature, weight, sleep, water and the rest live
- * in the full diary, one tap away at the end, because asking about them daily
- * would turn a fifteen-second habit into a form.
+ * Nothing else is asked by default. Temperature, weight, sleep, water and the
+ * rest live in the full diary, one tap away at the end, because asking about
+ * them daily would turn a fifteen-second habit into a form.
+ *
+ * ── The rule for adding a daily question
+ *
+ * Only ask what she can answer from where she is standing, right now, without
+ * fetching anything. Flow, mood and symptoms pass: she knows them. A scale
+ * reading, a step count or a thermometer reading do not pass for everyone —
+ * they need a device she may not own, or a moment (first thing in the
+ * morning) that may already be over. A question she cannot answer is worse
+ * than no question: it teaches her the check-in is something to dismiss.
+ *
+ * So a measurement only joins the check-in once she has shown she has it to
+ * hand — logged on three of the last thirty days, see `habitualMeasures` — and
+ * even then it can always be left blank without explanation.
  *
  * @typedef {import('../utils/date.js').DateKey} DateKey
  * @typedef {import('../domain/model.js').DayLog} DayLog
@@ -594,9 +607,15 @@ function measureStep(ids, draft, settings, stale, onNext, lastStep) {
   return question({
     stale,
     title: ids.length === 1 && ids[0] === 'bbt' ? 'This morning’s temperature' : 'Your numbers',
+    /*
+      A morning temperature is only answerable in the morning. Checked in at
+      night without having taken it, she cannot give it — so the screen says
+      plainly that blank is a fine answer, rather than leaving her staring at an
+      empty field wondering if Done will accept it.
+    */
     hint: ids.includes('bbt')
-      ? 'Taken before getting up. This is what lets Kittycal date ovulation from your own body rather than an average.'
-      : 'The ones you keep. Leave any of them blank.',
+      ? 'Didn’t take it today? Leave it blank and tap Done — that’s fine.'
+      : 'Leave any you don’t have to hand blank.',
     multi: true,
     options: [],
     extra: rows,
