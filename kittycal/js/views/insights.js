@@ -1,40 +1,54 @@
 // @ts-check
 /**
- * insights.js — cycle analysis.
+ * insights.js — what her own logs say about her body.
  *
  * Everything in here is behind Flo Premium. It's all arithmetic over data she
  * already has, so there's no honest reason for it to cost anything.
  *
- * The whole screen is a data zone: thin borders, tabular numerals, no
- * decorative motion, no mascot. Same palette as the rest of the app, different
- * density — cute chrome, restrained data.
+ * The rule for a card on this screen: it answers one question she actually has
+ * — is my cycle normal, which day is my heaviest, when does the bloating start,
+ * do I get PMS, does my cycle affect my sleep — and its title *is* the answer,
+ * in a sentence. The chart underneath is the evidence. A card that could only
+ * show a count ("141 days tracked") is not on this screen any more: a number
+ * she cannot do anything with is not an insight.
+ *
+ * When there is not enough data for an honest answer, a card says nothing and
+ * the "Still to come" list says what it is waiting for.
  *
  * @typedef {import('../utils/date.js').DateKey} DateKey
+ * @typedef {import('../domain/model.js').DayLog} DayLog
+ * @typedef {import('../domain/cycles.js').Cycle} Cycle
  */
 
 import { el, replace, haptic } from '../utils/dom.js';
 import { todayKey, fmtDayMonth, fmtMonth, addDays, range } from '../utils/date.js';
-import { plural, listJoin, fmtTemp, fmtWeight, fmtWater, mlToOz } from '../utils/fmt.js';
-import {
-  buildCycles, cycleLengths, cycleLengthPoints, periodLengthPoints, summarize, currentCycle,
-} from '../domain/cycles.js';
+import { plural, fmtTemp, fmtWeight, fmtWater, mlToOz } from '../utils/fmt.js';
+import { buildCycles, cycleLengthPoints, summarize, currentCycle } from '../domain/cycles.js';
 import { predict } from '../domain/predict.js';
 import { detectThermalShift } from '../domain/ovulation.js';
 import { predictionAccuracy, CLOSE_ENOUGH, MIN_SCORED } from '../domain/accuracy.js';
-import { phaseFor, PHASES } from '../domain/phases.js';
+import { phaseFor } from '../domain/phases.js';
+import { series, bbtForCycle, daysLogged, loggedIds } from '../domain/stats.js';
 import {
-  detectPatterns, symptomFrequency, series, bbtForCycle, daysLogged,
-  loggingConsistency, moodByPhase, severitySummary, cycleSummary, loggedIds,
-  MIN_CYCLES_FOR_PATTERN,
-} from '../domain/stats.js';
-import { labelOf, severityLabel, isMood } from '../data/taxonomy.js';
+  bodyMap, moodCurve, sleepCurve, goesWith, periodFingerprint,
+} from '../domain/rhythm.js';
+import { labelOf, isMood } from '../data/taxonomy.js';
 import * as acog from '../domain/acog.js';
-import { trendChart, lineChart, dayHeatmap } from '../ui/chart.js';
+import { trendChart, lineChart } from '../ui/chart.js';
+import { rhythmCurve, bodyMapGrid, fingerprint, pairedBars } from '../ui/insight-charts.js';
 import { openSheet } from '../ui/sheet.js';
-import { spotArt } from '../ui/mascot.js';
+import { spotArt, emblem } from '../ui/mascot.js';
 import { openReport } from './report.js';
 import { openNotes, noteCount } from './notes.js';
 import * as store from '../state/store.js';
+
+/**
+ * @typedef {Object} Finding
+ * @property {string} icon     a single emoji, for the At a glance list
+ * @property {string} text     the finding, as a sentence
+ * @property {string} target   id of the card that shows the evidence
+ * @property {number} weight   how much she would want to know it
+ */
 
 /** @param {HTMLElement} host */
 export function renderInsights(host) {
@@ -43,95 +57,64 @@ export function renderInsights(host) {
 
   const cycles = buildCycles(periodDays);
   const prediction = predict({ periodDays, settings, today, logs });
-  const lengths = cycleLengths(cycles);
-  const lengthPoints = cycleLengthPoints(cycles);
-  const periodPoints = periodLengthPoints(cycles, today);
-
-  /*
-    The screen used to refuse to render below two cycles, which meant the
-    analysis half of the app was a locked door for the first two months —
-    exactly the stretch when someone is deciding whether the app is worth
-    keeping. Nothing about that gate was necessary: plenty of what is here
-    needs only the days she has already logged.
-
-    So every card decides for itself now, and the cards that need history say
-    so by not appearing. The genuine empty state is reserved for a database
-    with nothing in it at all.
-  */
+  const age = acog.ageFrom(settings.birthYear, today);
   const complete = cycles.filter((c) => c.complete).length;
 
   /*
-    Worked out once and handed to both cards, because the plain count card
-    stands down for the Patterns card and "enough cycles exist" turned out not
-    to mean "patterns were found". Someone four cycles in who only started
-    logging symptoms last month has enough history for the threshold and no
-    symptom recurring often enough to clear it — gating on the count alone took
-    her count card away and gave her nothing in its place.
+    Every analysis is run once, up front, because two places read each one:
+    its own card, and the At a glance list that picks the strongest few.
   */
-  const patterns = detectPatterns(logs, cycles);
+  const lengthPoints = cycleLengthPoints(cycles);
+  const fp = periodFingerprint(logs, cycles);
+  // Moods have their own curve below, so the body map is the body: symptoms
+  // and anything she named herself.
+  const map = bodyMap(logs, cycles, 16).filter((row) => row.kind !== 'moods');
+  const mood = moodCurve(logs, cycles);
+  const sleep = sleepCurve(logs, cycles);
+  const pairs = goesWith(logs, today);
 
-  /*
-    Grouped, rather than one column of eleven.
+  /** @type {Finding[]} */
+  const findings = [];
 
-    Every card here is the same shape — a heading, some figures, a chart — so
-    presented as a flat list they read as one undifferentiated four-screen
-    scroll, and finding the thing she came for means reading all of it. The
-    groups are not decoration: they are the four different questions this
-    screen answers, and saying which is which is the difference between a page
-    and a report.
+  const cards = {
+    cycle: cycleCard(logs, cycles, lengthPoints, prediction, age, findings),
+    periods: periodsCard(fp, cycles, today, findings),
+    body: bodyMapCard(map, findings),
+    mood: moodCard(mood, settings.avgPeriodLength, findings),
+    sleep: sleepCard(sleep, settings.avgPeriodLength, findings),
+    pairs: goesWithCard(pairs, settings, findings),
+    bbt: bbtCard(logs, cycles, settings),
+    trends: trendCard(logs, settings),
+    notes: notesCard(),
+    report: reportCard(),
+  };
 
-    Cards still decide for themselves whether they have anything to say, so a
-    group whose cards all stood down disappears with them — a heading over
-    nothing is worse than no heading.
-  */
-  /** @type {[string, (HTMLElement|null)[]][]} */
-  const groups = [
-    ['Where you are', [
-      overviewCard(logs, cycles, lengths, today),
-      thisCycleCard(logs, cycles, today),
-    ]],
-    ['Your cycle', [
-      cycleLengthCard(lengthPoints, prediction, acog.ageFrom(settings.birthYear, today)),
-      periodLengthCard(periodPoints),
-      cycleListCard(logs, cycles, prediction),
-      accuracyCard(cycles),
-    ]],
-    ['How you feel', [
-      loggedMostCard(logs, patterns.length),
-      patternsCard(logs, cycles, prediction, patterns),
-      moodCard(logs, cycles, prediction.lutealDays),
-    ]],
-    ['What you measure', [
-      bbtCard(logs, cycles, settings),
-      trendCard(logs, settings),
-    ]],
-    ['Read and share', [
-      notesCard(),
-      reportCard(),
-    ]],
-  ];
-
-  // Flattened once, for the two questions that are about the page as a whole:
-  // whether there is anything on it at all, and whether anything on it is a
-  // chart the reading guide could explain.
-  const cards = groups.flatMap(([, group]) => group.filter(Boolean));
-
-  /*
-    The report card is always offered, so it alone is not evidence that there
-    is anything to look at — without this, a brand-new install would show a
-    "Read and share" heading over a lone "print a report of nothing" button
-    instead of the empty state.
-  */
-  if (cards.length <= 1) {
-    replace(host, [notEnoughYet(cycles.length)]);
+  const evidence = Object.entries(cards).filter(([key, card]) => card && key !== 'report');
+  if (!evidence.length && !daysLogged(logs)) {
+    replace(host, [notEnoughYet(cycles.length, settings.theme)]);
     return;
   }
 
+  /** @type {[string, (HTMLElement|null)[]][]} */
+  const groups = [
+    ['Your cycle', [cards.cycle, cards.periods]],
+    ['Your rhythm', [cards.body, cards.mood]],
+    ['Sleep and water', [cards.sleep, cards.pairs]],
+    ['Measurements', [cards.bbt, cards.trends]],
+    ['Read and share', [cards.notes, cards.report]],
+  ];
+
+  const glance = glanceCard(findings, settings.theme);
+  const coming = stillToCome({ cycles, complete, logs, settings, map, mood, sleep, pairs }, !glance && settings.theme);
+
   replace(host, [
     el('div', { class: 'data-zone' }, [
-      // Only offered once there is a chart to explain. Before that it would be
-      // a guide to things she cannot see.
-      cards.some(hasChart) ? readingGuideButton() : null,
+      /*
+        With findings, they lead. Without any yet, what is coming leads
+        instead: someone in her first weeks should open this screen to a
+        welcome and a plan, not to a lone chart of eleven nights.
+      */
+      glance ?? coming,
 
       ...groups.map(([label, group]) => {
         const present = group.filter(Boolean);
@@ -143,237 +126,178 @@ export function renderInsights(host) {
           : null;
       }),
 
-      comingUpCard(cycles, complete, logs),
+      glance ? coming : null,
+      // Only offered once there is a chart to explain. Before that it would be
+      // a guide to things she cannot see.
+      Object.values(cards).some((card) => card?.querySelector('.chart, .body-map, .fingerprint, .paired-bars'))
+        ? readingGuideButton() : null,
       footnote(),
     ]),
   ]);
 }
 
-/** @param {any} node */
-const hasChart = (node) =>
-  node instanceof HTMLElement && node.querySelector('.chart, .heatmap');
-
-/* ── Overview ───────────────────────────────────────────────────────────── */
+/* ── At a glance ────────────────────────────────────────────────────────── */
 
 /**
- * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
- * @param {import('../domain/cycles.js').Cycle[]} cycles
- * @param {number[]} lengths
- * @param {DateKey} today
+ * The strongest few findings, in a sentence each, at the top.
+ *
+ * For the days she opens Insights with ten seconds to spare. Every line is a
+ * finding some card below already makes, so tapping one scrolls to its
+ * evidence — this list repeats nothing that is not backed up further down.
+ *
+ * @param {Finding[]} findings
+ * @param {string} themeId
  */
-function overviewCard(logs, cycles, lengths, today) {
-  // Three zeros under three headings is not an overview of anything.
-  if (!cycles.length && !daysLogged(logs)) return null;
+function glanceCard(findings, themeId) {
+  const top = [...findings].sort((a, b) => b.weight - a.weight).slice(0, 3);
+  if (!top.length) return null;
 
-  /*
-    Complete cycles, not every cycle that has begun.
-
-    `cycles` includes the one she is living through, so this headline read "6"
-    while the confidence line on Today said "based on 5 complete cycles" and
-    the sticker asking for six stayed locked. Three surfaces, three different
-    answers to how much history she has, and the loudest one was the wrong
-    one — a cycle is only a length once it has ended, which is exactly why the
-    average a few lines down was already counting five.
-  */
-  const complete = cycles.filter((c) => c.complete).length;
-
-  const stats = summarize(lengths);
-  /*
-    Consistency over a window, not a streak.
-
-    A streak resets to zero the first time she misses a day, and this card is
-    the last place that should be showing her a zero — its job is to make the
-    history feel worth adding to. A count over the last thirty days moves by
-    one when she misses a day and moves back when she catches up.
-  */
-  const recent = loggingConsistency(logs, today, addDays);
-  const total = daysLogged(logs);
-
-  /*
-    Only the figures that are saying something.
-
-    All three were unconditional, which read badly in the first fortnight:
-    "Cycles 0" is a headline about an absence, and "Days 9 / Last 30 days 9" is
-    the same number under two labels — the second only diverges once there is
-    history older than a month for it to exclude.
-  */
-  const figures = [
-    complete ? stat('Cycles', String(complete), 'logged') : null,
-    stat('Days', String(total), 'tracked'),
-    recent < total
-      ? stat('Last 30 days', String(recent), recent === 1 ? 'day logged' : 'days logged')
-      : null,
-  ].filter(Boolean);
-
-  return el('div', { class: 'card' }, [
-    el('h3', { text: 'Your history' }),
-    el('div', { class: 'stat-row' }, figures),
-    stats.mean != null && el('p', { class: 'hint-sm', text:
-      `Average cycle ${Math.round(stats.mean)} days, ` +
-      `ranging from ${stats.min} to ${stats.max}.` }),
+  return el('section', { class: 'card glance-card' }, [
+    el('div', { class: 'glance-head' }, [
+      emblem(themeId, { size: 40, className: 'glance-emblem' }),
+      el('h2', { class: 'glance-title', text: 'At a glance' }),
+    ]),
+    el('ul', { class: 'glance-list' }, top.map((finding) => el('li', {}, [
+      el('button', {
+        type: 'button',
+        class: 'glance-item',
+        onclick: () => {
+          haptic(6);
+          document.getElementById(`insight-${finding.target}`)
+            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        },
+      }, [
+        el('span', { class: 'glance-icon', 'aria-hidden': 'true', text: finding.icon }),
+        el('span', { class: 'glance-text', text: finding.text }),
+        el('span', { class: 'row-value', 'aria-hidden': 'true', text: '›' }),
+      ]),
+    ]))),
   ]);
 }
 
-/* ── Cycle length ───────────────────────────────────────────────────────── */
-
 /**
- * How many points before the x-axis has to start skipping labels.
+ * The shell every finding card shares: the answer as the title, what it rests
+ * on underneath, then the evidence.
  *
- * Twelve fits, and a year of cycles is the span worth looking at: further back
- * than that and a change of pattern is history rather than news.
+ * @param {string} id
+ * @param {string} title
+ * @param {string} basis
+ * @param {(Node|null|false|undefined)[]} body
  */
+function insightCard(id, title, basis, body) {
+  return el('div', { class: 'card insight-card', id: `insight-${id}` }, [
+    el('h3', { text: title }),
+    basis ? el('p', { class: 'insight-basis', text: basis }) : null,
+    ...body,
+  ]);
+}
+
+/* ── Your cycle ─────────────────────────────────────────────────────────── */
+
+/** Cycles drawn on the chart. A year is about as far back as anyone wants to look. */
 const CHART_POINTS = 12;
 
-/**
- * And how few before a chart is the wrong thing entirely.
- *
- * Two dots joined by a line is not a trend, it is a line — it draws a slope
- * from a single difference and invites her to read a direction into it. Below
- * three, the honest form is a sentence.
- */
+/** Cycles before the chart is drawn: two dots are a line, not a pattern. */
 const CHART_MIN = 3;
 
 /**
+ * Is my cycle normal, and is it changing? One card, where there were four.
+ *
+ * Length, regularity, how far the forecasts have been off, and every past
+ * cycle were separate cards, all answering versions of the same question. The
+ * answer is the title; the dots are the evidence; the forecast record is one
+ * line; the full list folds away.
+ *
+ * @param {Record<DateKey, DayLog>} logs
+ * @param {Cycle[]} cycles
  * @param {{start: DateKey, length: number}[]} points
  * @param {import('../domain/predict.js').Prediction} prediction
- * @param {number|null} age years old, which sets the typical range
+ * @param {number|null} age
+ * @param {Finding[]} findings
  */
-function cycleLengthCard(points, prediction, age) {
+function cycleCard(logs, cycles, points, prediction, age, findings) {
   if (!points.length) return null;
 
   const stats = summarize(points.map((p) => p.length));
   const recent = points.slice(-CHART_POINTS);
+  const recentStats = summarize(recent.map((p) => p.length));
+  const max = acog.cycleMaxFor(age);
+  const outside = recent.filter((p) => !acog.isCycleTypical(p.length, age)).length;
 
   if (points.length < CHART_MIN) {
-    return el('div', { class: 'card' }, [
-      el('h3', { text: 'Cycle length' }),
-      el('p', { text: `${points.length === 1 ? 'Your first cycle was' : 'Your cycles so far:'} ` +
-        `${listJoin(points.map((p) => `${p.length} days`))}.` }),
-      el('p', { class: 'hint-sm', text:
-        points.every((p) => acog.isCycleTypical(p.length, age))
-          ? `That is inside the typical ${acog.CYCLE_MIN}–${acog.cycleMaxFor(age)} days.`
-          : `Typical is ${acog.CYCLE_MIN}–${acog.cycleMaxFor(age)} days.` }),
-    ]);
+    return insightCard('cycle',
+      points.length === 1
+        ? `Your first full cycle was ${plural(points[0].length, 'day')}`
+        : `Your cycles so far: ${points.map((p) => p.length).join(' and ')} days`,
+      points.every((p) => acog.isCycleTypical(p.length, age))
+        ? `Inside the typical ${acog.CYCLE_MIN} to ${max} days. A chart appears after ${plural(CHART_MIN - points.length, 'more cycle')}.`
+        : `Typical is ${acog.CYCLE_MIN} to ${max} days.`,
+      []);
   }
 
-  const data = recent.map((point) => ({
-    // The month it started, rather than its position in a list. "4" is a row
-    // number; "Mar" is a thing she can remember.
-    label: fmtMonth(point.start),
-    value: point.length,
-    flagged: !acog.isCycleTypical(point.length, age),
-  }));
+  const regularity = prediction.regularity ?? acog.regularity(recentStats.spread ?? 0);
+  const range = `${recentStats.min} to ${recentStats.max} days`;
+  const title = regularity === 'regular'
+    ? `Regular: your cycles run ${range}`
+    : regularity === 'variable'
+      ? `Your cycles move around a little: ${range}`
+      : `Your cycles vary quite a lot: ${range}`;
 
-  const outside = data.filter((d) => d.flagged).length;
+  findings.push({
+    icon: '🎀',
+    text: regularity === 'regular'
+      ? `Your cycle is regular, ${range}.`
+      : `Your cycles have ranged from ${range}.`,
+    target: 'cycle',
+    weight: regularity === 'regular' ? 2 : 3.5,
+  });
 
-  const regularity = prediction.regularity ?? 'regular';
-  /** @type {Record<string, string>} */
-  const wording = {
-    regular: 'Consistent from cycle to cycle.',
-    variable: 'Moves around a little between cycles.',
-    irregular: 'Varies quite a lot between cycles.',
-  };
+  const record = predictionAccuracy(cycles);
 
-  return el('div', { class: 'card' }, [
-    el('h3', { text: 'Cycle length' }),
-    el('p', { class: 'hint-sm', text:
-      `One dot per cycle, oldest first. Inside the shaded band is the typical ` +
-      `${acog.CYCLE_MIN}–${acog.cycleMaxFor(age)} days.` }),
-    trendChart({
-      data,
-      average: stats.mean ?? undefined,
-      normalBand: [acog.CYCLE_MIN, acog.cycleMaxFor(age)],
-      unit: 'd',
-      summary: `Your last ${recent.length} cycle lengths, from ${stats.min} to ` +
-        `${stats.max} days, averaging ${Math.round(stats.mean ?? 0)}. ` +
-        (outside
-          ? `${plural(outside, 'cycle')} outside the typical range.`
-          : 'All within the typical range.'),
-    }),
-    outside > 0 && el('p', { class: 'hint-sm', text:
-      `The ringed ${outside === 1 ? 'dot is a cycle' : 'dots are cycles'} outside ` +
-      'that range.' }),
-    el('div', { class: 'stat-row' }, [
-      stat('Average', String(prediction.avgCycleLength), 'days'),
-      stat('Variation', String(stats.spread ?? 0), 'days'),
-      stat('Pattern', regularity === 'regular' ? 'Regular'
-        : regularity === 'variable' ? 'Variable' : 'Irregular', ''),
-    ]),
-    el('p', { class: 'hint-sm', text: wording[regularity] }),
-  ]);
-}
-
-/** @param {{start: DateKey, length: number}[]} points */
-function periodLengthCard(points) {
-  if (!points.length) return null;
-  const stats = summarize(points.map((p) => p.length));
-  const recent = points.slice(-CHART_POINTS);
-
-  if (points.length < CHART_MIN) {
-    return el('div', { class: 'card' }, [
-      el('h3', { text: 'Period length' }),
-      el('p', { text: `${points.length === 1 ? 'Your last period lasted' : 'Your periods so far:'} ` +
-        `${listJoin(points.map((p) => `${p.length} days`))}.` }),
-      el('p', { class: 'hint-sm', text:
-        `Typical is ${acog.PERIOD_MIN}–${acog.PERIOD_MAX} days of bleeding.` }),
+  return insightCard('cycle', title,
+    `Your last ${plural(recent.length, 'cycle')}, averaging ${Math.round(recentStats.mean ?? 0)} days. `
+      + `The shaded band is the typical ${acog.CYCLE_MIN} to ${max}.`,
+    [
+      trendChart({
+        data: recent.map((point) => ({
+          label: fmtMonth(point.start),
+          value: point.length,
+          flagged: !acog.isCycleTypical(point.length, age),
+        })),
+        average: stats.mean ?? undefined,
+        normalBand: [acog.CYCLE_MIN, max],
+        unit: 'd',
+        summary: `Your last ${recent.length} cycle lengths, from ${recentStats.min} to `
+          + `${recentStats.max} days. `
+          + (outside ? `${plural(outside, 'cycle')} outside the typical range.` : 'All within the typical range.'),
+      }),
+      outside > 0 && el('p', { class: 'hint-sm', text:
+        `The ringed ${outside === 1 ? 'dot is a cycle' : 'dots are cycles'} outside the typical range. `
+        + 'One now and then is common; several in a row is worth mentioning to a doctor.' }),
+      record.total >= MIN_SCORED && el('p', { class: 'insight-note', text: record.hits === record.total
+        ? `All ${record.total} of Kittycal's period forecasts landed within ${CLOSE_ENOUGH} days.`
+        : `${record.hits} of ${record.total} of Kittycal's period forecasts landed within ${CLOSE_ENOUGH} days.` }),
+      cycleList(logs, cycles, prediction.avgCycleLength),
     ]);
-  }
-
-  return el('div', { class: 'card' }, [
-    el('h3', { text: 'Period length' }),
-    el('p', { class: 'hint-sm', text:
-      `Days of bleeding per period. Typical is ${acog.PERIOD_MIN}–` +
-      `${acog.PERIOD_MAX}.` }),
-    trendChart({
-      data: recent.map((point) => ({
-        label: fmtMonth(point.start),
-        value: point.length,
-        flagged: !acog.isPeriodTypical(point.length),
-      })),
-      average: stats.mean ?? undefined,
-      normalBand: [acog.PERIOD_MIN, acog.PERIOD_MAX],
-      unit: 'd',
-      height: 150,
-      summary: `Your last ${recent.length} period lengths, from ${stats.min} ` +
-        `to ${stats.max} days.`,
-    }),
-  ]);
 }
 
 /**
- * One row per cycle, newest first, each openable.
+ * Every past cycle, folded away under the chart. A dot cannot be opened; a row
+ * can, which is the route from "that odd one in March" to what she logged in it.
  *
- * The cycle-length chart above answers "are my cycles consistent" and gives no
- * route to "what was that bad one in March actually like" — a dot on a chart
- * is not a thing you can open. This is the missing direction: from the shape
- * back to the month.
- *
- * Deliberately a comparison rather than a list. Each row carries how it
- * differed from her own average, because "31 days" means nothing on its own and
- * "three days longer than usual" is the sentence she is actually looking for.
- * The running cycle is included and marked, since "where am I against the last
- * few" is the same question asked about now.
- *
- * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
- * @param {import('../domain/cycles.js').Cycle[]} cycles
- * @param {import('../domain/predict.js').Prediction} prediction
+ * @param {Record<DateKey, DayLog>} logs
+ * @param {Cycle[]} cycles
+ * @param {number} average
  */
-function cycleListCard(logs, cycles, prediction) {
+function cycleList(logs, cycles, average) {
   if (cycles.length < 2) return null;
-
   const recent = [...cycles].reverse().slice(0, 12);
-  const average = prediction.avgCycleLength;
 
-  return el('div', { class: 'card data-zone' }, [
-    el('h3', { text: 'Cycle by cycle' }),
-    el('p', { class: 'hint-sm', text:
-      `Newest first, against your average of ${plural(average, 'day')}. Tap one ` +
-      'to see what you logged in it.' }),
-
+  return el('details', { class: 'insight-more' }, [
+    el('summary', { text: 'See every cycle' }),
     el('ul', { class: 'cycle-list' }, recent.map((cycle) => {
       const running = !cycle.complete || cycle.length == null;
       const delta = running || cycle.length == null ? null : cycle.length - average;
-
       return el('li', {}, [
         el('button', {
           type: 'button',
@@ -381,14 +305,7 @@ function cycleListCard(logs, cycles, prediction) {
           onclick: () => { haptic(); openCycleDetail(logs, cycle, average); },
         }, [
           el('span', { class: 'cycle-row-date', text: fmtDayMonth(cycle.start) }),
-          el('span', { class: 'cycle-row-len num', text: running
-            ? 'running' : `${cycle.length}d` }),
-          /*
-            The difference is the column that makes this a comparison. Nothing
-            is printed for a cycle within a day of her average — "0 days
-            longer" is noise, and a sign in front of every row would turn a
-            normal month into something that looks like a finding.
-          */
+          el('span', { class: 'cycle-row-len num', text: running ? 'now' : `${cycle.length}d` }),
           el('span', { class: 'cycle-row-delta num', text: delta == null || Math.abs(delta) <= 1
             ? '' : delta > 0 ? `+${delta}` : String(delta) }),
           el('span', { class: 'cycle-row-period num', text: `${cycle.periodLength}d bleed` }),
@@ -400,411 +317,386 @@ function cycleListCard(logs, cycles, prediction) {
 }
 
 /**
- * What one cycle held.
+ * Are my periods getting heavier or longer, and which day is the worst?
  *
- * Counts of what was logged rather than a day-by-day dump: the diary already
- * shows any single day, and thirty of those in a sheet is not something anyone
- * reads. Moods are kept apart from physical symptoms for the same reason the
- * doctor report separates them — reading "Happy, 4 days" as a complaint is the
- * exact confusion that separation exists to prevent.
+ * Each period as a row of dots shaded by flow. The old card was a line of
+ * period lengths, which for most people is "5, 5, 5, 5" — flat, and silent
+ * about the thing that actually varies, which is how heavy each day was.
  *
- * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
- * @param {import('../domain/cycles.js').Cycle} cycle
- * @param {number} average
- */
-function openCycleDetail(logs, cycle, average) {
-  const end = cycle.nextStart ? addDays(cycle.nextStart, -1) : todayKey();
-  const days = range(cycle.start, end);
-
-  /** @type {Map<string, number>} */
-  const counts = new Map();
-  let logged = 0;
-
-  for (const date of days) {
-    const log = logs[date];
-    if (!log) continue;
-    logged += 1;
-    for (const id of loggedIds(log)) counts.set(id, (counts.get(id) ?? 0) + 1);
-  }
-
-  const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1]);
-  const symptoms = ranked.filter(([id]) => !isMood(id));
-  const moods = ranked.filter(([id]) => isMood(id));
-
-  /** @param {string} title @param {[string, number][]} rows */
-  const section = (title, rows) => (rows.length ? el('div', { class: 'guide-entry' }, [
-    el('h3', { text: title }),
-    el('ul', { class: 'flag-list' }, rows.slice(0, 8).map(([id, n]) =>
-      el('li', { text: `${labelOf(id)} — ${plural(n, 'day')}` }))),
-  ]) : null);
-
-  const delta = cycle.length == null ? null : cycle.length - average;
-
-  openSheet({
-    title: `Cycle from ${fmtDayMonth(cycle.start)}`,
-    body: [
-      el('p', { class: 'hint-sm', text: [
-        cycle.length == null
-          ? 'Still running.'
-          : `${plural(cycle.length, 'day')} long` +
-            (delta != null && Math.abs(delta) > 1
-              ? `, ${plural(Math.abs(delta), 'day')} ${delta > 0 ? 'longer' : 'shorter'} than your average.`
-              : ', about your average.'),
-        `${plural(cycle.periodLength, 'day')} of bleeding.`,
-        `${plural(logged, 'day')} logged.`,
-      ].join(' ') }),
-
-      section('Symptoms', symptoms),
-      section('Mood', moods),
-
-      !ranked.length ? el('p', { class: 'hint', text:
-        'Nothing was logged in this cycle beyond the period itself.' }) : null,
-    ].filter(Boolean),
-  });
-}
-
-/**
- * How often the app has been right.
- *
- * Everywhere else the app describes *her*. This is the one card that describes
- * the app, scored against her, and it is the only number on the screen that
- * Kittycal has an incentive to hide. A confidence badge asks to be believed; a
- * hit rate can be checked.
- *
- * Silent until there are enough scored cycles to mean anything — three — and
- * silent about anything it cannot support: the bias line only appears when the
- * app is consistently out in one direction, because "runs a day late" is
- * actionable and "sometimes early, sometimes late" is just the error bar again.
- *
- * @param {import('../domain/cycles.js').Cycle[]} cycles
- */
-function accuracyCard(cycles) {
-  const record = predictionAccuracy(cycles);
-  if (record.total < MIN_SCORED) return null;
-
-  const bias = record.bias ?? 0;
-  // Two days is the same threshold a prediction has to beat to count as a hit,
-  // so a "tends to run late" claim never rests on less than a real miss.
-  const leans = Math.abs(bias) > CLOSE_ENOUGH
-    ? (bias > 0 ? 'early' : 'late')
-    : null;
-
-  return el('div', { class: 'card' }, [
-    el('h3', { text: 'How close Kittycal has been' }),
-    el('p', { class: 'hint-sm', text:
-      `Each past cycle re-forecast from only what was known before it started, `
-      + `then compared with the day your period actually arrived.` }),
-    el('div', { class: 'stat-row' }, [
-      stat('Within ' + CLOSE_ENOUGH + ' days', `${record.hits}/${record.total}`, 'cycles'),
-      stat('Typical miss', String(record.medianError),
-        record.medianError === 1 ? 'day' : 'days'),
-    ]),
-    leans && el('p', { class: 'hint-sm', text:
-      `It tends to run ${leans} — your period usually arrives about `
-      + `${plural(Math.abs(bias), 'day')} ${leans === 'early' ? 'later' : 'sooner'} `
-      + 'than predicted.' }),
-    el('p', { class: 'hint-sm', text:
-      record.hits === record.total
-        ? 'Every prediction so far has landed within two days.'
-        : 'Cycles move for all sorts of ordinary reasons, so some misses are '
-          + 'the body rather than the maths.' }),
-  ]);
-}
-
-/* ── Early cards ────────────────────────────────────────────────────────── */
-
-/**
- * What this cycle has held so far.
- *
- * The first card that says anything on day three of using the app. Everything
- * else on this screen compares cycles to each other, which needs cycles to
- * compare — this just counts what is in the one she is in.
- *
- * It keeps appearing once there is a history, because "where am I and what has
- * this one been like" stays a reasonable question after a year.
- *
- * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
- * @param {import('../domain/cycles.js').Cycle[]} cycles
+ * @param {ReturnType<typeof periodFingerprint>} fp
+ * @param {Cycle[]} cycles
  * @param {DateKey} today
+ * @param {Finding[]} findings
  */
-function thisCycleCard(logs, cycles, today) {
-  const cycle = currentCycle(cycles);
-  if (!cycle) return null;
-
-  const summary = cycleSummary(logs, cycle, today);
-  if (!summary.daysLogged) return null;
+function periodsCard(fp, cycles, today, findings) {
+  if (!fp) return null;
 
   /*
-    The tally of what came up is only worth printing here once "this cycle" is
-    a subset of something. With a single cycle behind her it is every day she
-    has ever logged, which the count card below states more usefully — the same
-    five things, twice, a screen apart.
+    A period that is still going is shorter than it will be. Counting it would
+    let day two of this month's period read as "your periods are getting
+    shorter", so the length findings are worked out from finished periods only
+    — it is still drawn, as the top row.
   */
-  const top = cycles.length > 1 ? summary.logged.slice(0, 6) : [];
+  const current = cycles[cycles.length - 1];
+  const ongoing = current && !current.complete && addDays(current.periodEnd, 1) >= today;
+  const finished = ongoing ? fp.rows.slice(1) : fp.rows;
+  const long = finished.filter((r) => r.length > 7).length;
+  const lengths = finished.map((r) => r.length);
+  const trend = lengths.length >= 6
+    ? (lengths.slice(0, 3).reduce((a, b) => a + b, 0) - lengths.slice(3, 6).reduce((a, b) => a + b, 0)) / 3
+    : 0;
 
-  return el('div', { class: 'card' }, [
-    el('h3', { text: 'This cycle' }),
-    el('p', { class: 'hint-sm', text:
-      `Since your period started on ${fmtDayMonth(cycle.start)}.` }),
-    el('div', { class: 'stat-row' }, [
-      stat('Cycle day', String(summary.day), ''),
-      stat('Days logged', String(summary.daysLogged), ''),
-      stat('Bleeding', String(summary.bleedingDays), summary.bleedingDays === 1 ? 'day' : 'days'),
-    ]),
-    top.length ? el('div', { class: 'tally' }, top.map((entry) =>
-      el('span', { class: 'badge', text: `${labelOf(entry.id)} ${entry.count}` }))) : null,
-  ]);
+  let title = `Your last ${plural(fp.rows.length, 'period')}, day by day`;
+  if (long >= 2) {
+    title = `${long} of your recent periods lasted more than 7 days`;
+    findings.push({ icon: '🩸', text: `${long} recent periods ran past 7 days.`, target: 'periods', weight: 4 });
+  } else if (Math.abs(trend) >= 1.5) {
+    const days = Math.round(Math.abs(trend));
+    title = `Your last 3 periods were about ${plural(days, 'day')} ${trend > 0 ? 'longer' : 'shorter'}`;
+    findings.push({ icon: '🩸', text: `Your periods are running ${trend > 0 ? 'longer' : 'shorter'} lately.`, target: 'periods', weight: 3 });
+  } else if (fp.heaviestDay) {
+    title = `Day ${fp.heaviestDay.day} is usually your heaviest`;
+    findings.push({ icon: '🩸', text: `Day ${fp.heaviestDay.day} of your period is usually the heaviest.`, target: 'periods', weight: 1.5 });
+  }
+
+  return insightCard('periods', title,
+    'One row per period, newest at the top. Darker means heavier.',
+    [
+      fingerprint({
+        rows: fp.rows.map((row) => ({ label: fmtDayMonth(row.start), flows: row.flows })),
+        highlightDay: fp.heaviestDay?.day ?? null,
+        summary: `Your last ${fp.rows.length} periods: `
+          + fp.rows.map((r) => `${fmtDayMonth(r.start)}, ${plural(r.length, 'day')}`).join('; ') + '.',
+      }),
+      long >= 2 && el('p', { class: 'hint-sm', text:
+        'Bleeding for more than 7 days, more than once, is worth mentioning to a doctor. '
+        + 'It is in the report below.' }),
+    ]);
+}
+
+/* ── Your rhythm ────────────────────────────────────────────────────────── */
+
+/** Rows shown before "Show more". Five is what fits on a phone without scrolling the card. */
+const MAP_ROWS = 5;
+
+/**
+ * Where a row's symptom lands, in words.
+ * @param {import('../domain/rhythm.js').When|null} when
+ */
+function whenText(when) {
+  if (!when) return 'Spread through your cycle';
+  if (when.where === 'period') {
+    return when.from === when.to
+      ? `Day ${when.from} of your period`
+      : `Days ${when.from} to ${when.to} of your period`;
+  }
+  if (when.where === 'before') {
+    return when.from <= 1 ? 'The day before your period' : `From about ${when.from} days before your period`;
+  }
+  return 'Around the middle of your cycle';
 }
 
 /**
- * What she logs most, over everything she has ever logged.
+ * When in my cycle does each thing hit?
  *
- * A count is not a pattern and this card is careful never to call it one — but
- * it is true from the first week, which is the entire point. "Cramps, 6 days"
- * is a real thing to know about yourself long before "cramps in 8 of 9 cycles"
- * is available.
+ * Lined up against her period rather than a day number, so "bloating, from
+ * about three days before" is the same claim in a 26-day cycle and a 32-day one.
  *
- * It steps aside once the Patterns card can speak, because by then the same
- * symptoms are being described better a few centimetres further down.
- *
- * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
- * @param {number} patternCount  how many patterns the card below found
+ * @param {import('../domain/rhythm.js').BodyRow[]} rows
+ * @param {Finding[]} findings
  */
-function loggedMostCard(logs, patternCount) {
-  if (patternCount > 0) return null;
+function bodyMapCard(rows, findings) {
+  if (!rows.length) return null;
 
-  const top = symptomFrequency(logs).slice(0, 8);
-  if (!top.length) return null;
+  const name = (/** @type {import('../domain/rhythm.js').BodyRow} */ row) =>
+    (row.kind === 'custom' ? row.id : labelOf(row.id));
 
-  const most = top[0].count;
+  /*
+    The title names the most useful row: one that comes before her period,
+    because that is the one she can see coming. Failing that, the most regular.
+  */
+  const lead = rows.find((r) => r.when?.where === 'before') ?? rows.find((r) => r.when) ?? null;
+  let title = rows.some((r) => r.when)
+    ? 'What your body does through your cycle'
+    : 'What you log most is not tied to your cycle';
+  if (lead?.when) {
+    const n = name(lead);
+    title = lead.when.where === 'before'
+      ? `${n} usually starts ${lead.when.from <= 1 ? 'the day' : `about ${lead.when.from} days`} before your period`
+      : lead.when.where === 'period'
+        ? `${n} usually comes ${lead.when.from === lead.when.to ? `on day ${lead.when.from}` : `on days ${lead.when.from} to ${lead.when.to}`} of your period`
+        : `${n} usually shows up mid-cycle`;
+    findings.push({ icon: '✨', text: `${title}.`, target: 'body', weight: lead.when.where === 'before' ? 3 : 2 });
+  }
 
-  return el('div', { class: 'card' }, [
-    el('h3', { text: 'What you log most' }),
-    el('p', { class: 'hint-sm', text:
-      'Every day you have recorded, counted up. Not a pattern yet — just what ' +
-      'you have written down.' }),
-    el('ul', { class: 'tally-list' }, top.map((entry) => el('li', { class: 'tally-row' }, [
-      el('span', { class: 'tally-name', text: labelOf(entry.id) }),
-      // A track behind each bar, so a short bar reads as a low count rather
-      // than as a missing one.
-      el('span', { class: 'tally-track' }, [
-        el('span', { class: 'tally-fill', style: { width: `${(entry.count / most) * 100}%` } }),
+  /** @param {import('../domain/rhythm.js').BodyRow[]} list */
+  const grid = (list) => bodyMapGrid({
+    rows: list.map((row) => ({
+      label: name(row),
+      sentence: `${whenText(row.when)} · ${row.cyclesWith} of ${row.cyclesTotal} cycles`,
+      after: row.after,
+      before: row.before,
+    })),
+    summary: list.map((row) => `${name(row)}: ${whenText(row.when).toLowerCase()}, in ${row.cyclesWith} of ${row.cyclesTotal} cycles.`).join(' '),
+  });
+
+  /*
+    Something she logs every cycle but at no particular point is still worth
+    knowing — "my headaches are not about my cycle" is an answer — but a row of
+    pale squares to say so is clutter. It gets one line instead.
+  */
+  const timed = rows.filter((r) => r.when);
+  const untied = rows.filter((r) => !r.when);
+  const shown = timed.slice(0, MAP_ROWS);
+  const more = timed.slice(MAP_ROWS);
+
+  return insightCard('body', title,
+    'Things you log in most cycles, lined up against your period. Darker means more of your cycles.',
+    [
+      shown.length > 0 && grid(shown),
+      more.length > 0 && el('details', { class: 'insight-more' }, [
+        el('summary', { text: `Show ${more.length} more` }),
+        grid(more),
       ]),
-      el('span', { class: 'tally-count num', text: String(entry.count) }),
-    ]))),
-  ]);
+      untied.length > 0 && el('p', { class: 'map-untied', text:
+        `Not tied to your cycle: ${untied.map((r) => name(r)).join(', ')}. `
+        + 'You log these, but at no particular point in it.' }),
+    ]);
 }
 
 /**
- * What is not here yet, and exactly what it takes.
+ * Do I get PMS, and how much?
  *
- * This replaces the dead end the old empty state was. "Not enough to analyse"
- * with a button to the calendar told her the screen was useless without saying
- * for how long or why, which is the version of this message that gets an app
- * deleted. A specific number of cycles is a much smaller thing to be told.
+ * One line: how often a hard mood was logged at each point in her cycle. If the
+ * days before her period stand out, the title says so and the stretch is
+ * shaded; if they do not, that is a finding too, and the title says that.
  *
- * Silent once everything has arrived, rather than congratulating her.
- *
- * @param {import('../domain/cycles.js').Cycle[]} cycles
- * @param {number} complete
- * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
+ * @param {ReturnType<typeof moodCurve>} curve
+ * @param {number} periodDays
+ * @param {Finding[]} findings
  */
-function comingUpCard(cycles, complete, logs) {
+function moodCard(curve, periodDays, findings) {
+  if (!curve) return null;
+  const f = curve.finding;
+
+  const title = f
+    ? `Harder days bunch up in the ${f.window} days before your period`
+    : 'Your mood stays fairly steady through your cycle';
+  if (f) {
+    findings.push({
+      icon: '💭',
+      text: `Harder moods come ${times(f.windowRate, f.restRate)} in the days before your period.`,
+      target: 'mood',
+      weight: 4,
+    });
+  }
+
+  const pct = (/** @type {(number|null)[]} */ a) => a.map((v) => (v == null ? null : v * 100));
+
+  return insightCard('mood', title,
+    `How often you logged a hard mood, like irritable, sad or anxious, at each point in your cycle. `
+      + `${plural(curve.cycles, 'cycle')}.`,
+    [
+      rhythmCurve({
+        after: pct(curve.after),
+        before: pct(curve.before),
+        min: 0, max: 100,
+        ticks: [{ value: 0, label: '0%' }, { value: 50, label: '50%' }, { value: 100, label: '100%' }],
+        periodDays,
+        window: f ? f.window : 0,
+        reference: f ? f.restRate * 100 : null,
+        referenceLabel: f ? 'the rest of your cycle' : '',
+        summary: f
+          ? `Hard moods on ${Math.round(f.windowRate * 100)}% of days in the ${f.window} days before your period, `
+            + `against ${Math.round(f.restRate * 100)}% the rest of the time.`
+          : 'Hard moods are spread fairly evenly through your cycle.',
+      }),
+      f && el('p', { class: 'hint-sm', text:
+        'Lots of people feel this. It comes from progesterone falling just before a period. '
+        + 'If it is hard to live with, it is worth raising with a doctor; the report below carries it.' }),
+    ]);
+}
+
+/**
+ * "about twice as often" from two rates.
+ * @param {number} a
+ * @param {number} b
+ */
+function times(a, b) {
+  if (b <= 0) return 'much more often';
+  const r = a / b;
+  if (r >= 2.75) return 'about three times as often';
+  if (r >= 1.75) return 'about twice as often';
+  return 'noticeably more often';
+}
+
+/* ── Sleep and water ────────────────────────────────────────────────────── */
+
+/** @param {number} minutes */
+function duration(minutes) {
+  const m = Math.abs(minutes);
+  if (m < 60) return `${m} minutes`;
+  const h = Math.floor(m / 60);
+  const rest = Math.round((m - h * 60) / 5) * 5;
+  return rest ? `${plural(h, 'hour')} ${rest} minutes` : plural(h, 'hour');
+}
+
+/**
+ * Does my cycle affect my sleep?
+ *
+ * Average hours at each point in her cycle, on a fixed four-to-ten-hour scale.
+ * The old chart fitted its scale to her data, so the difference between 7.5
+ * and 8 hours filled the whole card and every night looked like a crisis.
+ *
+ * @param {ReturnType<typeof sleepCurve>} curve
+ * @param {number} periodDays
+ * @param {Finding[]} findings
+ */
+function sleepCard(curve, periodDays, findings) {
+  if (!curve) return null;
+  const f = curve.finding;
+
+  const title = f
+    ? `You sleep about ${duration(f.minutes)} ${f.minutes < 0 ? 'less' : 'more'} the week before your period`
+    : 'Your sleep stays steady through your cycle';
+  if (f) {
+    findings.push({
+      icon: '🌙',
+      text: `You sleep about ${duration(f.minutes)} ${f.minutes < 0 ? 'less' : 'more'} the week before your period.`,
+      target: 'sleep',
+      weight: 3.5,
+    });
+  }
+
+  return insightCard('sleep', title,
+    `Average hours slept at each point in your cycle. ${plural(curve.cycles, 'cycle')}.`,
+    [
+      rhythmCurve({
+        after: curve.after,
+        before: curve.before,
+        min: 4, max: 10,
+        ticks: [4, 6, 8, 10].map((h) => ({ value: h, label: `${h}h` })),
+        periodDays,
+        window: f ? 7 : 0,
+        reference: f ? f.restMean : null,
+        referenceLabel: f ? 'the rest of your cycle' : '',
+        summary: f
+          ? `About ${f.windowMean.toFixed(1)} hours a night in the week before your period, `
+            + `against ${f.restMean.toFixed(1)} the rest of the time.`
+          : 'Your sleep is about the same through your cycle.',
+      }),
+      f && f.minutes < 0 && el('p', { class: 'hint-sm', text:
+        'Common in the days before a period, when progesterone drops and body temperature runs higher. '
+        + 'A cooler room and an earlier night can help.' }),
+    ]);
+}
+
+/**
+ * What goes with my bad days?
+ *
+ * Her own days compared with each other: on short nights or low-water days, how
+ * often did a symptom or hard mood show up, against the rest. Only differences
+ * that are large and backed by enough days on both sides are shown, and the
+ * counts sit next to every bar.
+ *
+ * @param {ReturnType<typeof goesWith>} items
+ * @param {import('../domain/model.js').Settings} settings
+ * @param {Finding[]} findings
+ */
+function goesWithCard(items, settings, findings) {
+  if (!items.length) return null;
+
+  const litre = settings.unitWater === 'oz' ? `${Math.round(mlToOz(1000))} oz` : '1 L';
+  /** @type {Record<string, {lead: string, yes: string, no: string, icon: string}>} */
+  const words = {
+    shortSleep: { lead: 'After nights under 6 hours', yes: 'Under 6 hours', no: '6 hours or more', icon: '🌙' },
+    lowWater: { lead: `On days under ${litre} of water`, yes: `Under ${litre}`, no: `${litre} or more`, icon: '💧' },
+  };
+  const outcomeName = (/** @type {string} */ id) => (id === 'hard-mood' ? 'hard moods' : labelOf(id).toLowerCase());
+
+  const sentence = (/** @type {typeof items[number]} */ item) =>
+    `${words[item.condition].lead}, ${outcomeName(item.outcome)} showed up ${times(item.rateWith, item.rateWithout)}`;
+
+  const top = items[0];
+  findings.push({ icon: words[top.condition].icon, text: `${sentence(top)}.`, target: 'pairs', weight: 3.5 });
+
+  return insightCard('pairs', sentence(top),
+    'Your own days, compared. Each bar is how often it happened; the numbers are days.',
+    [
+      pairedBars({
+        groups: items.map((item) => ({
+          title: `${outcomeName(item.outcome)[0].toUpperCase()}${outcomeName(item.outcome).slice(1)}`,
+          rows: [
+            { label: words[item.condition].yes, rate: item.rateWith, hits: item.withHits, n: item.withN, strong: true },
+            { label: words[item.condition].no, rate: item.rateWithout, hits: item.withoutHits, n: item.withoutN },
+          ],
+        })),
+        summary: items.map((item) => `${sentence(item)}: ${item.withHits} of ${item.withN} days, `
+          + `against ${item.withoutHits} of ${item.withoutN}.`).join(' '),
+      }),
+      el('p', { class: 'hint-sm', text:
+        'These go together in your logs. That does not prove one causes the other, '
+        + 'but it is a pattern worth knowing about.' }),
+    ]);
+}
+
+/* ── Still to come ──────────────────────────────────────────────────────── */
+
+/**
+ * What each missing card is waiting for, in plain numbers.
+ *
+ * A card that is not there yet should not simply be absent: she would never
+ * know it exists, or what to log to see it. Each line names the card and the
+ * smallest thing that unlocks it. Silent once everything has arrived.
+ *
+ * @param {Object} ctx
+ * @param {Cycle[]} ctx.cycles
+ * @param {number} ctx.complete
+ * @param {Record<DateKey, DayLog>} ctx.logs
+ * @param {import('../domain/model.js').Settings} ctx.settings
+ * @param {import('../domain/rhythm.js').BodyRow[]} ctx.map
+ * @param {ReturnType<typeof moodCurve>} ctx.mood
+ * @param {ReturnType<typeof sleepCurve>} ctx.sleep
+ * @param {ReturnType<typeof goesWith>} ctx.pairs
+ * @param {string|false} welcome  a theme id when this card opens the screen
+ */
+function stillToCome({ cycles, complete, logs, settings, map, mood, sleep, pairs }, welcome) {
   /** @type {string[]} */
   const waiting = [];
+  const more = (/** @type {number} */ n) => plural(n, 'more cycle');
 
-  if (complete < 1) {
-    waiting.push('your cycle length, once one period follows another');
-  } else if (complete < CHART_MIN) {
-    waiting.push(`a cycle-length chart, after ${plural(CHART_MIN - complete, 'more cycle')}`);
+  if (complete < CHART_MIN) waiting.push(`Your cycle chart: after ${more(CHART_MIN - complete)}.`);
+  if (cycles.length < 2) waiting.push('Your period fingerprint: after your next period.');
+  if (!map.length && complete < 3) waiting.push(`When your symptoms hit: after ${more(3 - complete)}.`);
+  if (!mood) {
+    waiting.push(complete < 3
+      ? `Your mood curve: after ${more(3 - complete)}, logging how you feel.`
+      : 'Your mood curve: keep answering "How are you feeling?" for a few more weeks.');
   }
-
-  if (complete < MIN_CYCLES_FOR_PATTERN) {
-    waiting.push(`symptom patterns, after ${plural(MIN_CYCLES_FOR_PATTERN - complete, 'more cycle')}`);
+  if (!sleep && settings.askSleep) {
+    waiting.push(complete < 2
+      ? `How your cycle affects your sleep: after ${more(2 - complete)} of sleep logs.`
+      : 'How your cycle affects your sleep: about two more weeks of sleep answers.');
   }
-
-  if (!daysLogged(logs)) {
-    waiting.push('everything else, once you start logging days');
+  if (!pairs.length && (settings.askSleep || settings.askWater)) {
+    waiting.push('What goes with your harder days: once there are a few weeks of sleep and water to compare.');
   }
+  if (!daysLogged(logs)) waiting.push('Everything else: once you start logging days.');
 
   if (!waiting.length) return null;
 
-  return el('div', { class: 'card' }, [
-    el('h3', { text: 'Still to come' }),
-    el('ul', { class: 'coming-list' },
-      waiting.map((line) => el('li', { text: `${line[0].toUpperCase()}${line.slice(1)}.` }))),
+  return el('div', { class: `card still-card${welcome ? ' is-welcome' : ''}` }, [
+    welcome ? el('div', { class: 'glance-head' }, [
+      emblem(welcome, { size: 48, className: 'glance-emblem' }),
+      el('h2', { class: 'glance-title', text: 'Your insights are on their way' }),
+    ]) : el('h3', { text: 'Still to come' }),
+    el('ul', { class: 'coming-list' }, waiting.map((line) => el('li', { text: line }))),
     el('p', { class: 'hint-sm', text:
-      'Kittycal waits for enough history before calling something a pattern, ' +
-      'so what it does say is worth trusting.' }),
+      'Kittycal waits until there is enough to be sure, so what it does tell you is worth trusting.' }),
   ]);
 }
 
-/* ── Mood by phase ──────────────────────────────────────────────────────── */
-
-/**
- * Days with a mood logged before a phase is worth comparing.
- *
- * Three: enough that a single unusual day cannot own a whole phase, low enough
- * that the card appears within a couple of months of ordinary use.
- */
-const MIN_DAYS_PER_PHASE = 3;
-
-/**
- * How she tends to feel at each point in the cycle.
- *
- * Shares, not counts. The luteal stretch is about twice the length of the
- * fertile window, so whatever she feels then would top any raw table simply by
- * having more days in it — the bar would be measuring the calendar rather than
- * her mood.
- *
- * Only complete cycles count, and only phases with enough days behind them get
- * a row: one cheerful Tuesday in the follicular phase is not a finding.
- *
- * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
- * @param {import('../domain/cycles.js').Cycle[]} cycles
- * @param {number} lutealDays the luteal length the forecast uses
- */
-function moodCard(logs, cycles, lutealDays) {
-  /*
-    The luteal length the forecast actually uses — her measured one once two
-    cycles have confirmed it. This read the Settings value, so after the app had
-    dated her ovulation from her own temperatures, Today and the calendar split
-    the cycle on her real number while this chart still split it on fourteen,
-    and the same day was luteal on one screen and ovulatory on the next.
-  */
-  const byPhase = moodByPhase(logs, cycles, lutealDays);
-
-  // Drawn in cycle order rather than by size, so the card reads as a journey
-  // through the month.
-  const order = ['menstrual', 'follicular', 'ovulatory', 'luteal'];
-  const rows = order
-    .map((id) => ({ id, data: byPhase.get(id) }))
-    .filter((r) => r.data && r.data.total >= MIN_DAYS_PER_PHASE);
-
-  // Same reasoning as Patterns: absent rather than apologising for itself.
-  if (rows.length < 2) return null;
-
-  const total = rows.reduce((n, r) => n + (r.data?.total ?? 0), 0);
-
-  return el('div', { class: 'card' }, [
-    el('h3', { text: 'Mood by phase' }),
-    el('p', { class: 'hint-sm', text:
-      `What you logged most at each point in your cycle, as a share of the ` +
-      `days you recorded a mood. Based on ${plural(total, 'day')}.` }),
-
-    el('ul', { class: 'mood-list' }, rows.map(({ id, data }) => {
-      const phase = PHASES[/** @type {'menstrual'} */ (id)];
-      const top = (data?.moods ?? []).slice(0, 2);
-      const denom = data?.total ?? 1;
-
-      return el('li', { class: 'mood-row' }, [
-        el('div', { class: 'mood-head' }, [
-          el('span', { class: 'phase-dot', 'aria-hidden': 'true',
-                       style: { background: `var(${phase.token})` } }),
-          el('strong', { text: phase.name }),
-          el('span', { class: 'hint-sm', text: plural(denom, 'day') }),
-        ]),
-        el('div', { class: 'mood-bars' }, top.map((m) => {
-          const pct = Math.round((m.count / denom) * 100);
-          return el('div', { class: 'mood-bar-row' }, [
-            el('span', { class: 'mood-bar-label', text: labelOf(m.id) }),
-            el('span', { class: 'mood-bar-track', 'aria-hidden': 'true' }, [
-              el('span', { class: 'mood-bar-fill', style: { width: `${pct}%` } }),
-            ]),
-            el('span', { class: 'mood-bar-pct num', text: `${pct}%` }),
-          ]);
-        })),
-      ]);
-    })),
-  ]);
-}
-
-/* ── Symptom patterns ───────────────────────────────────────────────────── */
-
-/**
- * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
- * @param {import('../domain/cycles.js').Cycle[]} cycles
- * @param {import('../domain/predict.js').Prediction} prediction
- * @param {import('../domain/stats.js').Pattern[]} patterns
- */
-function patternsCard(logs, cycles, prediction, patterns) {
-  const complete = cycles.filter((c) => c.complete).length;
-
-  /*
-    Nothing to say, so nothing is said.
-
-    This used to render a card headed "Patterns" whose only content explained
-    that there were no patterns — which was reasonable when the whole screen
-    was otherwise blank, and is clutter now that there is real content above it
-    and a "Still to come" card below saying the same thing once. A heading over
-    an apology is worse than an absence.
-  */
-  if (!patterns.length) return null;
-
-  return el('div', { class: 'card' }, [
-    el('h3', { text: 'Patterns' }),
-    el('p', { class: 'hint-sm', text:
-      // The strips are a darkness ramp and nothing said so, which left the
-      // one thing they encode to be guessed at.
-      `Things that show up in most of your cycles, and where in the cycle they ` +
-      `land — darker means more cycles. Based on ` +
-      `${plural(complete, 'complete cycle')}.` }),
-
-    el('ul', { class: 'pattern-list' }, patterns.map((pattern) => {
-      const detail = pattern;
-      const max = Math.max(0, ...detail.byDay.values());
-      const label = labelOf(pattern.id);
-      const peaks = pattern.peakDays.slice(0, 3);
-      const where = peaks.length
-        ? `most often on day ${peaks.length > 1
-            ? `${peaks.slice(0, -1).join(', ')} and ${peaks[peaks.length - 1]}`
-            : peaks[0]}`
-        : '';
-
-      return el('li', { class: 'pattern' }, [
-        el('div', { class: 'pattern-head' }, [
-          el('strong', { text: label }),
-          el('span', { class: 'badge num', text:
-            `${pattern.cyclesWith}/${pattern.cyclesTotal} cycles` }),
-        ]),
-        dayHeatmap({
-          byDay: detail.byDay,
-          cycleLength: prediction.avgCycleLength,
-          max,
-          summary: `${label} logged in ${pattern.cyclesWith} of ` +
-            `${pattern.cyclesTotal} cycles, ${where || 'spread across the cycle'}.`,
-        }),
-        where && el('span', { class: 'hint-sm', text: `${where[0].toUpperCase()}${where.slice(1)}.` }),
-        severityLine(pattern.id, logs),
-      ]);
-    })),
-  ]);
-}
-
-/**
- * "Usually mild, severe 3 times" — but only where she has said.
- *
- * Silent unless the symptom was graded, and silent about the days it was not,
- * because severity is optional by design and a line reading "graded on 2 of 14
- * days" would turn an optional field into a chore she is behind on.
- *
- * @param {string} id
- * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
- */
-function severityLine(id, logs) {
-  const summary = severitySummary(id, logs);
-  if (!summary.rated) return null;
-
-  const typical = severityLabel(summary.typical)?.toLowerCase();
-  const severe = summary.counts[2];
-
-  // "Usually severe, severe 4 times" says one thing twice.
-  const text = severe && summary.typical !== 3
-    ? `Usually ${typical}, but severe ${plural(severe, 'time')}.`
-    : `Usually ${typical}.`;
-
-  return el('span', { class: 'hint-sm', text });
-}
+/* ── Measurements ───────────────────────────────────────────────────────── */
 
 /* ── BBT ────────────────────────────────────────────────────────────────── */
 
@@ -855,7 +747,7 @@ function bbtCard(logs, cycles, settings) {
           el('div', { text:
             `Your temperature rose on day ${shiftPoint.day} (${fmtDayMonth(shiftPoint.date)}) ` +
             `and stayed up. That normally means ovulation had already happened ` +
-            `a day or two earlier — it confirms it after the fact rather than ` +
+            `a day or two earlier. It confirms it after the fact rather than ` +
             `predicting it.` }),
         ])
       : el('p', { class: 'hint-sm', text:
@@ -863,6 +755,7 @@ function bbtCard(logs, cycles, settings) {
           'the previous six days would confirm ovulation has happened.' }),
   ]);
 }
+
 
 /* ── Numeric trends ─────────────────────────────────────────────────────── */
 
@@ -896,8 +789,8 @@ function trendCard(logs, settings) {
   const steps = series(logs, 'steps').slice(-30);
   if (weights.length < 3 && sleeps.length < 3 && waters.length < 3 && steps.length < 3) return null;
 
-  return el('div', { class: 'card' }, [
-    el('h3', { text: 'Trends' }),
+  return el('div', { class: 'card', id: 'insight-trends' }, [
+    el('h3', { text: 'Your recent numbers' }),
 
     weights.length >= 3 && el('div', {}, [
       el('p', { class: 'hint-sm', text:
@@ -927,13 +820,19 @@ function trendCard(logs, settings) {
     sleeps.length >= 3 && el('div', { style: { marginTop: 'var(--sp-4)' } }, [
       el('p', { class: 'hint-sm', text:
         `Sleep, last ${plural(sleeps.length, 'night')}. Average ` +
-        `${(sleeps.reduce((a, s) => a + s.value, 0) / sleeps.length).toFixed(1)} hours.` }),
+        `${(sleeps.reduce((a, s) => a + s.value, 0) / sleeps.length).toFixed(1)} hours. ` +
+        'The band is the recommended 7 to 9.' }),
       trendChart({
         data: sleeps.map((point) => ({ label: fmtDayMonth(point.date), value: point.value })),
         height: 140,
         unit: 'h',
         decimals: 1,
-        average: sleeps.reduce((a, s) => a + s.value, 0) / sleeps.length,
+        /*
+          The recommended seven to nine hours, as the band. Without it the
+          scale was fitted to her own nights, so 7.5 against 8 hours filled
+          the whole chart and an ordinary week looked like a crisis.
+        */
+        normalBand: [7, 9],
         summary: `Sleep hours over the last ${sleeps.length} nights.`,
       }),
     ]),
@@ -943,27 +842,18 @@ function trendCard(logs, settings) {
       is drawn in her unit rather than the storage one — a chart labelled "ml"
       to someone who set ounces is the same number lying about its scale.
     */
-    waters.length >= 3 && el('div', { style: { marginTop: 'var(--sp-4)' } }, [
-      el('p', { class: 'hint-sm', text:
-        `Water, last ${plural(waters.length, 'day')}. Average `
-        + `${fmtWater(waters.reduce((a, w) => a + w.value, 0) / waters.length, settings.unitWater)} a day.` }),
-      /*
-        Litres rather than millilitres, because `fmtWater` already switches to
-        litres past a thousand and a day's water is always past a thousand —
-        so the sentence above said "2.1 L a day" over an axis labelled in ml.
-        Same number, two scales, one card.
-      */
-      trendChart({
-        data: waters.map((point) => ({
-          label: fmtDayMonth(point.date),
-          value: settings.unitWater === 'oz' ? mlToOz(point.value) : point.value / 1000,
-        })),
-        height: 140,
-        decimals: settings.unitWater === 'oz' ? 0 : 1,
-        unit: settings.unitWater === 'oz' ? 'oz' : 'L',
-        summary: `Water drunk over the last ${waters.length} days.`,
-      }),
-    ]),
+    /*
+      Water is a sentence, not a chart. Daily water zig-zags by nature, and a
+      month of zig-zag answers nothing; the average and the number of low days
+      are the two facts in it. What water goes *with* is on its own card.
+    */
+    waters.length >= 3 && el('p', { class: 'insight-note', style: { marginTop: 'var(--sp-4)' }, text:
+      `Water: about ${fmtWater(waters.reduce((a, w) => a + w.value, 0) / waters.length, settings.unitWater)} a day `
+      + `over the last ${plural(waters.length, 'day')}`
+      + (waters.some((w) => w.value < 1000)
+        ? `, with ${plural(waters.filter((w) => w.value < 1000).length, 'day')} under `
+          + `${settings.unitWater === 'oz' ? `${Math.round(mlToOz(1000))} oz` : '1 L'}.`
+        : '.') }),
 
     steps.length >= 3 && el('div', { style: { marginTop: 'var(--sp-4)' } }, [
       el('p', { class: 'hint-sm', text:
@@ -977,6 +867,71 @@ function trendCard(logs, settings) {
       }),
     ]),
   ]);
+}
+
+
+/**
+ * What one cycle held.
+ *
+ * Counts of what was logged rather than a day-by-day dump: the diary already
+ * shows any single day, and thirty of those in a sheet is not something anyone
+ * reads. Moods are kept apart from physical symptoms for the same reason the
+ * doctor report separates them — reading "Happy, 4 days" as a complaint is the
+ * exact confusion that separation exists to prevent.
+ *
+ * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
+ * @param {import('../domain/cycles.js').Cycle} cycle
+ * @param {number} average
+ */
+function openCycleDetail(logs, cycle, average) {
+  const end = cycle.nextStart ? addDays(cycle.nextStart, -1) : todayKey();
+  const days = range(cycle.start, end);
+
+  /** @type {Map<string, number>} */
+  const counts = new Map();
+  let logged = 0;
+
+  for (const date of days) {
+    const log = logs[date];
+    if (!log) continue;
+    logged += 1;
+    for (const id of loggedIds(log)) counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+
+  const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  const symptoms = ranked.filter(([id]) => !isMood(id));
+  const moods = ranked.filter(([id]) => isMood(id));
+
+  /** @param {string} title @param {[string, number][]} rows */
+  const section = (title, rows) => (rows.length ? el('div', { class: 'guide-entry' }, [
+    el('h3', { text: title }),
+    el('ul', { class: 'flag-list' }, rows.slice(0, 8).map(([id, n]) =>
+      el('li', { text: `${labelOf(id)}: ${plural(n, 'day')}` }))),
+  ]) : null);
+
+  const delta = cycle.length == null ? null : cycle.length - average;
+
+  openSheet({
+    title: `Cycle from ${fmtDayMonth(cycle.start)}`,
+    body: [
+      el('p', { class: 'hint-sm', text: [
+        cycle.length == null
+          ? 'Still running.'
+          : `${plural(cycle.length, 'day')} long` +
+            (delta != null && Math.abs(delta) > 1
+              ? `, ${plural(Math.abs(delta), 'day')} ${delta > 0 ? 'longer' : 'shorter'} than your average.`
+              : ', about your average.'),
+        `${plural(cycle.periodLength, 'day')} of bleeding.`,
+        `${plural(logged, 'day')} logged.`,
+      ].join(' ') }),
+
+      section('Symptoms', symptoms),
+      section('Mood', moods),
+
+      !ranked.length ? el('p', { class: 'hint', text:
+        'Nothing was logged in this cycle beyond the period itself.' }) : null,
+    ].filter(Boolean),
+  });
 }
 
 /* ── Report ─────────────────────────────────────────────────────────────── */
@@ -1009,7 +964,7 @@ function reportCard() {
   return el('div', { class: 'card' }, [
     el('h3', { text: 'Report for a doctor' }),
     el('p', { class: 'hint-sm', text:
-      'A printable summary of your last six months — cycle lengths, period ' +
+      'A printable summary of your last six months: cycle lengths, period ' +
       'lengths, recurring symptoms and anything outside the typical ranges. ' +
       'Print it, or choose "Save as PDF" in the print dialogue.' }),
     el('button', {
@@ -1025,8 +980,9 @@ function reportCard() {
 function footnote() {
   return el('p', { class: 'hint-sm', style: { textAlign: 'center', marginTop: 'var(--sp-4)' }, text:
     'All of this is calculated on your device from what you have logged. ' +
-    'It describes your own history — it is not a diagnosis.' });
+    'It describes your own history, and it is not a diagnosis.' });
 }
+
 
 /* ── How to read these ──────────────────────────────────────────────────── */
 
@@ -1058,6 +1014,11 @@ function readingGuideButton() {
  * shares rather than counts, that darker strips mean more cycles. Those are
  * the sentences here, and nothing else is.
  */
+
+/**
+ * One entry per kind of chart, each explaining the one thing that is not
+ * obvious from the chart itself.
+ */
 function openReadingGuide() {
   /** @param {string} title @param {string} body */
   const entry = (title, body) => el('div', { class: 'guide-entry' }, [
@@ -1068,36 +1029,27 @@ function openReadingGuide() {
   openSheet({
     title: 'How to read these',
     body: [
-      entry('Cycle length and period length',
-        'One dot per cycle, oldest on the left, labelled with the month it '
-        + 'began. The shaded band is the typical range and its edges are '
-        + 'numbered on the left. A dot outside it is ringed and its value '
-        + 'written next to it. The dashed line is your own average.'),
-
-      entry('Patterns',
-        'One strip per thing you log, running across a whole cycle. Day 1 is '
-        + 'the first day of bleeding. The darker a day, the more of your '
-        + 'cycles you logged that thing on it.'),
-
-      entry('Mood by phase',
-        'The share of days in each phase where you logged that mood — shares, '
-        + 'not counts, because the luteal phase is about twice as long as the '
-        + 'fertile window and would otherwise win every row by having more '
-        + 'days in it.'),
-
-      entry('Temperature',
-        'Your waking temperature through the current cycle. A rise that holds '
-        + 'for three days suggests ovulation has already happened; the dotted '
-        + 'line is the baseline it is measured against.'),
-
-      entry('Weight and sleep',
-        'Your recent readings in order. The numbers on the left are the '
-        + 'highest and lowest in view, so any dot can be read off them.'),
-
+      entry('Titles',
+        'Each card’s title is what your logs say. The chart underneath is the evidence, '
+        + 'and the small line under the title says how much data it is based on.'),
+      entry('Cycle length',
+        'One dot per cycle, oldest on the left. The shaded band is the typical range. '
+        + 'A dot outside it is ringed, and the dashed line is your own average.'),
+      entry('Periods',
+        'Each row is one period, newest at the top, with one dot per day. Darker dots were heavier days. '
+        + 'A dotted outline is spotting.'),
+      entry('When things hit',
+        'Squares on the left are the first days of your period. Squares on the right are the days '
+        + 'before your next one. The darker a square, the more of your cycles had it on that day.'),
+      entry('Mood and sleep curves',
+        'Left is the start of your period, right is the day before the next one. The pink patch on '
+        + 'the left is your period; the lilac patch on the right is the stretch the title is about.'),
+      entry('What goes with it',
+        'Two bars: how often something happened on days with the condition, and on all your other days. '
+        + 'The numbers are days, so you can see how much each bar rests on.'),
       el('p', { class: 'hint', text:
-        'Nothing here is a diagnosis. It is a description of what you logged, '
-        + 'and the ranges it compares against are published by the American '
-        + 'College of Obstetricians and Gynecologists.' }),
+        'Nothing here is a diagnosis. It describes what you logged. The typical ranges come from '
+        + 'the American College of Obstetricians and Gynecologists.' }),
     ],
   });
 }
@@ -1105,28 +1057,20 @@ function openReadingGuide() {
 /* ── Helpers ────────────────────────────────────────────────────────────── */
 
 /**
- * @param {string} label
- * @param {string} value
- * @param {string} unit
+ * The screen before there is anything to show. Cute rather than apologetic:
+ * this is the first thing someone sees on day one.
+ *
+ * @param {number} cycleCount
+ * @param {string} themeId
  */
-function stat(label, value, unit) {
-  return el('div', { class: 'stat' }, [
-    el('span', { class: 'stat-label', text: label }),
-    el('span', { class: 'stat-value num', text: value }),
-    unit && el('span', { class: 'stat-unit', text: unit }),
-  ]);
-}
-
-/** @param {number} cycleCount */
-function notEnoughYet(cycleCount) {
+function notEnoughYet(cycleCount, themeId) {
   return el('div', { class: 'empty' }, [
-    spotArt('chart'),
-    el('h3', { text: 'Not enough to analyse yet' }),
+    emblem(themeId, { size: 96, className: 'empty-art' }),
+    el('h3', { text: 'Your insights will grow here' }),
     el('p', { text: cycleCount === 0
-      ? 'Once you have logged a couple of periods, this is where your cycle ' +
-        'length, patterns and trends show up.'
-      : 'One period logged. After the next one Kittycal can start comparing ' +
-        'cycles, and the charts here fill in.' }),
+      ? 'Log your period and answer the daily questions. After a cycle or two, this page '
+        + 'starts telling you things about your body you might not have noticed.'
+      : 'One period logged. After the next one, Kittycal can start comparing cycles.' }),
     el('button', {
       type: 'button', class: 'btn', text: 'Go to the calendar',
       onclick: () => { haptic(); store.setView('calendar'); },
