@@ -41,7 +41,7 @@
 
 import { el, haptic, announce } from '../utils/dom.js';
 import { todayKey, fmtRelative, addDays } from '../utils/date.js';
-import { CATEGORIES, DEFAULT_CHIPS, MEASURES, WATER_GLASS_ML, labelFor } from '../data/taxonomy.js';
+import { CATEGORIES, DEFAULT_CHIPS, MEASURES, glassMl, labelFor } from '../data/taxonomy.js';
 import { fmtWater } from '../utils/fmt.js';
 import { openSheet, closeSheet } from '../ui/sheet.js';
 import { severityBlock } from '../ui/severity.js';
@@ -411,10 +411,14 @@ export function openCheckin(date = todayKey()) {
         shortcut past the questions, not one of the answers to the first.
       */
       shortcut: !flowAnswered && draft.moods.length === 0 && draft.symptoms.length === 0
-        ? { label: 'Nothing to report today', onPick: () => {
+        ? { label: isToday ? 'Nothing to report today' : 'Nothing to report', onPick: () => {
             draft.flow = 'none';
             draft.moods = [];
             draft.symptoms = [];
+            flowAnswered = true;
+            // Past the three body questions, but sleep and water still get
+            // asked: "nothing wrong" says nothing about how she slept.
+            if (steps.length > 3) { step = 3; render(); return; }
             step = steps.length;
             void finish();
           } }
@@ -606,8 +610,9 @@ export function openCheckin(date = todayKey()) {
   /** @param {() => boolean} stale */
   function waterStep(stale) {
     const settings = store.getState().settings;
-    const glass = fmtWater(WATER_GLASS_ML, settings.unitWater);
-    const glasses = Math.round(draft.water / WATER_GLASS_ML);
+    const size = glassMl(settings);
+    const glass = fmtWater(size, settings.unitWater);
+    const glasses = Math.round(draft.water / size);
     const index = steps.indexOf(waterStep);
     /*
       "So far", because the check-in happens whenever she opens the app — in
@@ -619,8 +624,8 @@ export function openCheckin(date = todayKey()) {
       stale,
       title: isToday ? 'How much water so far today?' : `How much water ${whenPhrase}?`,
       hint: isToday
-        ? `In glasses of about ${glass}. Add more later with one tap on Today.`
-        : `In glasses of about ${glass}.`,
+        ? `One glass is ${glass}. You can add more later from Today.`
+        : `One glass is ${glass}.`,
       columns: 3,
       options: WATER_CHOICES.map((n, i) => ({
         id: String(n),
@@ -628,7 +633,7 @@ export function openCheckin(date = todayKey()) {
         selected: draft.water > 0 && Math.min(8, glasses) === n,
         onPick: () => {
           // Keep a total above eight that was built up a glass at a time.
-          if (!(n === 8 && glasses > 8)) draft.water = n * WATER_GLASS_ML;
+          if (!(n === 8 && glasses > 8)) draft.water = n * size;
           next();
         },
       })),

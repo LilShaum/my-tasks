@@ -10,7 +10,8 @@
 import { el, replace, haptic, announce } from '../utils/dom.js';
 import { checkStorage, fmtBytes } from '../storage/persist.js';
 import { todayKey, daysBetween, fmtLong } from '../utils/date.js';
-import { plural } from '../utils/fmt.js';
+import { plural, fmtWater } from '../utils/fmt.js';
+import { GLASS_SIZES, glassMl } from '../data/taxonomy.js';
 import { loadLock, disableLock, promptForNewPin } from '../ui/lock.js';
 import {
   loadReminders, saveReminders, permissionState, requestPermission,
@@ -1210,6 +1211,15 @@ function dailyQuestionRows(settings) {
   return el('div', { class: 'rows' }, [
     row('askSleep', 'Ask about sleep', 'Hours and how well you slept'),
     row('askWater', 'Ask about water', 'Glasses so far, with a quick add on Today'),
+    selectRow({
+      label: 'One tap of water is',
+      value: String(glassMl(settings)),
+      options: GLASS_SIZES.map((g) => ({
+        value: String(g.ml),
+        label: `${g.name} (${fmtWater(g.ml, settings.unitWater)})`,
+      })),
+      onChange: (v) => store.updateSettings({ glassMl: Number(v) }),
+    }),
   ]);
 }
 

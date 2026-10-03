@@ -16,7 +16,7 @@
 import { el, svg, haptic, announce } from '../utils/dom.js';
 import { fmtRelative, fmtLong, todayKey } from '../utils/date.js';
 import {
-  CATEGORIES, TESTS, MEASURES, WATER_GLASS_ML, WATER_GOAL_ML, labelFor,
+  CATEGORIES, TESTS, MEASURES, WATER_GOAL_ML, glassMl, labelFor,
   optionMatches, fieldMatches, FIELD_TERMS, normalizeQuery, DEFAULT_CHIPS, severityLabel,
 } from '../data/taxonomy.js';
 import { nothingRecorded, isBleeding } from '../domain/model.js';
@@ -1009,8 +1009,9 @@ function waterRow(draft, settings, chips) {
   const readout = el('span', { class: 'water-readout num' });
   const glasses = el('div', { class: 'water-glasses' });
 
-  const total = () => Math.round(draft.water / WATER_GLASS_ML);
-  const goalGlasses = Math.round(WATER_GOAL_ML / WATER_GLASS_ML);
+  const size = glassMl(settings);
+  const total = () => Math.round(draft.water / size);
+  const goalGlasses = Math.round(WATER_GOAL_ML / size);
 
   const paint = () => {
     readout.textContent =
@@ -1026,7 +1027,7 @@ function waterRow(draft, settings, chips) {
         text: filled ? '◆' : '◇',
         onclick: () => {
           // Tapping the last filled glass empties it; otherwise fill to here.
-          draft.water = (total() === i + 1) ? i * WATER_GLASS_ML : (i + 1) * WATER_GLASS_ML;
+          draft.water = (total() === i + 1) ? i * size : (i + 1) * size;
           paint();
           chips.sync();
           haptic(6);
@@ -1041,7 +1042,7 @@ function waterRow(draft, settings, chips) {
     el('div', { class: 'measure-label' }, [
       el('span', { text: 'Water' }),
       el('span', { class: 'hint-sm', text:
-        `One glass is ${fmtWater(WATER_GLASS_ML, settings.unitWater)}.` }),
+        `One glass is ${fmtWater(size, settings.unitWater)}.` }),
     ]),
     glasses,
     readout,

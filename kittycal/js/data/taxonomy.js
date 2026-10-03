@@ -274,6 +274,26 @@ export const WATER_GLASS_ML = 250;
 export const WATER_GOAL_ML = 2000;
 
 /**
+ * What one tap of water means, chosen in Settings. Stored in ml whatever the
+ * display unit, like every other amount of water.
+ */
+export const GLASS_SIZES = [
+  { ml: 200, name: 'Small glass' },
+  { ml: 250, name: 'Glass' },
+  { ml: 330, name: 'Can' },
+  { ml: 500, name: 'Bottle' },
+];
+
+/**
+ * The glass size she chose, or the default if the stored value is not one of
+ * the offered sizes.
+ * @param {{glassMl?: number}} settings
+ */
+export function glassMl(settings) {
+  return GLASS_SIZES.some((g) => g.ml === settings.glassMl) ? /** @type {number} */ (settings.glassMl) : WATER_GLASS_ML;
+}
+
+/**
  * What the quick rows show before she has any history of her own.
  *
  * `recentChips` only fills up when something is applied from the full diary
