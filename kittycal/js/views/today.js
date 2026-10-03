@@ -16,11 +16,13 @@
  * @typedef {import('../utils/date.js').DateKey} DateKey
  */
 
-import { el, svg, replace, haptic } from '../utils/dom.js';
+import { el, svg, replace, haptic, announce } from '../utils/dom.js';
 import { todayKey, fmtDayMonth, fmtRelative, daysBetween, addDays, dow, dayOfMonth, DOW_MIN }
   from '../utils/date.js';
-import { plural, listJoin } from '../utils/fmt.js';
-import { labelFor, labelOf, CATEGORIES, DEFAULT_CHIPS } from '../data/taxonomy.js';
+import { plural, listJoin, fmtWater } from '../utils/fmt.js';
+import {
+  labelFor, labelOf, CATEGORIES, DEFAULT_CHIPS, GLASS_SIZES, glassMl,
+} from '../data/taxonomy.js';
 import { pick } from '../data/tips.js';
 import { loggedIds, spottingBetweenPeriods, MIN_CYCLES_FOR_PATTERN } from '../domain/stats.js';
 import { premenstrualPatterns, headsUpToday } from '../domain/heads-up.js';
@@ -32,7 +34,7 @@ import { installNudge } from '../domain/install-health.js';
 import { storageSnapshot, installPlatform } from '../storage/persist.js';
 import { exportEverything } from '../storage/export-action.js';
 import { openLogSheet } from './log.js';
-import { openCheckin } from './checkin.js';
+import { openCheckin, onlyWater, checkinQuestionCount } from './checkin.js';
 import { buildCycles, cycleLengths, periodLengths } from '../domain/cycles.js';
 import { predict, conceptionChance } from '../domain/predict.js';
 import { phaseFor } from '../domain/phases.js';
@@ -47,6 +49,28 @@ import * as store from '../state/store.js';
  * @param {HTMLElement} host
  */
 export function renderToday(host) {
+  /*
+    The whole view is rebuilt on every store change, so a button she has just
+    tapped is destroyed and focus drops to <body>. For the water buttons that
+    is a keyboard or switch user losing their place after every glass, and
+    they are the one control here meant to be tapped several times in a row.
+    Remember which one had focus and put it back on the new node.
+  */
+  const held = document.activeElement instanceof HTMLElement && host.contains(document.activeElement)
+    ? document.activeElement.dataset.water : undefined;
+
+  renderTodayInner(host);
+
+  if (held) {
+    // "Remove" disables itself at zero; focus goes to "Add" rather than nowhere.
+    const target = host.querySelector(`[data-water="${held}"]:not(:disabled)`)
+      ?? host.querySelector('[data-water="add"]');
+    if (target instanceof HTMLElement) target.focus({ preventScroll: true });
+  }
+}
+
+/** @param {HTMLElement} host */
+function renderTodayInner(host) {
   const state = store.getState();
   const { settings, periodDays, logs } = state;
   const today = todayKey();
@@ -72,6 +96,7 @@ export function renderToday(host) {
       emptyState(settings.name),
       logButton(logs[today], today, logs, cycles),
       weekStrip(logs, periodDays, today),
+      waterStrip(settings, logs[today], today),
       disclaimerNote(),
     ]);
     return;
@@ -137,6 +162,7 @@ export function renderToday(host) {
     prediction.expecting ? null : phaseLine(phase),
     logButton(logs[today], today, logs, cycles),
     weekStrip(logs, periodDays, today),
+    waterStrip(settings, logs[today], today),
 
     /*
       The recap sits under the daily loop, not over it.
@@ -540,15 +566,15 @@ function phaseLine(phase) {
  * @param {import('../domain/cycles.js').Cycle[]} cycles
  */
 function logButton(log, today, logs, cycles) {
-  if (!log) {
+  // Water added a glass at a time from the strip below is not an answer.
+  if (!log || onlyWater(log)) {
     return el('div', { class: 'log-cta' }, [
       el('button', {
         type: 'button',
         class: 'btn btn-block btn-lg',
         onclick: () => { haptic(); openCheckin(today); },
       }, ['Check in for today']),
-      el('p', { class: 'hint-sm log-cta-summary', text:
-        'Three quick questions, about fifteen seconds.' }),
+      el('p', { class: 'hint-sm log-cta-summary', text: checkinPromise() }),
     ]);
   }
 
@@ -582,6 +608,18 @@ function logButton(log, today, logs, cycles) {
       onclick: () => { haptic(); openLogSheet(today); },
     }, ['Add more']),
   ]);
+}
+
+/**
+ * What the check-in button promises: how many questions, and roughly how long.
+ * The count comes from the check-in itself so the two cannot drift apart.
+ */
+function checkinPromise() {
+  const n = checkinQuestionCount();
+  const words = ['Three', 'Four', 'Five', 'Six'];
+  const count = words[Math.min(Math.max(n, 3), 6) - 3];
+  const time = n <= 3 ? 'about fifteen seconds' : n === 4 ? 'about half a minute' : 'under a minute';
+  return `${count} quick questions, ${time}.`;
 }
 
 /**
@@ -625,7 +663,10 @@ function weekStrip(logs, periodDays, today) {
 
   for (let back = 6; back >= 0; back -= 1) {
     const key = addDays(today, -back);
-    const log = logs[key];
+    // A day with only water on it has had no questions answered, so it is
+    // still waiting for its check-in: no tick, and part of the catch-up count.
+    const stored = logs[key];
+    const log = stored && !onlyWater(stored) ? stored : undefined;
     const isToday = key === today;
 
     /*
@@ -673,6 +714,76 @@ function weekStrip(logs, periodDays, today) {
   ]);
 }
 
+
+/**
+ * Water so far today, with a glass added or taken away in one tap.
+ *
+ * The check-in asks once; this is for the rest of the day. It writes only the
+ * water and never marks the day as checked in, so drinking something does not
+ * cancel the questions that are still owed.
+ *
+ * Shown only when she has water switched on.
+ *
+ * @param {import('../domain/model.js').Settings} settings
+ * @param {import('../domain/model.js').DayLog|undefined} log
+ * @param {DateKey} today
+ */
+function waterStrip(settings, log, today) {
+  if (!settings.askWater || !settings.onboarded) return null;
+
+  const size = glassMl(settings);
+  const name = (GLASS_SIZES.find((g) => g.ml === size)?.name ?? 'Glass');
+  const noun = name.toLowerCase();
+  const nouns = /s$/.test(noun) ? `${noun}es` : `${noun}s`;
+  const water = log?.water ?? 0;
+  const glasses = Math.round((water / size) * 10) / 10;
+
+  /** @param {number} delta */
+  const change = async (delta) => {
+    haptic();
+    const next = structuredClone(store.getLog(today));
+    next.water = Math.max(0, next.water + delta);
+    announce(next.water ? `${fmtWater(next.water, settings.unitWater)} of water today` : 'No water logged today');
+    await store.putLog(next);
+  };
+
+  return el('section', { class: 'water-strip', 'aria-label': 'Water today' }, [
+    el('div', { class: 'water-strip-text' }, [
+      svg('svg', {
+        class: 'water-strip-icon',
+        viewBox: '0 0 24 24',
+        fill: 'none',
+        stroke: 'currentColor',
+        'stroke-width': '2',
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round',
+        'aria-hidden': 'true',
+        html: '<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>',
+      }),
+      el('div', {}, [
+        el('p', { class: 'water-strip-label', text: 'Water today' }),
+        el('p', { class: 'water-strip-total', text: water
+          ? `${fmtWater(water, settings.unitWater)} \u00b7 ${glasses === 1 ? `1 ${noun}` : `${glasses} ${nouns}`}`
+          : 'None yet' }),
+      ]),
+    ]),
+    el('button', {
+      type: 'button',
+      class: 'water-btn water-btn-minus',
+      'data-water': 'remove',
+      'aria-label': `Remove a ${noun} of water`,
+      disabled: water <= 0,
+      onclick: () => { void change(-size); },
+    }, ['\u2212']),
+    el('button', {
+      type: 'button',
+      class: 'water-btn water-btn-add',
+      'data-water': 'add',
+      'aria-label': `Add a ${noun} of water`,
+      onclick: () => { void change(size); },
+    }, [`+ ${name}`]),
+  ]);
+}
 
 /* ── Pieces ─────────────────────────────────────────────────────────────── */
 

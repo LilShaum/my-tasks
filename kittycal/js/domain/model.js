@@ -71,6 +71,9 @@
  * @property {string} backupSnoozed   DateKey the backup prompt was dismissed, or ''
  * @property {string} installSnoozed  DateKey the install prompt was dismissed, or ''
  * @property {string} checkinSkipped  DateKey the daily check-in was skipped, or ''
+ * @property {boolean} askSleep        the check-in asks about last night's sleep
+ * @property {boolean} askWater        the check-in asks about water so far
+ * @property {number} glassMl          what one tap of water adds, in ml
  * @property {boolean} onboarded
  * @property {boolean} disclaimerAck
  * @property {string[]} customSymptoms
@@ -124,6 +127,9 @@ export function defaultSettings() {
     backupSnoozed: '',
     installSnoozed: '',
     checkinSkipped: '',
+    askSleep: true,
+    askWater: true,
+    glassMl: 250,
     onboarded: false,
     disclaimerAck: false,
     customSymptoms: [],
@@ -368,6 +374,7 @@ export function normalizeSettings(raw) {
   out.firstDayOfWeek = out.firstDayOfWeek === 0 ? 0 : 1;
   if (!Array.isArray(out.customSymptoms)) out.customSymptoms = [];
   if (!Array.isArray(out.recentChips)) out.recentChips = [];
+  if (![200, 250, 330, 500].includes(out.glassMl)) out.glassMl = base.glassMl;
 
   return out;
 }

@@ -68,7 +68,7 @@ function seed(page, days) {
         tx.objectStore('logs').put({ ...emptyLog(shift(-i)), checkedIn: true });
       }
       tx.objectStore('meta').put({ key: 'settings', value: {
-        theme: 'hellokitty', onboarded: true, disclaimerAck: true,
+        theme: 'hellokitty', askSleep: false, askWater: false, onboarded: true, disclaimerAck: true,
         avgCycleLength: 28, avgPeriodLength: 5, name: 'Sam',
         lastBackup: shift(0), lastBackupAt: Date.now(),
       } });

@@ -10,7 +10,8 @@
 import { el, replace, haptic, announce } from '../utils/dom.js';
 import { checkStorage, fmtBytes } from '../storage/persist.js';
 import { todayKey, daysBetween, fmtLong } from '../utils/date.js';
-import { plural } from '../utils/fmt.js';
+import { plural, fmtWater } from '../utils/fmt.js';
+import { GLASS_SIZES, glassMl } from '../data/taxonomy.js';
 import { loadLock, disableLock, promptForNewPin } from '../ui/lock.js';
 import {
   loadReminders, saveReminders, permissionState, requestPermission,
@@ -65,6 +66,11 @@ export function renderSettings(host) {
     el('div', { class: 'section' }, [
       el('div', { class: 'section-title' }, [el('h2', { text: 'Your cycle' })]),
       cycleRows(settings),
+    ]),
+
+    el('div', { class: 'section' }, [
+      el('div', { class: 'section-title' }, [el('h2', { text: 'Daily questions' })]),
+      dailyQuestionRows(settings),
     ]),
 
     el('div', { class: 'section' }, [
@@ -1177,6 +1183,44 @@ function toggleRow({ checked, disabled = false, label, onChange }) {
     },
   });
   return button;
+}
+
+/**
+ * Which of the optional questions the daily check-in asks.
+ *
+ * Bleeding, mood and symptoms are always asked — every prediction and pattern
+ * is built from them. Sleep and water are easy to answer and feed Insights, but
+ * someone who does not care about either should be able to keep the check-in
+ * at three taps.
+ *
+ * @param {import('../domain/model.js').Settings} settings
+ */
+function dailyQuestionRows(settings) {
+  /** @param {'askSleep'|'askWater'} key @param {string} label @param {string} sub */
+  const row = (key, label, sub) => el('div', { class: 'row' }, [
+    el('span', { class: 'row-label' }, [
+      label,
+      el('span', { class: 'choice-sub', text: sub }),
+    ]),
+    toggleRow({
+      checked: settings[key],
+      label,
+      onChange: (checked) => store.updateSettings({ [key]: checked }),
+    }),
+  ]);
+  return el('div', { class: 'rows' }, [
+    row('askSleep', 'Ask about sleep', 'Hours and how well you slept'),
+    row('askWater', 'Ask about water', 'Glasses so far, with a quick add on Today'),
+    selectRow({
+      label: 'Glass size',
+      value: String(glassMl(settings)),
+      options: GLASS_SIZES.map((g) => ({
+        value: String(g.ml),
+        label: `${g.name} (${fmtWater(g.ml, settings.unitWater)})`,
+      })),
+      onChange: (v) => store.updateSettings({ glassMl: Number(v) }),
+    }),
+  ]);
 }
 
 /**

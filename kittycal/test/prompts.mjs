@@ -48,7 +48,7 @@ const check = (cond, label, extra = '') => {
  * Six tidy cycles, with today sitting mid-cycle so a fertile window exists.
  * @param {{mode: string, log?: Record<string, any>}} opts
  */
-const seed = (opts) => async ({ mode, log, bbtDays, weightDays }) => {
+const seed = (opts) => async ({ mode, log, bbtDays, weightDays, askSleep, askWater }) => {
   const db = await new Promise((res, rej) => {
     const r = indexedDB.open('kittycal', 1);
     r.onupgradeneeded = () => {
@@ -75,6 +75,7 @@ const seed = (opts) => async ({ mode, log, bbtDays, weightDays }) => {
     tx.objectStore('meta').put({ key: 'settings', value: {
       theme: 'hellokitty', onboarded: true, disclaimerAck: true, avgCycleLength: 28,
       avgPeriodLength: 5, name: 'Sam', showFertility: true, mode,
+      askSleep, askWater,
     } });
     tx.objectStore('meta').put({ key: 'periodDays', value: days });
     if (log) tx.objectStore('logs').put({ date: key(now), ...log });
@@ -101,13 +102,14 @@ const seed = (opts) => async ({ mode, log, bbtDays, weightDays }) => {
 const browser = await launchChromium();
 
 /** A fresh profile, seeded, with the day sheet dismissed. */
-async function open({ mode = 'cycle', log = null, bbtDays = 0, weightDays = 0 } = {}) {
+async function open({ mode = 'cycle', log = null, bbtDays = 0, weightDays = 0,
+  askSleep = false, askWater = false } = {}) {
   const ctx = await browser.newContext({
     viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true,
   });
   const page = await ctx.newPage();
   await page.goto(BASE, { waitUntil: 'networkidle' });
-  await page.evaluate(seed({}), { mode, log, bbtDays, weightDays });
+  await page.evaluate(seed({}), { mode, log, bbtDays, weightDays, askSleep, askWater });
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForTimeout(1700);
   if (await page.locator('.sheet[data-open="true"]').count()) {
@@ -227,122 +229,137 @@ console.log('\nthe daily check-in carries the measurements she already keeps');
     temperature, which is useless to someone with no thermometer, the question
     follows the habit she has already shown: three days in the last thirty.
   */
-  for (const [bbtDays, wanted] of [[0, 3], [2, 3], [6, 4]]) {
-    // eslint-disable-next-line no-await-in-loop
-    const { ctx, page } = await open({ bbtDays });
-    // eslint-disable-next-line no-await-in-loop
-    await page.locator('button:has-text("Check in for today")').click();
-    // eslint-disable-next-line no-await-in-loop
-    await page.waitForTimeout(800);
-    // eslint-disable-next-line no-await-in-loop
-    const steps = await page.evaluate(() =>
-      Number((document.querySelector('.sheet')?.textContent?.match(/Step 1 of (\d+)/) ?? [])[1] ?? 0));
-    check(steps === wanted,
-      `${bbtDays} temperature readings in the last month gives ${wanted} questions`,
-      `got ${steps}`);
-
-    if (wanted === 4) {
-      // eslint-disable-next-line no-await-in-loop
-      await page.locator('.sheet button:has-text("No bleeding")').click();
-      // eslint-disable-next-line no-await-in-loop
+  /*
+    Sleep and water are asked of everyone by default, so the count is the three
+    body questions plus two, with the temperature after them. They are run both
+    ways: switched off, which is the old three/three/four, and on, which is
+    five/five/six. The temperature, when there is one, is always the last
+    question.
+  */
+  const walkToTemperature = async (page, defaults) => {
+    await page.locator('.sheet button:has-text("No bleeding")').click();
+    await page.waitForTimeout(500);
+    await page.locator('.sheet button:has-text("Next")').click();
+    await page.waitForTimeout(500);
+    await page.locator('.sheet button').filter({ hasText: /^Next$|^Done$/ }).first().click();
+    await page.waitForTimeout(500);
+    if (defaults) {
+      // Sleep: Next. Water: one tap on "None yet" moves straight on.
+      await page.locator('.sheet button').filter({ hasText: /^Next$/ }).first().click();
       await page.waitForTimeout(500);
-      // eslint-disable-next-line no-await-in-loop
-      await page.locator('.sheet button:has-text("Next")').click();
-      // eslint-disable-next-line no-await-in-loop
+      await page.locator('.sheet [data-opt="0"]').click();
       await page.waitForTimeout(500);
-      // eslint-disable-next-line no-await-in-loop
-      await page.locator('.sheet button').filter({ hasText: /^Next$|^Done$/ }).first().click();
-      // eslint-disable-next-line no-await-in-loop
-      await page.waitForTimeout(700);
-
-      // eslint-disable-next-line no-await-in-loop
-      const field = page.locator('.sheet input[type=number]');
-      // eslint-disable-next-line no-await-in-loop
-      check(await field.count() === 1, 'and the last question is a temperature field');
-
-      /* A morning reading is only answerable in the morning, so the screen
-         promises blank is fine — and that promise has to be true. */
-      // eslint-disable-next-line no-await-in-loop
-      const hint = await page.evaluate(() => document.querySelector('.sheet .hint')?.textContent ?? '');
-      check(/leave it blank/i.test(hint), 'and says plainly that she can leave it blank', hint);
-      /* A dropped decimal point. The check-in first shipped with its own input
-         that stored any number, so this became 366 °C in the database — the
-         bug the diary's row had already been fixed for. */
-      // eslint-disable-next-line no-await-in-loop
-      await field.fill('366');
-      // eslint-disable-next-line no-await-in-loop
-      await field.blur();
-      // eslint-disable-next-line no-await-in-loop
-      await page.waitForTimeout(300);
-      // eslint-disable-next-line no-await-in-loop
-      const refused = await page.evaluate(() => ({
-        told: !document.querySelector('.sheet .measure-problem')?.hidden,
-        text: document.querySelector('.sheet .measure-problem')?.textContent ?? '',
-        cleared: document.querySelector('.sheet input[type=number]')?.value === '',
-      }));
-      check(refused.told && refused.cleared,
-        'an impossible reading is refused and she is told why', JSON.stringify(refused));
-
-      // eslint-disable-next-line no-await-in-loop
-      await field.fill('36.60');
-      // eslint-disable-next-line no-await-in-loop
-      await page.locator('.sheet button:has-text("Done")').click();
-      // eslint-disable-next-line no-await-in-loop
-      await page.waitForTimeout(1200);
-
-      /* Stored in Celsius whatever she reads in, like the full diary — getting
-         this wrong would silently corrupt every reading taken the fast way. */
-      // eslint-disable-next-line no-await-in-loop
-      const saved = await page.evaluate(async () => {
-        const store = await import('/js/state/store.js');
-        const t = new Date();
-        const k = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
-        return store.getState().logs[k]?.bbt ?? null;
-      });
-      check(saved != null && Math.abs(saved - 36.6) < 0.01,
-        'and what she types there is saved', String(saved));
     }
-    if (wanted === 4) {
-      // Now the promise itself: blank, Done, and the check-in completes.
+  };
+
+  for (const defaults of [false, true]) {
+    const extra = defaults ? 2 : 0;
+    console.log(`  — sleep and water ${defaults ? 'on (the defaults)' : 'off'}`);
+    for (const [bbtDays, base] of [[0, 3], [2, 3], [6, 4]]) {
+      const wanted = base + extra;
       // eslint-disable-next-line no-await-in-loop
-      const again = await open({ bbtDays });
+      const { ctx, page } = await open({ bbtDays, askSleep: defaults, askWater: defaults });
       // eslint-disable-next-line no-await-in-loop
-      await again.page.locator('button:has-text("Check in for today")').click();
+      await page.locator('button:has-text("Check in for today")').click();
       // eslint-disable-next-line no-await-in-loop
-      await again.page.waitForTimeout(700);
+      await page.waitForTimeout(800);
       // eslint-disable-next-line no-await-in-loop
-      await again.page.locator('.sheet button:has-text("No bleeding")').click();
+      const steps = await page.evaluate(() =>
+        Number((document.querySelector('.sheet')?.textContent?.match(/Step 1 of (\d+)/) ?? [])[1] ?? 0));
+      check(steps === wanted,
+        `${bbtDays} temperature readings in the last month gives ${wanted} questions`,
+        `got ${steps}`);
+
+      if (base === 4) {
+        // eslint-disable-next-line no-await-in-loop
+        await walkToTemperature(page, defaults);
+        // eslint-disable-next-line no-await-in-loop
+        await page.waitForTimeout(200);
+
+        // eslint-disable-next-line no-await-in-loop
+        const field = page.locator('.sheet input[type=number]');
+        // eslint-disable-next-line no-await-in-loop
+        check(await field.count() === 1, 'and the last question is a temperature field');
+        // eslint-disable-next-line no-await-in-loop
+        const position = await page.evaluate(() => document.querySelector('.sheet')?.textContent
+          ?.match(/Step (\d+) of (\d+)/)?.slice(1).map(Number) ?? []);
+        check(position[0] === wanted && position[1] === wanted,
+          `and it is step ${wanted} of ${wanted}, after sleep and water when they are asked`,
+          JSON.stringify(position));
+
+        /* A morning reading is only answerable in the morning, so the screen
+           promises blank is fine — and that promise has to be true. */
+        // eslint-disable-next-line no-await-in-loop
+        const hint = await page.evaluate(() => document.querySelector('.sheet .hint')?.textContent ?? '');
+        check(/leave it blank/i.test(hint), 'and says plainly that she can leave it blank', hint);
+        /* A dropped decimal point. The check-in first shipped with its own input
+           that stored any number, so this became 366 °C in the database — the
+           bug the diary's row had already been fixed for. */
+        // eslint-disable-next-line no-await-in-loop
+        await field.fill('366');
+        // eslint-disable-next-line no-await-in-loop
+        await field.blur();
+        // eslint-disable-next-line no-await-in-loop
+        await page.waitForTimeout(300);
+        // eslint-disable-next-line no-await-in-loop
+        const refused = await page.evaluate(() => ({
+          told: !document.querySelector('.sheet .measure-problem')?.hidden,
+          text: document.querySelector('.sheet .measure-problem')?.textContent ?? '',
+          cleared: document.querySelector('.sheet input[type=number]')?.value === '',
+        }));
+        check(refused.told && refused.cleared,
+          'an impossible reading is refused and she is told why', JSON.stringify(refused));
+
+        // eslint-disable-next-line no-await-in-loop
+        await field.fill('36.60');
+        // eslint-disable-next-line no-await-in-loop
+        await page.locator('.sheet button:has-text("Done")').click();
+        // eslint-disable-next-line no-await-in-loop
+        await page.waitForTimeout(1200);
+
+        /* Stored in Celsius whatever she reads in, like the full diary — getting
+           this wrong would silently corrupt every reading taken the fast way. */
+        // eslint-disable-next-line no-await-in-loop
+        const saved = await page.evaluate(async () => {
+          const store = await import('/js/state/store.js');
+          const t = new Date();
+          const k = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+          return store.getState().logs[k]?.bbt ?? null;
+        });
+        check(saved != null && Math.abs(saved - 36.6) < 0.01,
+          'and what she types there is saved', String(saved));
+
+        // Now the promise itself: blank, Done, and the check-in completes.
+        // eslint-disable-next-line no-await-in-loop
+        const again = await open({ bbtDays, askSleep: defaults, askWater: defaults });
+        // eslint-disable-next-line no-await-in-loop
+        await again.page.locator('button:has-text("Check in for today")').click();
+        // eslint-disable-next-line no-await-in-loop
+        await again.page.waitForTimeout(700);
+        // eslint-disable-next-line no-await-in-loop
+        await walkToTemperature(again.page, defaults);
+        // eslint-disable-next-line no-await-in-loop
+        await again.page.locator('.sheet button:has-text("Done")').click();
+        // eslint-disable-next-line no-await-in-loop
+        await again.page.waitForTimeout(1000);
+        // eslint-disable-next-line no-await-in-loop
+        const done = await again.page.evaluate(async () => {
+          const store = await import('/js/state/store.js');
+          const t = new Date();
+          const k = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+          const log = store.getState().logs[k];
+          return { closed: !document.querySelector('.sheet[data-open="true"]'),
+            checkedIn: log?.checkedIn === true, bbt: log?.bbt ?? null };
+        });
+        check(done.closed && done.checkedIn && done.bbt == null,
+          'and left blank, Done still finishes the check-in without inventing a reading',
+          JSON.stringify(done));
+        // eslint-disable-next-line no-await-in-loop
+        await again.ctx.close();
+      }
       // eslint-disable-next-line no-await-in-loop
-      await again.page.waitForTimeout(500);
-      // eslint-disable-next-line no-await-in-loop
-      await again.page.locator('.sheet button:has-text("Next")').click();
-      // eslint-disable-next-line no-await-in-loop
-      await again.page.waitForTimeout(500);
-      // eslint-disable-next-line no-await-in-loop
-      await again.page.locator('.sheet button').filter({ hasText: /^Next$|^Done$/ }).first().click();
-      // eslint-disable-next-line no-await-in-loop
-      await again.page.waitForTimeout(600);
-      // eslint-disable-next-line no-await-in-loop
-      await again.page.locator('.sheet button:has-text("Done")').click();
-      // eslint-disable-next-line no-await-in-loop
-      await again.page.waitForTimeout(1000);
-      // eslint-disable-next-line no-await-in-loop
-      const done = await again.page.evaluate(async () => {
-        const store = await import('/js/state/store.js');
-        const t = new Date();
-        const k = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
-        const log = store.getState().logs[k];
-        return { closed: !document.querySelector('.sheet[data-open="true"]'),
-          checkedIn: log?.checkedIn === true, bbt: log?.bbt ?? null };
-      });
-      check(done.closed && done.checkedIn && done.bbt == null,
-        'and left blank, Done still finishes the check-in without inventing a reading',
-        JSON.stringify(done));
-      // eslint-disable-next-line no-await-in-loop
-      await again.ctx.close();
+      await ctx.close();
     }
-    // eslint-disable-next-line no-await-in-loop
-    await ctx.close();
   }
 }
 
@@ -357,6 +374,16 @@ console.log('\nthe check-in never asks for something she would have to go and fe
     Number((document.querySelector('.sheet')?.textContent?.match(/Step 1 of (\d+)/) ?? [])[1] ?? 0));
   check(steps === 3, 'a habitual weigher still gets three questions, not a scale reading', `got ${steps}`);
   await ctx.close();
+
+  // With the defaults on it is the same three plus sleep and water — and still
+  // no weight, because nobody can answer that from where she is standing.
+  const withDefaults = await open({ weightDays: 8, askSleep: true, askWater: true });
+  await withDefaults.page.locator('button:has-text("Check in for today")').click();
+  await withDefaults.page.waitForTimeout(700);
+  const five = await withDefaults.page.evaluate(() =>
+    Number((document.querySelector('.sheet')?.textContent?.match(/Step 1 of (\d+)/) ?? [])[1] ?? 0));
+  check(five === 5, 'and with sleep and water on, five questions, still no scale reading', `got ${five}`);
+  await withDefaults.ctx.close();
 }
 
 console.log('\na search that finds nothing offers to make the thing');

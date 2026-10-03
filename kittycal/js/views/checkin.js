@@ -41,10 +41,11 @@
 
 import { el, haptic, announce } from '../utils/dom.js';
 import { todayKey, fmtRelative, addDays } from '../utils/date.js';
-import { CATEGORIES, DEFAULT_CHIPS, MEASURES, labelFor } from '../data/taxonomy.js';
+import { CATEGORIES, DEFAULT_CHIPS, MEASURES, glassMl, labelFor } from '../data/taxonomy.js';
+import { fmtWater } from '../utils/fmt.js';
 import { openSheet, closeSheet } from '../ui/sheet.js';
 import { severityBlock } from '../ui/severity.js';
-import { pruneSeverity } from '../domain/model.js';
+import { pruneSeverity, nothingRecorded } from '../domain/model.js';
 import { openLogSheet } from './log.js';
 import { measureRow } from '../ui/measure.js';
 import { burst } from '../ui/particles.js';
@@ -58,17 +59,36 @@ import { getTheme } from '../data/themes.js';
 import * as store from '../state/store.js';
 
 /**
- * The measurements the check-in may ask for, even when she keeps them.
+ * The measurements the check-in asks for only once she keeps them.
  *
- * The rule for a daily question is that she can answer it from where she is
- * standing, without fetching anything. A temperature passes once she has shown
- * she takes one — and it is the reading that changes a prediction. Sleep passes:
- * she knows roughly how long she slept. Weight needs a scale, and steps needs
- * another app opened to read a number off; asking either at bedtime is asking
- * her to go and get something, which is how a fifteen-second habit becomes a
- * chore. They stay one tap away in the full diary, and in Insights.
+ * A temperature needs a thermometer and a moment first thing in the morning,
+ * so it is only asked of someone who has shown she takes one. Sleep and water
+ * are different: anyone can say roughly how long they slept and how many
+ * glasses they have had, so they have questions of their own (see `sleepStep`
+ * and `waterStep`), on by default and switchable in Settings. Weight and steps
+ * need a scale or another app, and stay in the full diary.
  */
-const CHECKIN_MEASURES = ['bbt', 'sleep'];
+const CHECKIN_MEASURES = ['bbt'];
+
+/**
+ * Hours offered on the sleep question. The first stands for "under six", the
+ * last for "ten or more": six buttons fill two even rows, and the line that
+ * matters for Insights is the six-hour one.
+ */
+const SLEEP_HOURS = [5, 6, 7, 8, 9, 10];
+
+/**
+ * How the night went, stored as the symptoms that already exist for it, so a
+ * restless night lands in Patterns and the report without a new field.
+ */
+const SLEEP_QUALITY = /** @type {const} */ ([
+  { id: 'well', label: 'Slept well', symptom: null },
+  { id: 'restless', label: 'Restless', symptom: 'restless-sleep' },
+  { id: 'barely', label: 'Barely slept', symptom: 'insomnia' },
+]);
+
+/** Glasses offered on the water question; the last one means "that or more". */
+const WATER_CHOICES = [0, 1, 2, 3, 4, 5, 6, 7, 8];
 
 /**
  * The moods offered.
@@ -129,8 +149,51 @@ const FLOW_STEPS = /** @type {const} */ ([
 export function needsCheckin(date) {
   const { logs, settings } = store.getState();
   if (!settings.onboarded) return false;
-  if (logs[date]) return false;
+  if (logs[date] && !onlyWater(logs[date])) return false;
   return settings.checkinSkipped !== date;
+}
+
+/**
+ * A day whose only entry is water.
+ *
+ * Water is added a glass at a time from Today, often before the check-in has
+ * happened. Counting that as "logged" would quietly cancel the day's questions
+ * the first time she drank something.
+ *
+ * @param {DayLog} log
+ */
+export function onlyWater(log) {
+  return !log.checkedIn && log.water > 0 && nothingRecorded({ ...log, water: 0 });
+}
+
+/**
+ * @typedef {'flow'|'mood'|'symptoms'|'sleep'|'water'|'measure'} CheckinStep
+ */
+
+/**
+ * Which questions the check-in asks, in order.
+ *
+ * Bleeding, mood and symptoms always. Sleep and water unless she has turned
+ * them off — both are answerable without fetching anything. Temperature only
+ * for someone who has shown she takes one. Kept in one place so the check-in
+ * and the "how many questions" line on Today cannot disagree.
+ *
+ * @returns {{kinds: CheckinStep[], measureIds: string[]}}
+ */
+function checkinPlan() {
+  const { settings, logs } = store.getState();
+  const measureIds = habitualMeasures(logs, todayKey(), CHECKIN_MEASURES, addDays);
+  /** @type {CheckinStep[]} */
+  const kinds = ['flow', 'mood', 'symptoms'];
+  if (settings.askSleep) kinds.push('sleep');
+  if (settings.askWater) kinds.push('water');
+  if (measureIds.length) kinds.push('measure');
+  return { kinds, measureIds };
+}
+
+/** How many questions today's check-in will ask. */
+export function checkinQuestionCount() {
+  return checkinPlan().kinds.length;
 }
 
 /**
@@ -160,7 +223,8 @@ export function openCheckin(date = todayKey()) {
     single-select, so a pre-selected option also means the obvious tap does
     nothing visible.
   */
-  let flowAnswered = store.getState().logs[date] != null;
+  const existing = store.getState().logs[date];
+  let flowAnswered = existing != null && !onlyWater(existing);
 
   const isToday = date === todayKey();
 
@@ -173,14 +237,41 @@ export function openCheckin(date = todayKey()) {
   let step = 0;
 
   /*
-    The fourth question exists only for someone who has shown she wants it.
-    Everyone else still gets three, which is the whole promise of this screen.
+    Bleeding, mood and symptoms always. Sleep and water unless she has turned
+    them off — both are answerable without fetching anything. Temperature only
+    for someone who has shown she takes one.
   */
-  const measureIds = habitualMeasures(store.getState().logs, todayKey(), CHECKIN_MEASURES, addDays);
-  const steps = [flowStep, moodStep, symptomStep];
-  if (measureIds.length) {
-    steps.push((/** @type {() => boolean} */ stale) =>
-      measureStep(measureIds, draft, store.getState().settings, stale, next, true));
+  const plan = checkinPlan();
+  const measureIds = plan.measureIds;
+  /** @type {Record<CheckinStep, (stale: () => boolean) => HTMLElement>} */
+  const builders = {
+    flow: flowStep,
+    mood: moodStep,
+    symptoms: symptomStep,
+    sleep: sleepStep,
+    water: waterStep,
+    measure: (stale) => measureStep(measureIds, draft, store.getState().settings, stale, next,
+      isLast(steps.length - 1), openDiary),
+  };
+  const steps = plan.kinds.map((kind) => builders[kind]);
+  /** @param {number} index */
+  function isLast(index) { return index === steps.length - 1; }
+
+  /*
+    Straight into the full diary, carrying everything answered so far so
+    nothing has to be re-entered. Offered on whichever question is last.
+  */
+  function openDiary() {
+    draft.checkedIn = true;
+    // Learned from here too: the answers are already being stored, so not
+    // remembering them would depend on her going on to tap Apply.
+    store.rememberPicks(draft);
+    // Not awaited: the diary is opening on the same draft, and she will
+    // Apply there. A failure surfaces as a toast either way.
+    void store.putLog(draft);
+    step = steps.length;
+    closeSheet();
+    openLogSheet(date);
   }
 
   const sheet = openSheet({
@@ -357,10 +448,14 @@ export function openCheckin(date = todayKey()) {
         shortcut past the questions, not one of the answers to the first.
       */
       shortcut: !flowAnswered && draft.moods.length === 0 && draft.symptoms.length === 0
-        ? { label: 'Nothing to report today', onPick: () => {
+        ? { label: isToday ? 'Nothing to report today' : 'Nothing to report', onPick: () => {
             draft.flow = 'none';
             draft.moods = [];
             draft.symptoms = [];
+            flowAnswered = true;
+            // Past the three body questions, but sleep and water still get
+            // asked: "nothing wrong" says nothing about how she slept.
+            if (steps.length > 3) { step = 3; render(); return; }
             step = steps.length;
             void finish();
           } }
@@ -480,22 +575,108 @@ export function openCheckin(date = todayKey()) {
             : toggle(draft.symptoms, id, (l) => { draft.symptoms = l; })),
         };
       }),
-      lastStep: measureIds.length === 0,
+      lastStep: isLast(2),
       onNext: next,
-      onMore: () => {
-        // Straight into the full diary, carrying everything answered so far so
-        // nothing has to be re-entered.
-        draft.checkedIn = true;
-        // Learned from here too: the answers are already being stored, so not
-        // remembering them would depend on her going on to tap Apply.
-        store.rememberPicks(draft);
-        // Not awaited: the diary is opening on the same draft, and she will
-        // Apply there. A failure surfaces as a toast either way.
-        void store.putLog(draft);
-        step = steps.length;
-        closeSheet();
-        openLogSheet(date);
+      onMore: openDiary,
+    });
+  }
+
+  /* ── 4. Sleep ──────────────────────────────────────────────────────── */
+
+  /** @param {() => boolean} stale */
+  function sleepStep(stale) {
+    /*
+      Two small answers on one screen rather than two screens: how long, and
+      how well. Either can be left — "roughly seven, no idea how well" is a
+      fine answer, and so is skipping the lot.
+
+      Quality is stored as the symptoms that already exist for it, so it needs
+      no new field and a restless night shows up in Patterns and on the report
+      the way it always would have.
+    */
+    const qualityFrom = () => draft.symptoms.includes('insomnia') ? 'barely'
+      : draft.symptoms.includes('restless-sleep') ? 'restless' : null;
+    /** @type {string|null} */
+    let quality = qualityFrom();
+    const nearest = () => draft.sleep == null ? null
+      : String(Math.min(10, Math.max(5, Math.round(draft.sleep))));
+
+    const qualityButtons = SLEEP_QUALITY.map((option) => el('button', {
+      type: 'button',
+      class: 'checkin-option',
+      'aria-pressed': String(quality === option.id),
+      dataset: { opt: option.id },
+      onclick: () => {
+        if (stale()) return;
+        haptic(10);
+        quality = quality === option.id ? null : option.id;
+        draft.symptoms = draft.symptoms.filter((id) => id !== 'restless-sleep' && id !== 'insomnia');
+        const picked = SLEEP_QUALITY.find((q) => q.id === quality);
+        if (picked?.symptom) draft.symptoms = [...draft.symptoms, picked.symptom];
+        for (const b of qualityButtons) {
+          b.setAttribute('aria-pressed', String(b.dataset.opt === quality));
+        }
       },
+    }, [option.label]));
+
+    return question({
+      stale,
+      title: isToday ? 'How did you sleep last night?' : `How did you sleep, the night before ${whenLabel}?`,
+      hint: 'Roughly is fine. Leave either part blank if you are not sure.',
+      multi: true,
+      columns: 3,
+      current: () => { const n = nearest(); return n ? [n] : []; },
+      options: SLEEP_HOURS.map((hours, i) => ({
+        id: String(hours),
+        label: i === 0 ? 'Under 6h' : i === SLEEP_HOURS.length - 1 ? `${hours}h+` : `${hours}h`,
+        selected: nearest() === String(hours),
+        onPick: () => { draft.sleep = nearest() === String(hours) ? null : hours; },
+      })),
+      extra: el('div', { class: 'checkin-subgroup' }, [
+        el('p', { class: 'checkin-sublabel', text: 'And how well?' }),
+        el('div', { class: 'checkin-options is-3' }, qualityButtons),
+      ]),
+      lastStep: isLast(steps.indexOf(sleepStep)),
+      onNext: next,
+      onMore: openDiary,
+    });
+  }
+
+  /* ── 5. Water ──────────────────────────────────────────────────────── */
+
+  /** @param {() => boolean} stale */
+  function waterStep(stale) {
+    const settings = store.getState().settings;
+    const size = glassMl(settings);
+    const glass = fmtWater(size, settings.unitWater);
+    const glasses = Math.round(draft.water / size);
+    const index = steps.indexOf(waterStep);
+    /*
+      "So far", because the check-in happens whenever she opens the app — in
+      the morning that is one glass, at night it is the day's total. Either is
+      honest, and the Today screen has a one-tap glass for adding the rest.
+      Single tap answers and moves on, like the bleeding question.
+    */
+    return question({
+      stale,
+      title: isToday ? 'How much water so far today?' : `How much water ${whenPhrase}?`,
+      hint: isToday
+        ? `One glass is ${glass}. You can add more later from Today.`
+        : `One glass is ${glass}.`,
+      columns: 3,
+      options: WATER_CHOICES.map((n, i) => ({
+        id: String(n),
+        label: n === 0 ? (isToday ? 'None yet' : 'None') : i === WATER_CHOICES.length - 1 ? `${n}+ glasses` : n === 1 ? '1 glass' : `${n} glasses`,
+        selected: draft.water > 0 && Math.min(8, glasses) === n,
+        onPick: () => {
+          // Keep a total above eight that was built up a glass at a time.
+          if (!(n === 8 && glasses > 8)) draft.water = n * size;
+          next();
+        },
+      })),
+      shortcut: { label: 'Skip', onPick: next },
+      lastStep: isLast(index),
+      onMore: openDiary,
     });
   }
 
@@ -516,25 +697,6 @@ function toggle(list, id, set) {
 }
 
 /**
- * One question: a heading, a grid of answers, and a way onward.
- *
- * @param {Object} opts
- * @param {string} opts.title
- * @param {string} opts.hint
- * @param {{id: string, label: string, selected: boolean, onPick: () => void,
- *   note?: string, wide?: boolean}[]} opts.options
- * @param {() => boolean} opts.stale true once this question has been left
- * @param {{label: string, onPick: () => void}|null} [opts.shortcut] a way past
- *   the whole flow, offered only where answering everything at once is honest
- * @param {boolean} [opts.multi]
- * @param {() => string[]} [opts.current]
- * @param {HTMLElement} [opts.extra] sits between the answers and the way onward
- * @param {() => void} [opts.onChange] after any answer is toggled
- * @param {boolean} [opts.lastStep]
- * @param {() => void} [opts.onNext]
- * @param {() => void} [opts.onMore]
- */
-/**
  * The measurements she already keeps, asked in the daily fifteen seconds.
  *
  * `habitualMeasures` decides which — see the reasoning there. The short version
@@ -554,8 +716,9 @@ function toggle(list, id, set) {
  * @param {() => boolean} stale
  * @param {() => void} onNext
  * @param {boolean} lastStep
+ * @param {() => void} onMore
  */
-function measureStep(ids, draft, settings, stale, onNext, lastStep) {
+function measureStep(ids, draft, settings, stale, onNext, lastStep, onMore) {
   /*
     The same row the full diary uses, so a reading entered here obeys the same
     plausible range and the same units. This step first shipped with its own
@@ -595,6 +758,7 @@ function measureStep(ids, draft, settings, stale, onNext, lastStep) {
     extra: rows,
     lastStep,
     onNext,
+    onMore,
   });
 }
 
@@ -620,10 +784,11 @@ function measureStep(ids, draft, settings, stale, onNext, lastStep) {
  * @param {boolean} [spec.lastStep]    label the button Done rather than Next
  * @param {() => void} [spec.onNext]
  * @param {() => void} [spec.onMore]   open the full diary instead
+ * @param {2|3|4} [spec.columns]       narrower answers, for numbers
  */
 function question({ title, hint, options, stale, shortcut, multi, current, extra, onChange,
-  lastStep, onNext, onMore }) {
-  const grid = el('div', { class: 'checkin-options' });
+  lastStep, onNext, onMore, columns = 2 }) {
+  const grid = el('div', { class: `checkin-options${columns === 2 ? '' : ` is-${columns}`}` });
 
   /*
     Every control on this question goes through here. Once the question has
@@ -667,7 +832,6 @@ function question({ title, hint, options, stale, shortcut, multi, current, extra
   }
 
   return el('div', { class: 'checkin-step' }, [
-    // tabindex so the step change can move focus here; see render().
     // tabindex so the step change can move focus here; data-autofocus so the
     // sheet lands on the question rather than on its own close button.
     el('h2', { class: 'checkin-title', tabindex: '-1', 'data-autofocus': '', text: title }),

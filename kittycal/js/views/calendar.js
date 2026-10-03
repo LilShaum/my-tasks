@@ -357,7 +357,18 @@ function buildMarks(prediction, cycles, today) {
  * @param {number} month
  */
 function monthHeader(year, month) {
-  return el('div', { class: 'cal-head cal-head-5' }, [
+  /*
+    Two rows: the month and its arrows, then Today and Year.
+
+    All five used to share one row, which left the month name about a third
+    of a phone's width — "October 2026" broke over two lines, and the title
+    of the screen became the least readable thing in its own header. Today
+    is also left out while it would do nothing: on the current month it was a
+    button that went nowhere.
+  */
+  const now = todayKey();
+  const onThisMonth = year === yearOf(now) && month === monthOf(now);
+  return el('div', { class: 'cal-head' }, [
     el('button', {
       type: 'button', class: 'btn-icon', 'aria-label': 'Previous month', text: '‹',
       onclick: () => { haptic(8); store.shiftMonth(-1); },
@@ -367,18 +378,20 @@ function monthHeader(year, month) {
       type: 'button', class: 'btn-icon', 'aria-label': 'Next month', text: '›',
       onclick: () => { haptic(8); store.shiftMonth(1); },
     }),
-    el('button', {
-      type: 'button', class: 'btn btn-secondary cal-today-btn', text: 'Today',
-      onclick: () => {
-        const now = todayKey();
-        store.setUi({ calYear: yearOf(now), calMonth: monthOf(now) });
-        haptic(8);
-      },
-    }),
-    el('button', {
-      type: 'button', class: 'btn btn-secondary cal-today-btn', text: 'Year',
-      onclick: () => { haptic(8); store.setUi({ calView: 'year' }); },
-    }),
+    el('div', { class: 'cal-head-actions' }, [
+      onThisMonth ? null : el('button', {
+        type: 'button', class: 'btn btn-secondary cal-today-btn', text: 'Back to today',
+        onclick: () => {
+          const today = todayKey();
+          store.setUi({ calYear: yearOf(today), calMonth: monthOf(today) });
+          haptic(8);
+        },
+      }),
+      el('button', {
+        type: 'button', class: 'btn btn-secondary cal-today-btn', text: 'Whole year',
+        onclick: () => { haptic(8); store.setUi({ calView: 'year' }); },
+      }),
+    ]),
   ]);
 }
 
