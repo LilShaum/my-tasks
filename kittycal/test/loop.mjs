@@ -92,7 +92,7 @@ function seed(page, withHistory) {
     await new Promise((res) => {
       const tx = db.transaction(['meta'], 'readwrite');
       tx.objectStore('meta').put({ key: 'settings', value: {
-        theme: 'hellokitty', onboarded: true, disclaimerAck: true,
+        theme: 'hellokitty', askSleep: false, askWater: false, onboarded: true, disclaimerAck: true,
         avgCycleLength: 28, avgPeriodLength: 5, name: 'Sam',
         lastBackup: shift(0), lastBackupAt: Date.now(),
       } });
@@ -565,7 +565,7 @@ await withPage(async (p) => {
         tx.objectStore('logs').put(l);
       }
       tx.objectStore('meta').put({ key: 'settings', value: {
-        theme: 'hellokitty', onboarded: true, disclaimerAck: true, avgCycleLength: 28,
+        theme: 'hellokitty', askSleep: false, askWater: false, onboarded: true, disclaimerAck: true, avgCycleLength: 28,
         avgPeriodLength: 5, name: 'Sam', lastBackup: shift(0), lastBackupAt: Date.now(),
         checkinSkipped: shift(0) } });
       tx.objectStore('meta').put({ key: 'periodDays', value: days });
@@ -690,7 +690,7 @@ await withPage(async (p) => {
         }
       }
       tx.objectStore('meta').put({ key: 'settings', value: {
-        theme: 'hellokitty', onboarded: true, disclaimerAck: true, avgCycleLength: 28,
+        theme: 'hellokitty', askSleep: false, askWater: false, onboarded: true, disclaimerAck: true, avgCycleLength: 28,
         avgPeriodLength: 5, name: 'Sam', lastBackup: shift(0), lastBackupAt: Date.now() } });
       tx.objectStore('meta').put({ key: 'periodDays', value: days });
       tx.oncomplete = () => res(undefined);
@@ -908,7 +908,7 @@ await withPage(async (p) => {
     await new Promise((res) => {
       const tx = db.transaction(['meta'], 'readwrite');
       tx.objectStore('meta').put({ key: 'settings', value: {
-        theme: 'hellokitty', onboarded: true, disclaimerAck: true, avgCycleLength: 28,
+        theme: 'hellokitty', askSleep: false, askWater: false, onboarded: true, disclaimerAck: true, avgCycleLength: 28,
         avgPeriodLength: 5, name: 'Sam', lastBackup: shift(0), lastBackupAt: Date.now(),
         checkinSkipped: shift(0) } });
       tx.objectStore('meta').put({ key: 'periodDays', value: days });
@@ -1014,7 +1014,7 @@ await withPage(async (p) => {
     await new Promise((res) => {
       const tx = db.transaction(['meta'], 'readwrite');
       tx.objectStore('meta').put({ key: 'settings', value: {
-        theme: 'hellokitty', onboarded: true, disclaimerAck: true, avgCycleLength: 28,
+        theme: 'hellokitty', askSleep: false, askWater: false, onboarded: true, disclaimerAck: true, avgCycleLength: 28,
         avgPeriodLength: 5, name: 'Sam', lastBackup: shift(0), lastBackupAt: Date.now(),
         checkinSkipped: shift(0) } });
       tx.objectStore('meta').put({ key: 'periodDays', value: days });

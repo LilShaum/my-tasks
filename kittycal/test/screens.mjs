@@ -87,7 +87,7 @@ await page.evaluate(async () => {
     for (const l of logs) tx.objectStore('logs').put(l);
     tx.objectStore('meta').put({ key: 'periodDays', value: periodDays });
     tx.objectStore('meta').put({ key: 'settings', value: {
-      theme: 'hellokitty', onboarded: true, disclaimerAck: true,
+      theme: 'hellokitty', askSleep: false, askWater: false, onboarded: true, disclaimerAck: true,
       avgCycleLength: 28, avgPeriodLength: 5, name: 'Sam',
       lastBackup: shift(0), lastBackupAt: Date.now(),
     } });
@@ -105,6 +105,18 @@ if (await page.locator('.sheet[data-open="true"]').count()) {
 const tab = async (name) => {
   await page.locator(`[data-tab="${name}"]`).click();
   await page.waitForTimeout(600);
+};
+
+/*
+  "Back to today" is only drawn when the calendar is showing some other month,
+  so there is nothing to click on the current one. Returns whether it was there.
+*/
+const backToToday = async () => {
+  const button = page.locator('.cal-today-btn', { hasText: 'today' });
+  if (!await button.count()) return false;
+  await button.click();
+  await page.waitForTimeout(450);
+  return true;
 };
 
 /* ── 1. Every screen agrees how much history there is ─────────────────── */
@@ -142,6 +154,19 @@ console.log('\nthe screens tell the same story about her history');
 console.log('\nedit mode does not offer a tap that does nothing');
 {
   await tab('calendar');
+
+  // The header only offers a way back when she is somewhere else.
+  const backBtn = page.locator('.cal-today-btn', { hasText: 'today' });
+  check(await backBtn.count() === 0,
+    'the calendar opens on the current month with no "Back to today" button');
+  await page.locator('[aria-label="Next month"]').click();
+  await page.waitForTimeout(450);
+  check(await backBtn.count() === 1 && /^Back to today$/i.test((await backBtn.innerText()).trim()),
+    'paging to another month brings it in, worded "Back to today"');
+  await backBtn.click();
+  await page.waitForTimeout(450);
+  check(await backBtn.count() === 0, 'and pressing it takes the button away again');
+
   await page.locator('.cal-editbar button').click();
   await page.waitForTimeout(400);
 
@@ -168,8 +193,10 @@ console.log('\nedit mode does not offer a tap that does nothing');
   }
 
   // Back to where today is, so the sections below are about the current month.
-  await page.locator('.cal-today-btn', { hasText: 'Today' }).click();
-  await page.waitForTimeout(450);
+  // If she never left it there is no button, which is the point of it.
+  await backToToday();
+  check(await page.locator('.cal-today-btn', { hasText: 'today' }).count() === 0,
+    'on the current month there is no "Back to today" to press');
 
   /*
     The mode is carried by a titled panel, not by a full-width filled button.
@@ -263,8 +290,7 @@ console.log('\nthe legend describes the grid rather than the prediction');
     ? (await page.locator('.cal-legend').innerText()).replace(/\n/g, ' / ')
     : '');
 
-  await page.locator('button:has-text("Today")').first().click();
-  await page.waitForTimeout(500);
+  await backToToday();
   const now = await legend();
 
   /*
@@ -316,9 +342,8 @@ console.log('\nthe legend describes the grid rather than the prediction');
   check(past === 'Period logged',
     'a month behind her names only the one state it draws', past);
 
-  await page.locator('button:has-text("Today")').first().click();
-  await page.waitForTimeout(400);
-  await page.locator('button:has-text("Year")').click();
+  await backToToday();
+  await page.locator('button:has-text("Whole year")').click();
   await page.waitForTimeout(600);
   const year = await legend();
   check(!/Fertile|Ovulation|After ovulation/.test(year),
@@ -448,8 +473,14 @@ console.log('\nthe calendar says which day of the cycle she is on');
 
   await tab('calendar');
   // Back to the current month; §3 left the view several months ahead.
-  await page.locator('.cal-today-btn', { hasText: 'Today' }).click();
-  await page.waitForTimeout(450);
+  // Wherever §4 left the calendar (it may be in the year view), the button is
+  // only there if she is away from the current month, and gone once she is back.
+  await backToToday();
+  const monthsBtn = page.locator('.cal-today-btn', { hasText: 'Months' });
+  if (await monthsBtn.count()) { await monthsBtn.click(); await page.waitForTimeout(450); }
+  await backToToday();
+  check(await page.locator('.cal-today-btn', { hasText: 'today' }).count() === 0,
+    'back on the current month there is no "Back to today" left to press');
 
   const here = page.locator('.cal-here');
   check(await here.count() === 1, 'the month containing today carries the strip');
