@@ -237,8 +237,9 @@ function cycleCard(logs, cycles, points, prediction, age, findings) {
 
   const regularity = prediction.regularity ?? acog.regularity(recentStats.spread ?? 0);
   const range = `${recentStats.min} to ${recentStats.max} days`;
+  const same = recentStats.min === recentStats.max;
   const title = regularity === 'regular'
-    ? `Regular: your cycles run ${range}`
+    ? (same ? `Regular: your cycles are all ${plural(recentStats.min ?? 0, 'day')}` : `Regular: your cycles run ${range}`)
     : regularity === 'variable'
       ? `Your cycles move around a little: ${range}`
       : `Your cycles vary quite a lot: ${range}`;
@@ -246,7 +247,7 @@ function cycleCard(logs, cycles, points, prediction, age, findings) {
   findings.push({
     icon: '🎀',
     text: regularity === 'regular'
-      ? `Your cycle is regular, ${range}.`
+      ? (same ? `Your cycles are all ${plural(recentStats.min ?? 0, 'day')}.` : `Your cycle is regular, ${range}.`)
       : `Your cycles have ranged from ${range}.`,
     target: 'cycle',
     weight: regularity === 'regular' ? 2 : 3.5,

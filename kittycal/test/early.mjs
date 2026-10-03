@@ -244,7 +244,7 @@ console.log('\nfive periods marked, so four completed cycles');
   const { ctx, page, headings, text, errors } = await insightsWith({ cycles: 5, loggedDays: 30 });
 
   ok('now there is a chart', (await page.$$('#insight-cycle .chart')).length === 1);
-  ok('the cycle title is the finding', /^Regular: your cycles run 28 to 28 days$/.test(
+  ok('the cycle title is the finding', /^Regular: your cycles are all 28 days$/.test(
     await page.$eval('#insight-cycle h3', (h) => h.textContent ?? '')));
   ok('and the reading guide is offered with it',
     (await page.$$('.guide-button')).length === 1);
