@@ -70,8 +70,12 @@ import * as store from '../state/store.js';
  */
 const CHECKIN_MEASURES = ['bbt'];
 
-/** Hours offered on the sleep question. The ends stand for "or less"/"or more". */
-const SLEEP_HOURS = [4, 5, 6, 7, 8, 9, 10];
+/**
+ * Hours offered on the sleep question. The first stands for "under six", the
+ * last for "ten or more": six buttons fill two even rows, and the line that
+ * matters for Insights is the six-hour one.
+ */
+const SLEEP_HOURS = [5, 6, 7, 8, 9, 10];
 
 /**
  * How the night went, stored as the symptoms that already exist for it, so a
@@ -595,7 +599,7 @@ export function openCheckin(date = todayKey()) {
     /** @type {string|null} */
     let quality = qualityFrom();
     const nearest = () => draft.sleep == null ? null
-      : String(Math.min(10, Math.max(4, Math.round(draft.sleep))));
+      : String(Math.min(10, Math.max(5, Math.round(draft.sleep))));
 
     const qualityButtons = SLEEP_QUALITY.map((option) => el('button', {
       type: 'button',
@@ -620,11 +624,11 @@ export function openCheckin(date = todayKey()) {
       title: isToday ? 'How did you sleep last night?' : `How did you sleep, the night before ${whenLabel}?`,
       hint: 'Roughly is fine. Leave either part blank if you are not sure.',
       multi: true,
-      columns: 4,
+      columns: 3,
       current: () => { const n = nearest(); return n ? [n] : []; },
       options: SLEEP_HOURS.map((hours, i) => ({
         id: String(hours),
-        label: i === 0 ? `${hours}h or less` : i === SLEEP_HOURS.length - 1 ? `${hours}h+` : `${hours}h`,
+        label: i === 0 ? 'Under 6h' : i === SLEEP_HOURS.length - 1 ? `${hours}h+` : `${hours}h`,
         selected: nearest() === String(hours),
         onPick: () => { draft.sleep = nearest() === String(hours) ? null : hours; },
       })),
@@ -662,7 +666,7 @@ export function openCheckin(date = todayKey()) {
       columns: 3,
       options: WATER_CHOICES.map((n, i) => ({
         id: String(n),
-        label: n === 0 ? 'None yet' : i === WATER_CHOICES.length - 1 ? `${n}+ glasses` : n === 1 ? '1 glass' : `${n} glasses`,
+        label: n === 0 ? (isToday ? 'None yet' : 'None') : i === WATER_CHOICES.length - 1 ? `${n}+ glasses` : n === 1 ? '1 glass' : `${n} glasses`,
         selected: draft.water > 0 && Math.min(8, glasses) === n,
         onPick: () => {
           // Keep a total above eight that was built up a glass at a time.

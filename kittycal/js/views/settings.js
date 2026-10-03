@@ -1212,7 +1212,7 @@ function dailyQuestionRows(settings) {
     row('askSleep', 'Ask about sleep', 'Hours and how well you slept'),
     row('askWater', 'Ask about water', 'Glasses so far, with a quick add on Today'),
     selectRow({
-      label: 'One tap of water is',
+      label: 'Glass size',
       value: String(glassMl(settings)),
       options: GLASS_SIZES.map((g) => ({
         value: String(g.ml),
