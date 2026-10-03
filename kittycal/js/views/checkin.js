@@ -163,6 +163,36 @@ export function onlyWater(log) {
 }
 
 /**
+ * @typedef {'flow'|'mood'|'symptoms'|'sleep'|'water'|'measure'} CheckinStep
+ */
+
+/**
+ * Which questions the check-in asks, in order.
+ *
+ * Bleeding, mood and symptoms always. Sleep and water unless she has turned
+ * them off — both are answerable without fetching anything. Temperature only
+ * for someone who has shown she takes one. Kept in one place so the check-in
+ * and the "how many questions" line on Today cannot disagree.
+ *
+ * @returns {{kinds: CheckinStep[], measureIds: string[]}}
+ */
+function checkinPlan() {
+  const { settings, logs } = store.getState();
+  const measureIds = habitualMeasures(logs, todayKey(), CHECKIN_MEASURES, addDays);
+  /** @type {CheckinStep[]} */
+  const kinds = ['flow', 'mood', 'symptoms'];
+  if (settings.askSleep) kinds.push('sleep');
+  if (settings.askWater) kinds.push('water');
+  if (measureIds.length) kinds.push('measure');
+  return { kinds, measureIds };
+}
+
+/** How many questions today's check-in will ask. */
+export function checkinQuestionCount() {
+  return checkinPlan().kinds.length;
+}
+
+/**
  * Open the check-in for a date.
  *
  * Any date, not just today. A day that got skipped is reachable from the week
@@ -207,16 +237,19 @@ export function openCheckin(date = todayKey()) {
     them off — both are answerable without fetching anything. Temperature only
     for someone who has shown she takes one.
   */
-  const askSettings = store.getState().settings;
-  const measureIds = habitualMeasures(store.getState().logs, todayKey(), CHECKIN_MEASURES, addDays);
-  /** @type {((stale: () => boolean) => HTMLElement)[]} */
-  const steps = [flowStep, moodStep, symptomStep];
-  if (askSettings.askSleep) steps.push(sleepStep);
-  if (askSettings.askWater) steps.push(waterStep);
-  if (measureIds.length) {
-    steps.push((stale) => measureStep(measureIds, draft, store.getState().settings, stale, next,
-      isLast(steps.length - 1), openDiary));
-  }
+  const plan = checkinPlan();
+  const measureIds = plan.measureIds;
+  /** @type {Record<CheckinStep, (stale: () => boolean) => HTMLElement>} */
+  const builders = {
+    flow: flowStep,
+    mood: moodStep,
+    symptoms: symptomStep,
+    sleep: sleepStep,
+    water: waterStep,
+    measure: (stale) => measureStep(measureIds, draft, store.getState().settings, stale, next,
+      isLast(steps.length - 1), openDiary),
+  };
+  const steps = plan.kinds.map((kind) => builders[kind]);
   /** @param {number} index */
   function isLast(index) { return index === steps.length - 1; }
 
