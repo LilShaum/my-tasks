@@ -2,7 +2,7 @@
 
 .cal-head {
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: var(--sp-2);
   margin-bottom: var(--sp-3);
@@ -11,6 +11,14 @@
 .cal-month {
   font-size: var(--fs-lg);
   text-align: center;
+  white-space: nowrap;
+}
+
+.cal-head-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+  gap: var(--sp-2);
 }
 
 .cal-head .btn-icon {
@@ -260,9 +268,6 @@
 .cal-legend-swatch.is-fertile { background: var(--fertile-soft); border-color: var(--fertile-soft); }
 .cal-legend-swatch.is-ovulation { border: 2px dotted var(--ovulation); background: var(--fertile-soft); }
 .cal-legend-swatch.is-luteal { background: var(--luteal-soft); border-color: var(--luteal-soft); }
-
-/* The month header carries five controls once the Year button is there. */
-.cal-head-5 { grid-template-columns: auto 1fr auto auto auto; }
 
 /* ── Year view ────────────────────────────────────────────────────────── */
 .year-grid {

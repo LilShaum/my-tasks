@@ -641,3 +641,11 @@
   display: grid;
   gap: var(--sp-2);
 }
+
+/* Narrower answers for the number questions (sleep hours, glasses). */
+.checkin-options.is-3 { grid-template-columns: repeat(3, 1fr); }
+.checkin-options.is-4 { grid-template-columns: repeat(4, 1fr); }
+.checkin-options.is-3 .checkin-option,
+.checkin-options.is-4 .checkin-option { min-height: 56px; padding: var(--sp-2); }
+.checkin-subgroup { margin-top: var(--sp-4); }
+.checkin-sublabel { font-weight: 600; margin: 0; }

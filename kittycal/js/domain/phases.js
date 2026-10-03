@@ -50,7 +50,7 @@ export const PHASES = {
     summary:
       'Oestrogen is climbing as your body prepares an egg. Energy and mood ' +
       'often pick up through this stretch.',
-    token: '--fertile-soft',
+    token: '--follicular',
   },
   ovulatory: {
     id: 'ovulatory',

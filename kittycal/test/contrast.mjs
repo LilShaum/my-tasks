@@ -119,6 +119,11 @@ const CYCLE_PAIRS = [
   ['--fertile', '--ovulation'],
   ['--fertile', '--luteal'],
   ['--ovulation', '--luteal'],
+  // Follicular sits between the period and the fertile window on the ring.
+  ['--follicular', '--period'],
+  ['--follicular', '--fertile'],
+  ['--follicular', '--ovulation'],
+  ['--follicular', '--luteal'],
 ];
 
 const CYCLE_TOKENS = [...new Set(CYCLE_PAIRS.flat())];
@@ -227,7 +232,7 @@ for (const theme of THEMES) {
         probe.remove();
         return out;
       },
-      { theme, mode, phases: ['--period', '--fertile-soft', '--ovulation', '--luteal'] },
+      { theme, mode, phases: ['--period', '--follicular', '--ovulation', '--luteal'] },
     );
 
     for (const [token, mixed] of Object.entries(washes)) {

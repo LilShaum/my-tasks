@@ -68,6 +68,11 @@ export function renderSettings(host) {
     ]),
 
     el('div', { class: 'section' }, [
+      el('div', { class: 'section-title' }, [el('h2', { text: 'Daily questions' })]),
+      dailyQuestionRows(settings),
+    ]),
+
+    el('div', { class: 'section' }, [
       el('div', { class: 'section-title' }, [el('h2', { text: 'Units' })]),
       unitRows(settings),
     ]),
@@ -1177,6 +1182,35 @@ function toggleRow({ checked, disabled = false, label, onChange }) {
     },
   });
   return button;
+}
+
+/**
+ * Which of the optional questions the daily check-in asks.
+ *
+ * Bleeding, mood and symptoms are always asked — every prediction and pattern
+ * is built from them. Sleep and water are easy to answer and feed Insights, but
+ * someone who does not care about either should be able to keep the check-in
+ * at three taps.
+ *
+ * @param {import('../domain/model.js').Settings} settings
+ */
+function dailyQuestionRows(settings) {
+  /** @param {'askSleep'|'askWater'} key @param {string} label @param {string} sub */
+  const row = (key, label, sub) => el('div', { class: 'row' }, [
+    el('span', { class: 'row-label' }, [
+      label,
+      el('span', { class: 'choice-sub', text: sub }),
+    ]),
+    toggleRow({
+      checked: settings[key],
+      label,
+      onChange: (checked) => store.updateSettings({ [key]: checked }),
+    }),
+  ]);
+  return el('div', { class: 'rows' }, [
+    row('askSleep', 'Ask about sleep', 'Hours and how well you slept'),
+    row('askWater', 'Ask about water', 'Glasses so far, with a quick add on Today'),
+  ]);
 }
 
 /**
