@@ -203,7 +203,7 @@ console.log('\nsleep: hours, and how well');
   await toSleep(page);
 
   const hourLabels = await page.evaluate(() =>
-    [...document.querySelectorAll('.checkin-options:not(.is-3) .checkin-option')]
+    [...document.querySelectorAll('.checkin-step > .checkin-options .checkin-option')]
       .map((b) => [b.dataset.opt, (b.textContent ?? '').trim()]));
   check(hourLabels.map((h) => h[0]).join(',') === '5,6,7,8,9,10',
     'hours run from five to ten, six choices', JSON.stringify(hourLabels));
