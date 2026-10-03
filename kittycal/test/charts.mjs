@@ -131,7 +131,9 @@ ok('none of them overflows the phone',
 
 console.log('\nthe cycle-length chart says what it is showing');
 
-const cycleCard = await page.$('.card:has(h3:text-is("Cycle length"))');
+const cycleCard = await page.$('#insight-cycle');
+ok('the cycle card is there and its title is the finding',
+  cycleCard != null && /^(Regular|Your cycles)/.test(await cycleCard.$eval('h3', (h) => h.textContent ?? '')));
 const labels = await cycleCard.$$eval('.chart text', (n) => n.map((t) => t.textContent));
 
 ok('the x-axis is labelled with months, not row numbers',
@@ -187,18 +189,18 @@ ok('no two labels sit on top of each other', collisions.length === 0,
 console.log('\na nightly series does not repeat itself');
 
 const sleepLabels = await page.evaluate(() => {
-  const cards = [...document.querySelectorAll('.card')];
-  const trends = cards.find((c) => c.querySelector('h3')?.textContent === 'Trends');
+  const trends = document.querySelector('#insight-trends');
   if (!trends) return null;
-  const charts = [...trends.querySelectorAll('.chart')];
-  const last = charts[charts.length - 1];
-  return [...last.querySelectorAll('text')]
+  const chart = [...trends.querySelectorAll('.chart')]
+    .find((c) => /^Sleep hours/.test(c.getAttribute('aria-label') ?? ''));
+  if (!chart) return null;
+  return [...chart.querySelectorAll('text')]
     .map((t) => t.textContent)
     .filter((t) => /^\d+ [A-Z][a-z]{2}$/.test(t));
 });
 
 if (sleepLabels === null) {
-  ok('the sleep chart rendered', false, 'no Trends card');
+  ok('the sleep chart rendered', false, 'no sleep chart in #insight-trends');
 } else {
   ok('sixteen nights get a handful of dated labels',
     sleepLabels.length > 0 && sleepLabels.length <= 6, JSON.stringify(sleepLabels));
@@ -206,30 +208,32 @@ if (sleepLabels === null) {
     new Set(sleepLabels).size === sleepLabels.length, JSON.stringify(sleepLabels));
 }
 
+console.log('\nthe sleep chart shows the recommended band');
+{
+  const edges = await page.evaluate(() => {
+    const chart = [...document.querySelectorAll('#insight-trends .chart')]
+      .find((c) => /^Sleep hours/.test(c.getAttribute('aria-label') ?? ''));
+    return chart ? [...chart.querySelectorAll('text')].map((t) => t.textContent) : [];
+  });
+  ok('both edges of the 7 to 9 hour band are numbered',
+    edges.some((l) => Number(l) === 7) && edges.some((l) => Number(l) === 9), JSON.stringify(edges));
+}
+
 console.log('\nthe numbers she can type are numbers she can see again');
 {
   const trends = await page.evaluate(() => {
-    const card = [...document.querySelectorAll('#view-insights .card')]
-      .find((c) => c.querySelector('h3')?.textContent === 'Trends');
-    return card ? (card.innerText ?? '') : null;
+    const card = document.querySelector('#insight-trends');
+    return card ? { text: card.innerText ?? '', title: card.querySelector('h3')?.textContent ?? '',
+      labels: [...card.querySelectorAll('.chart')].map((c) => c.getAttribute('aria-label') ?? '') } : null;
   });
-  ok('the Trends card is there', trends != null);
-  ok('water comes back as a trend', /Water, last/.test(trends ?? ''), (trends ?? '').slice(0, 80));
-  ok('steps come back as a trend', /Steps, last/.test(trends ?? ''), (trends ?? '').slice(0, 80));
-
-  /*
-    The sentence and the axis have to be in the same unit. `fmtWater` switches
-    to litres past a thousand and a day's water is always past a thousand, so
-    the summary read "2.1 L a day" over an axis labelled in millilitres.
-  */
-  const water = (trends ?? '').match(/Water, last [^.]*\. Average ([\d.]+) (L|oz|ml)/);
-  ok('the water average names a unit', water != null, (trends ?? '').slice(0, 80));
-  if (water) {
-    const [, value, unit] = water;
-    ok('and the chart beside it is drawn on that same scale',
-      unit === 'L' ? Number(value) < 20 : Number(value) > 20,
-      `average ${value} ${unit}`);
-  }
+  ok('the card is called "Your recent numbers"', trends?.title === 'Your recent numbers', trends?.title);
+  const text = trends?.text ?? '';
+  // Water zig-zags by nature, so it is one sentence (average and low days), not a chart.
+  ok('water comes back as a sentence', /Water: about [\d.]+ (L|oz|ml) a day over the last/.test(text), text.slice(0, 200));
+  ok('and is not drawn as a chart', !(trends?.labels ?? []).some((l) => /water/i.test(l)),
+    JSON.stringify(trends?.labels));
+  ok('steps come back as a trend', /Steps, last/.test(text), text.slice(0, 200));
+  ok('and so does sleep', /Sleep, last/.test(text), text.slice(0, 200));
 }
 
 console.log('\nand it is still described to a screen reader');

@@ -123,9 +123,12 @@ const backToToday = async () => {
 console.log('\nthe screens tell the same story about her history');
 {
   await tab('insights');
-  const history = await page.locator('.card', { hasText: 'Your history' }).innerText();
-  const shown = /(\d+)\s*\n?\s*logged/i.exec(history.replace(/\s+/g, ' '))
-    || /CYCLES\s+(\d+)/i.exec(history.replace(/\s+/g, ' '));
+  /*
+    The "Your history" counter card is gone; the cycle card is where the number
+    of cycles lives now, in its basis line ("Your last 5 cycles, averaging ...").
+  */
+  const history = await page.locator('#insight-cycle .insight-basis').innerText();
+  const shown = /Your last (\d+) cycles?/i.exec(history.replace(/\s+/g, ' '));
 
   /*
     Read off the domain rather than hard-coded, so the check survives the
