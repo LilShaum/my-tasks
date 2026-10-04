@@ -15,7 +15,6 @@ import { el } from '../utils/dom.js';
 import { openSheet } from '../ui/sheet.js';
 import { optionCount, CATEGORIES } from '../data/taxonomy.js';
 import { THEMES } from '../data/themes.js';
-import { STICKER_COUNT } from '../domain/stickers.js';
 import * as acog from '../domain/acog.js';
 
 /** Open the help sheet. */
@@ -160,14 +159,6 @@ export function openHelp() {
           'them can use your own picture instead of the built-in art.'),
         p('The Plain theme turns off all the pattern and colour. Handy if you ' +
           'want to show a screen to someone.'),
-      ]),
-
-      section('The sticker book', [
-        p(`${STICKER_COUNT} stickers, under Settings. They come from using ` +
-          'Kittycal, like logging days, filling in cycles and finding the ' +
-          'corners of the diary. They never depend on what your cycle did.'),
-        p('Nothing is ever taken away. Missing a week, or a month, leaves the ' +
-          'ones you have exactly where they are.'),
       ]),
     ],
   });

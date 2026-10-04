@@ -13,6 +13,7 @@
  *   - A brand-new user and a check-in for a past day never see the screen.
  *   - Today shows exactly one card; "Not useful" hides that moment for good.
  *   - A moment with somewhere to go opens Insights at the right card.
+ *   - The check-in after her first full cycle closes says so, as a milestone.
  *   - Nothing throws, and nothing is wider than a 390px phone.
  *
  * Run: node test/run-browser.mjs foryou
@@ -374,6 +375,28 @@ console.log('\ntapping a moment that has an anchor');
   });
   check(inView, 'and has been scrolled into view');
   check(!(await wider(page)), 'Insights fits a 390px screen');
+  check(errors.length === 0, 'no page errors', errors.join(' | '));
+  await ctx.close();
+}
+
+/* ── Her first full cycle just closed ───────────────────────────────────── */
+console.log('\nher first full cycle closed three days ago');
+{
+  const { ctx, page, errors } = await open({ ago: 3, cycles: 1 });
+  await ensureCheckin(page);
+  await answer(page);
+  const items = await itemTexts(page);
+  check(items.some((t) => /first full cycle is in: 28 days/.test(t)),
+    'the check-in ends by saying her first full cycle is in, with its length', JSON.stringify(items));
+  check(await page.locator('.foryou-item.is-milestone').count() === 1, 'drawn as the one milestone');
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/milestone.png` });
+  await page.locator('.checkin-next', { hasText: 'See you tomorrow' }).click();
+  await page.waitForTimeout(600);
+
+  // And the sticker book is gone, rather than one tap away in Settings.
+  await page.locator('[data-tab="settings"]').click();
+  await page.waitForTimeout(500);
+  check(!(await page.locator('#view-settings', { hasText: 'Sticker book' }).count()), 'Settings has no sticker book');
   check(errors.length === 0, 'no page errors', errors.join(' | '));
   await ctx.close();
 }

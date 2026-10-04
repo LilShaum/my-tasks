@@ -7,8 +7,7 @@
  * was found. All three were invisible to code review and obvious on screen:
  *
  *   - Insights counted the cycle she is living through, so it announced "6
- *     cycles logged" while Today said "based on 5 complete cycles" and the
- *     sticker asking for six stayed locked.
+ *     cycles logged" while Today said "based on 5 complete cycles".
  *   - Edit mode said "tap any day" while every day after today was disabled.
  *   - The calendar had half a screen of empty background below the legend and
  *     nothing to say about the month she had paged back to.

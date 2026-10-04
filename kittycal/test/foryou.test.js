@@ -560,3 +560,40 @@ test('end to end: two days out, said once today, then quiet for it until tomorro
   const next = fresh(moments(tomorrow), seen, TOMORROW);
   assert.ok(next.some((m) => /likely tomorrow/.test(m.text)));
 });
+
+/* ── Milestones: what her logging just made possible ────────────────── */
+
+test('the first full cycle is news for a few days, with its length', () => {
+  // The cycle closed three days ago: 28 − 25.
+  const now = ofKind(moments(world({ complete: 1, until: 25 })), 'milestone');
+  assert.equal(now.length, 1);
+  assert.equal(now[0].id, 'milestone:first-cycle');
+  assert.match(now[0].text, /28 days/);
+  assert.equal(now[0].anchor, 'insight-cycle');
+
+  // Eighteen days on it is history, not news.
+  assert.equal(ofKind(moments(world({ complete: 1, until: 10 })), 'milestone').length, 0);
+});
+
+test('three cycles and a track record each get their moment, and nothing old is replayed', () => {
+  const three = ofKind(moments(world({ complete: 3, until: 25 })), 'milestone').map((m) => m.id);
+  assert.deepEqual(three, ['milestone:three-cycles']);
+
+  // Five complete cycles is the first time three forecasts can be scored.
+  const record = ofKind(moments(world({ complete: 5, until: 25 })), 'milestone');
+  assert.deepEqual(record.map((m) => m.id), ['milestone:track-record']);
+  assert.match(record[0].text, /within 2 days on 3 of your last 3 periods/);
+
+  // Someone with a long history is not congratulated on anything.
+  assert.equal(ofKind(moments(world({ complete: 8, until: 25 })), 'milestone').length, 0);
+});
+
+test('a milestone is said once, and remembered past the usual two months', () => {
+  const w = world({ complete: 1, until: 25 });
+  const shown = fresh(moments(w), {}, TODAY);
+  const first = shown.find((m) => m.kind === 'milestone');
+  assert.ok(first);
+  const seen = markSeen({}, shown, TODAY);
+  assert.equal(fresh(moments(w), seen, TOMORROW).some((m) => m.kind === 'milestone'), false);
+  assert.ok(markSeen(seen, [], addDays(TODAY, 120))[first.id]);
+});
