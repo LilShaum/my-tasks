@@ -1029,7 +1029,7 @@ function privacyNote() {
       + 'No account, no analytics. Your logs stay on this phone.',
     ] : [
       el('strong', { text: 'Nothing here is sent anywhere. ' }),
-      'No account, no analytics, no server, and no internet requests at all. ' +
+      'No account, no analytics, and no internet requests at all. ' +
       'The only copies of your data are the ones you export yourself.',
     ]),
   ]);

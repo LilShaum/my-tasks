@@ -108,8 +108,9 @@ export function openHelp() {
       ]),
 
       section('Privacy and passcode', [
-        p('No account, no server, no analytics. The app makes no internet ' +
-          'requests at all.'),
+        p('No account, no analytics. What you log stays on this phone. The app ' +
+          'makes no internet requests unless you turn on partner sharing, and ' +
+          'then it sends only an encrypted summary of what you chose to share.'),
         p('Settings can put a four-digit code in front of the app. The code is ' +
           'never stored, only a scrambled version. It isn’t encryption: ' +
           'someone determined, with your unlocked phone, could still reach the ' +
@@ -151,7 +152,7 @@ export function openHelp() {
         p('Your phone is a different matter. Settings → Themes → the picture ' +
           'row under your current theme lets you use any image from your ' +
           'camera roll instead. It’s cropped in the app, stored on your ' +
-          'phone and never uploaded. Kittycal makes no internet requests at all.'),
+          'phone and never uploaded.'),
       ]),
 
       section('Themes', [

@@ -602,10 +602,10 @@ function stepDisclaimer() {
       el('div', { class: 'note' }, [
         el('span', { class: 'note-icon', text: '♥', 'aria-hidden': 'true' }),
         el('div', {}, [
-          el('strong', { text: 'Your data never leaves this device.' }),
-          ' Kittycal has no account, no server and makes no internet requests ' +
-          'at all. Everything you log is stored in this browser, and you can ' +
-          'export or erase all of it whenever you like.',
+          el('strong', { text: 'What you log stays on this phone.' }),
+          ' No account, no analytics. Nothing is sent anywhere unless you choose ' +
+          'to share a summary with a partner, and that’s encrypted first. You ' +
+          'can export or erase everything whenever you like.',
         ]),
       ]),
     ],
