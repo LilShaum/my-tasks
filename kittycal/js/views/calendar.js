@@ -99,7 +99,7 @@ export function renderCalendar(host) {
   replace(host, [
     monthHeader(ui.calYear, ui.calMonth),
     youAreHere({ year: ui.calYear, month: ui.calMonth, today, cycles, prediction }),
-    editModeBar(ui.periodEditMode),
+    ui.periodEditMode ? editModeBar(true) : null,
     grid({
       year: ui.calYear,
       month: ui.calMonth,
@@ -112,6 +112,15 @@ export function renderCalendar(host) {
       editMode: ui.periodEditMode,
     }),
     legend(statesPresent(monthKeys, shared)),
+    /*
+      Below the calendar, and sized like the occasional job it is.
+
+      It was a full-width button above the grid, bigger than the month's own
+      name — the loudest thing on a screen whose job is to be looked at. Once
+      tapped, the editing panel still appears above the grid, where the
+      instructions need to be read before the first tap.
+    */
+    ui.periodEditMode ? null : editModeBar(false),
     monthRecall({ year: ui.calYear, month: ui.calMonth, today, periodFill, logs }),
     !cycles.length ? firstRunHint() : null,
   ]);
@@ -204,7 +213,13 @@ function monthRecall({ year, month, today, periodFill, logs }) {
     return log && (log.checkedIn || !nothingRecorded(log));
   }).length;
 
-  if (!bled.length && !logged) return null;
+  /*
+    Only months with a period get this card, and it says only that.
+
+    It also counted "logged something on 2 of 3 days", which is a number with
+    nothing to do: the days she logged are already marked on the grid above.
+  */
+  if (!bled.length) return null;
 
   /*
     Runs, not a total. Two separate three-day bleeds and one six-day bleed are
@@ -221,13 +236,10 @@ function monthRecall({ year, month, today, periodFill, logs }) {
 
   const name = MONTHS[month];
   const lines = [
-    runs.length
-      ? runs.map((run) => (run.length === 1
-        ? `${fmtDayMonth(run[0])}`
-        : `${dayOfMonth(run[0])}–${fmtDayMonth(run[run.length - 1])}`)).join(', ')
-        + ` — ${plural(runs.reduce((n, r) => n + r.length, 0), 'day')} of bleeding`
-      : `No period days marked in ${name}.`,
-    `Logged something on ${logged} of ${plural(elapsed.length, 'day')}.`,
+    runs.map((run) => (run.length === 1
+      ? `${fmtDayMonth(run[0])}`
+      : `${dayOfMonth(run[0])}–${fmtDayMonth(run[run.length - 1])}`)).join(', ')
+      + `: ${plural(runs.reduce((n, r) => n + r.length, 0), 'day')} of bleeding`,
   ];
 
   return el('div', { class: 'card data-zone cal-recall' }, [
@@ -399,7 +411,7 @@ function monthHeader(year, month) {
 function editModeBar(active) {
   const toggle = el('button', {
     type: 'button',
-    class: active ? 'btn' : 'btn btn-secondary',
+    class: active ? 'btn' : 'btn btn-secondary cal-edit-btn',
     'aria-pressed': String(active),
     text: active ? 'Done' : 'Edit period dates',
     onclick: () => {

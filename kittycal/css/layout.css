@@ -399,3 +399,18 @@ button.row:active, a.row:active { background: var(--surface-2); }
   :root { --shell-max: 520px; }
   .view { padding-top: var(--sp-5); }
 }
+
+/*
+  In Settings the sticker book is a setting, not the page. Fourteen full-size
+  tiles filled the whole first screen, so her cycle settings sat two scrolls
+  down under a choice she makes once. Four across and smaller: every theme still
+  previews itself, in about half the height. Onboarding keeps the big tiles,
+  where choosing one is the moment.
+*/
+#view-settings .theme-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--sp-2);
+}
+#view-settings .theme-card { padding: var(--sp-2) var(--sp-1) var(--sp-1); }
+#view-settings .theme-card svg, #view-settings .theme-card img { width: 40px; height: 40px; }
+#view-settings .theme-card-name { font-size: 10px; }

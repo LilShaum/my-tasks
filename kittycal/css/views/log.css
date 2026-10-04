@@ -88,7 +88,7 @@
   place-items: center;
   font-size: 22px;
   line-height: 1;
-  color: var(--line-soft);
+  color: var(--line);
   border-radius: var(--r-sm);
   transition: transform var(--dur-tap) var(--ease-bounce),
               color var(--dur-hover) var(--ease-soft);
@@ -96,7 +96,14 @@
 
 .water-glass:active { transform: scale(0.85); }
 
+.water-glass svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
 .water-glass.is-filled { color: var(--primary-line); }
+.water-glass.is-filled svg { fill: currentColor; }
 
 .water-readout {
   font-size: var(--fs-sm);

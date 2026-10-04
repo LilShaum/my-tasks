@@ -244,8 +244,8 @@ export const MEASURES = [
   {
     id: 'bbt',
     name: 'Basal body temperature',
-    hint: 'Taken first thing, before getting up. Three consecutive readings ' +
-      'above your recent average confirm that ovulation has happened.',
+    hint: 'Take it first thing, before you get up. A rise that lasts three days ' +
+      'means ovulation has happened.',
     unitSetting: 'unitTemp',
     min: 35, max: 39, step: 0.01, decimals: 2,
   },

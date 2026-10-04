@@ -531,9 +531,8 @@ function reminderRows() {
       el('div', { class: 'alert alert-warn', style: { marginTop: 'var(--sp-3)' } }, [
         el('span', { class: 'alert-icon', text: '!', 'aria-hidden': 'true' }),
         el('div', {}, [
-          el('strong', { text: 'These only arrive while you are using Kittycal. ' }),
-          'A reminder fires when you next open the app on the day it is due, ' +
-          'not before — there is no server to push one.',
+          el('strong', { text: 'Reminders show when you open Kittycal. ' }),
+          'There is no server, so they cannot arrive while it is closed.',
         ]),
       ]),
 
@@ -600,8 +599,8 @@ function lockRows() {
         ]),
 
         el('p', { class: 'hint-sm', style: { marginTop: 'var(--sp-2)' }, text:
-          'The code itself is never stored. It keeps the app shut to whoever ' +
-          'picks up your phone, but it is not encryption.' }),
+          'Keeps the app shut to anyone who picks up your phone. '
+          + 'The code itself is never stored.' }),
       ]);
     }).catch((err) => {
       // The whole passcode section used to vanish without a word if this

@@ -29,6 +29,9 @@ import { addDays } from '../utils/date.js';
  *                             phases at all and "Not enough data phase" is what
  *                             you get from appending the word in the view
  * @property {string} summary   what's happening, plainly
+ * @property {string} [more]    for the four real phases: why, explained by what
+ *                             each hormone does to how she feels, not by
+ *                             defining it. Behind a tap on Today.
  * @property {string} token     the CSS custom property to colour it with
  */
 
@@ -39,8 +42,13 @@ export const PHASES = {
     name: 'Period',
     heading: 'Your period',
     summary:
-      'The lining of your uterus is shedding. Cramps, tiredness and a lower ' +
-      'mood are all common in these few days.',
+      'Your period. Cramps and tiredness are common for the first few days.',
+    more:
+      'Your uterus is shedding its lining. To do that it releases ' +
+      'prostaglandins, chemicals that make the muscle squeeze, and that squeeze ' +
+      'is what a cramp is. It is why heat and ibuprofen help: heat relaxes the ' +
+      'muscle, and ibuprofen lowers prostaglandins. Your hormones are at their ' +
+      'lowest now too, so low energy is normal.',
     token: '--period',
   },
   follicular: {
@@ -48,8 +56,12 @@ export const PHASES = {
     name: 'Follicular',
     heading: 'Follicular phase',
     summary:
-      'Oestrogen is climbing as your body prepares an egg. Energy and mood ' +
-      'often pick up through this stretch.',
+      'Oestrogen is rising, and energy and mood often rise with it.',
+    more:
+      'Oestrogen rebuilds the lining of your uterus after a period. It also ' +
+      'lifts mood and energy and can clear up skin, so for many people this is ' +
+      'the stretch they feel their best. Meanwhile your body is getting an egg ' +
+      'ready.',
     token: '--follicular',
   },
   ovulatory: {
@@ -57,8 +69,13 @@ export const PHASES = {
     name: 'Ovulatory',
     heading: 'Ovulatory phase',
     summary:
-      'An egg is released around now. You may notice clearer, stretchier ' +
-      'discharge and a higher sex drive. This is the fertile part of the cycle.',
+      'Your fertile window. An egg is released around now.',
+    more:
+      'A surge of a hormone called LH releases an egg, and oestrogen is at its ' +
+      'peak. That is behind the clear, stretchy discharge and the higher sex ' +
+      'drive some people notice. Pregnancy is most likely in these days, and ' +
+      'because sperm can live for up to five days the window opens before the ' +
+      'egg is released.',
     token: '--ovulation',
   },
   luteal: {
@@ -66,8 +83,13 @@ export const PHASES = {
     name: 'Luteal',
     heading: 'Luteal phase',
     summary:
-      'Progesterone rises and then falls if there is no pregnancy. PMS ' +
-      'symptoms — sore breasts, bloating, mood shifts — usually show up here.',
+      'Progesterone is high. If you get PMS, this is when it shows up.',
+    more:
+      'After ovulation your body makes progesterone, the hormone that gets your ' +
+      'uterus ready for a possible pregnancy. It can leave you sleepier, warmer ' +
+      'and more bloated. If there is no pregnancy it drops in the last few days ' +
+      'before your period, and that drop is what brings on PMS: mood dips, sore ' +
+      'breasts, cravings.',
     token: '--luteal',
   },
   unknown: {
