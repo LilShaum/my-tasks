@@ -168,13 +168,29 @@ const closeSheets = async (page) => {
  * goodbye.
  */
 const walkCheckin = async (page, label) => {
+  /*
+    Most of these people already logged today, so the check-in does not open
+    by itself: open it directly, the way the week strip or a missed day would.
+  */
+  if (!await sheetOpen(page)) {
+    await page.evaluate(async () => (await import('/js/views/checkin.js')).openCheckin());
+    await page.waitForTimeout(500);
+  }
   if (!await sheetOpen(page)) return 0;
   let steps = 0;
   for (let i = 0; i < 12; i += 1) {
     await scan(page, `${label}, check-in step ${i + 1}`);
     steps += 1;
     const next = page.locator('.sheet[data-open="true"] .checkin-next').first();
-    if (!await next.count()) break;
+    // The bleeding and water questions move on when an answer is tapped.
+    if (!await next.count()) {
+      const answer = page.locator('.sheet[data-open="true"] .checkin-option').first();
+      if (!await answer.count()) break;
+      await answer.click().catch(() => {});
+      await page.waitForTimeout(350);
+      if (!await sheetOpen(page)) break;
+      continue;
+    }
     const done = /see you tomorrow/i.test(await next.innerText());
     await next.click().catch(() => {});
     await page.waitForTimeout(350);
