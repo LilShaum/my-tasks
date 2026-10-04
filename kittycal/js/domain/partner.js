@@ -112,6 +112,52 @@ export function buildSnapshot({ settings, prediction: p, choices, helps, pattern
 }
 
 /**
+ * A summary that arrived from somewhere else, made safe to draw.
+ *
+ * It was encrypted by her phone, but the link that carries the key can be
+ * forwarded or hand-made, so what decrypts is untrusted until checked: every
+ * field is typed, dates are real dates, numbers are in range and text is
+ * capped. Anything that is not a summary at all comes back null.
+ *
+ * @param {unknown} raw
+ * @returns {Snapshot|null}
+ */
+export function cleanSnapshot(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const r = /** @type {Record<string, unknown>} */ (raw);
+  const DATE = /^\d{4}-\d{2}-\d{2}$/;
+  const date = (/** @type {unknown} */ v) => (typeof v === 'string' && DATE.test(v) && !Number.isNaN(Date.parse(v))
+    ? /** @type {DateKey} */ (v) : null);
+  const int = (/** @type {unknown} */ v, /** @type {number} */ lo, /** @type {number} */ hi, /** @type {number} */ dflt) =>
+    (typeof v === 'number' && Number.isInteger(v) && v >= lo && v <= hi ? v : dflt);
+  const text = (/** @type {unknown} */ v, /** @type {number} */ max) => (typeof v === 'string' ? v.slice(0, max) : '');
+
+  const updated = date(r.updated);
+  if (r.v !== 1 || !updated) return null;
+  const lastStart = date(r.lastStart);
+  const nextStart = date(r.nextStart);
+  return {
+    v: 1,
+    name: typeof r.name === 'string' && r.name.trim() ? r.name.trim().slice(0, 40) : null,
+    updated,
+    paused: r.paused === true || !lastStart || !nextStart,
+    lastStart,
+    nextStart,
+    cycleLength: int(r.cycleLength, 15, 90, 28),
+    periodLength: int(r.periodLength, 1, 15, 5),
+    lutealDays: int(r.lutealDays, 7, 20, 14),
+    phase: r.phase === true,
+    fertile: r.fertile === true,
+    patterns: Array.isArray(r.patterns)
+      ? r.patterns.slice(0, 5).flatMap((x) => (x && typeof x === 'object' && typeof x.label === 'string'
+        ? [{ label: x.label.slice(0, 40), before: int(x.before, 1, 14, 3) }] : []))
+      : [],
+    mood: r.mood == null ? null : int(r.mood, 1, 14, 0) || null,
+    helps: text(r.helps, 600),
+  };
+}
+
+/**
  * @typedef {Object} PartnerModel
  * @property {'quiet'|'period'|'due'|'soon'|'later'} status
  * @property {string} who            "Sam" or "Your partner"

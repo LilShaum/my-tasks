@@ -575,7 +575,7 @@
   transition: transform var(--dur-tap) var(--ease-bounce);
 }
 .glance-item:active { transform: scale(0.98); }
-.glance-icon { font-size: 1.25rem; line-height: 1; }
+.glance-icon { font-size: 1.25rem; line-height: 1; color: var(--primary-line); flex: none; }
 .glance-text { font-size: var(--fs-sm); line-height: 1.35; }
 
 /* Every card on the screen answers in its title, so scrolling to one from

@@ -56,7 +56,7 @@ import { buildCycles, cycleDay } from '../domain/cycles.js';
 import { predict } from '../domain/predict.js';
 import { phaseFor } from '../domain/phases.js';
 import { momentsFor, fresh, markSeen } from '../domain/foryou.js';
-import { mascot } from '../ui/mascot.js';
+import { mascot, momentIcon } from '../ui/mascot.js';
 import { STREAK_MARKS } from '../domain/response.js';
 import { toast } from '../ui/toast.js';
 import { getTheme } from '../data/themes.js';
@@ -501,12 +501,12 @@ export function openCheckin(date = todayKey()) {
                   ?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 350);
               },
             }, [
-              el('span', { class: 'foryou-icon', 'aria-hidden': 'true', text: m.icon }),
+              momentIcon(m.icon, 'foryou-icon'),
               el('span', { class: 'foryou-text', text: m.text }),
               el('span', { class: 'row-value', 'aria-hidden': 'true', text: '›' }),
             ])
           : el('div', { class: `foryou-item${m.kind === 'milestone' ? ' is-milestone' : ''}` }, [
-              el('span', { class: 'foryou-icon', 'aria-hidden': 'true', text: m.icon }),
+              momentIcon(m.icon, 'foryou-icon'),
               el('span', { class: 'foryou-text', text: m.text }),
             ]),
       ]))),

@@ -293,5 +293,40 @@ export function iconFor(id, category) {
   if (category && ICONS_BY_CATEGORY[`${category}:${id}`]) {
     return ICONS_BY_CATEGORY[`${category}:${id}`];
   }
-  return ICONS[id] ?? null;
+  // Own keys only: a custom symptom called "constructor" must not find
+  // Object's constructor on the prototype and hand it to innerHTML.
+  return Object.hasOwn(ICONS, id) ? ICONS[/** @type {keyof typeof ICONS} */ (id)] : null;
+}
+
+/*
+  Marks for "For you" and "At a glance".
+
+  Those lists used phone emoji as their icons (🌙 💧 ✨ 🩸), the same mistake
+  the diary made before this file existed: drawn differently on every phone,
+  in colours that ignore the theme, and the quickest tell that an app was
+  assembled rather than designed. The domain modules still name each moment
+  by its emoji, which reads well in code and tests; the views draw this
+  instead, in the theme's own colour and on the same 24px stroke contract as
+  everything above. Several reuse shapes already drawn here.
+*/
+export const MOMENT_MARKS = {
+  '🌙': ICONS['restless-sleep'],
+  '💧': ICONS.light,
+  '🩸': ICONS.light,
+  '✨': ICONS['oily-skin'],
+  '🌟': ICONS.confident,
+  '💗': ICONS_BY_CATEGORY['drive:neutral'],
+  '💭': '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
+  '🗓️': '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
+  '🌷': '<circle cx="12" cy="9" r="2"/><path d="M12 3a3 3 0 0 1 3 3 3 3 0 0 1 3 3 3 3 0 0 1-3 3 3 3 0 0 1-3 3 3 3 0 0 1-3-3 3 3 0 0 1-3-3 3 3 0 0 1 3-3 3 3 0 0 1 3-3Z"/><path d="M12 15v6"/>',
+  '🎀': '<path d="M12 12 4.5 7.5v9Z"/><path d="m12 12 7.5-4.5v9Z"/><circle cx="12" cy="12" r="1.8"/><path d="m10.5 13.5-2 6"/><path d="m13.5 13.5 2 6"/>',
+};
+
+/**
+ * The drawn mark for a moment's emoji, or null to fall back to the text.
+ * @param {string} emoji
+ * @returns {string|null}
+ */
+export function momentMark(emoji) {
+  return Object.hasOwn(MOMENT_MARKS, emoji) ? MOMENT_MARKS[/** @type {keyof typeof MOMENT_MARKS} */ (emoji)] : null;
 }

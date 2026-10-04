@@ -43,7 +43,7 @@ import { evaluate, ageFrom } from '../domain/acog.js';
 import { packPosition, describePack, unmarkedDays } from '../domain/pill.js';
 import { cycleSignals } from '../domain/ovulation.js';
 import { cycleRing } from '../ui/ring.js';
-import { spotArt } from '../ui/mascot.js';
+import { spotArt, momentIcon } from '../ui/mascot.js';
 import * as store from '../state/store.js';
 
 /**
@@ -981,7 +981,7 @@ function forYouCard({ phase, prediction, logs, cycles, settings, today }) {
   return el('section', { class: 'foryou-card', 'aria-label': 'For you' }, [
     el('h3', { class: 'section-label', text: 'For you' }),
     el('div', { class: 'foryou-card-body' }, [
-      el('span', { class: 'foryou-icon', 'aria-hidden': 'true', text: m.icon }),
+      momentIcon(m.icon, 'foryou-icon'),
       el('p', { class: 'foryou-text', text: m.text }),
     ]),
     el('div', { class: 'card-actions' }, [
