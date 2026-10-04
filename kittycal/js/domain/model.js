@@ -76,12 +76,35 @@
  * @property {number} glassMl          what one tap of water adds, in ml
  * @property {Record<string, string>} forYouSeen  "For you" moment id → DateKey last shown
  * @property {string[]} forYouDismissed  moment ids she marked "not useful"
+ * @property {PartnerShare|null} partnerShare  her own share, when she is sharing
+ * @property {PartnerOf|null} partnerOf        a share someone sent her phone
  * @property {boolean} onboarded
  * @property {boolean} disclaimerAck
  * @property {string[]} customSymptoms
  * @property {string[]} recentChips    ids, most recent first
  * @property {boolean} showFertility   derived-ish; see predict.js
  * @property {number} schemaVersion
+ */
+
+/**
+ * @typedef {Object} PartnerShare
+ * @property {string} id
+ * @property {string} key
+ * @property {string} token
+ * @property {import('./partner.js').ShareChoices} choices
+ * @property {string} helps
+ * @property {string} since     DateKey sharing started
+ * @property {string} sentHash  the last summary sent, so an unchanged one is not sent again
+ * @property {number} sentAt    epoch ms of the last successful send, 0 if none
+ */
+
+/**
+ * @typedef {Object} PartnerOf
+ * @property {string} id
+ * @property {string} key
+ * @property {import('./partner.js').Snapshot|null} snapshot  the last one fetched
+ * @property {number} fetchedAt  epoch ms
+ * @property {boolean} gone      she stopped sharing
  */
 
 /** Hormonal methods suppress ovulation, so fertility output is meaningless. */
@@ -134,6 +157,8 @@ export function defaultSettings() {
     glassMl: 250,
     forYouSeen: {},
     forYouDismissed: [],
+    partnerShare: null,
+    partnerOf: null,
     onboarded: false,
     disclaimerAck: false,
     customSymptoms: [],
@@ -383,6 +408,33 @@ export function normalizeSettings(raw) {
     out.forYouSeen = {};
   }
   if (!Array.isArray(out.forYouDismissed)) out.forYouDismissed = [];
+
+  // Null by default, so the type loop above cannot vouch for them.
+  const share = /** @type {any} */ (raw).partnerShare;
+  out.partnerShare = share && typeof share.id === 'string' && typeof share.key === 'string'
+    && typeof share.token === 'string' && share.choices && typeof share.choices === 'object'
+    ? {
+        id: share.id, key: share.key, token: share.token,
+        choices: {
+          phase: share.choices.phase !== false, patterns: share.choices.patterns !== false,
+          helps: share.choices.helps !== false, name: share.choices.name !== false,
+          mood: share.choices.mood === true, fertile: share.choices.fertile === true,
+        },
+        helps: typeof share.helps === 'string' ? share.helps : '',
+        since: typeof share.since === 'string' ? share.since : '',
+        sentHash: typeof share.sentHash === 'string' ? share.sentHash : '',
+        sentAt: typeof share.sentAt === 'number' ? share.sentAt : 0,
+      }
+    : null;
+  const of = /** @type {any} */ (raw).partnerOf;
+  out.partnerOf = of && typeof of.id === 'string' && typeof of.key === 'string'
+    ? {
+        id: of.id, key: of.key,
+        snapshot: of.snapshot && typeof of.snapshot === 'object' ? of.snapshot : null,
+        fetchedAt: typeof of.fetchedAt === 'number' ? of.fetchedAt : 0,
+        gone: of.gone === true,
+      }
+    : null;
 
   return out;
 }

@@ -108,3 +108,17 @@ test('something logged all month is not announced as a pre-period symptom', () =
   const ids = premenstrualPatterns(logs, cycles).map((p) => p.id);
   assert.deepEqual(ids, ['bloating']);
 });
+
+test('a one-off in the window each cycle is not a pattern', () => {
+  /*
+    Acne once per cycle, eight days before the period, and nowhere else. It is
+    in the window every cycle and never outside it, so presence and the
+    before/after ratio both say "premenstrual". But it is there on one day of
+    the eight from "usually starts" to the period: not something to warn about.
+  */
+  const { logs, cycles } = history([28, 28, 28], {
+    acne: { kind: 'symptoms', before: [8] },
+    bloating: { kind: 'symptoms', before: [3, 2, 1] },
+  });
+  assert.deepEqual(premenstrualPatterns(logs, cycles).map((p) => p.id), ['bloating']);
+});
