@@ -320,7 +320,7 @@ console.log('\nthe screen has a hierarchy rather than one weight');
   const weights = await page.evaluate(() => {
     const answer = [...document.querySelectorAll('#view-today .card')]
       .find((c) => /Next period|days late|Fertile window/.test(c.textContent ?? ''));
-    const tip = document.querySelector('#view-today .tip-card');
+    const tip = document.querySelector('#view-today .foryou-card');
     const phase = document.querySelector('.phase-line');
     /** Resolve a token to the same string form getComputedStyle reports. */
     const asPainted = (/** @type {string} */ name) => {

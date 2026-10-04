@@ -137,60 +137,6 @@
 
 .flag-list strong { font-size: var(--fs-sm); }
 
-/* ── Daily insight cards ──────────────────────────────────────────────── */
-.tips { margin-bottom: var(--sp-5); }
-
-/* The eyebrow itself is .section-label in components.css — shared with the
-   group headings on Insights so the two screens cannot drift apart. */
-
-.tips-scroller {
-  display: flex;
-  gap: var(--sp-3);
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-  /* Bleed to the screen edges so a partially-visible next card hints that
-     the row scrolls, then pad the content back in. */
-  margin-inline: calc(var(--sp-4) * -1);
-  padding: 2px var(--sp-4) var(--sp-2);
-  scrollbar-width: none;
-}
-
-.tips-scroller::-webkit-scrollbar { display: none; }
-
-.tip-card {
-  flex: 0 0 78%;
-  max-width: 300px;
-  scroll-snap-align: start;
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-  padding: var(--sp-4);
-  /*
-    The quiet tier, not the full sticker treatment.
-
-    These are background reading — what a luteal phase is, why spotting is
-    counted separately — and they were the two biggest, heaviest blocks on the
-    screen, drawn identically to the card that answers "when is my period".
-    With everything shouting, nothing leads.
-  */
-  background: var(--surface-2);
-  border: var(--bw-data) solid var(--line-soft);
-  border-radius: var(--r-lg);
-}
-
-.tip-card h4 {
-  font-size: var(--fs-md);
-  line-height: 1.2;
-}
-
-.tip-card p {
-  font-size: var(--fs-sm);
-  color: var(--ink-2);
-  line-height: 1.5;
-}
-
 /* ── Phase caption under the ring ─────────────────────────────────────── */
 /* Not a card: it captions the ring above it. Bordering it made it compete
    with the actual predictions below. */
@@ -789,7 +735,14 @@ button.foryou-item:active { transform: translate(2px, 3px) scale(0.98); box-shad
 .foryou-icon { font-size: 1.4rem; line-height: 1; }
 .foryou-text { font-size: var(--fs-sm); line-height: 1.4; }
 
-/* The single "For you" card on Today. */
+/* The single "For you" card on Today: the quiet reference tier. */
+.foryou-card {
+  margin-bottom: var(--sp-4);
+  padding: var(--sp-4);
+  background: var(--surface-2);
+  border: var(--bw-data) solid var(--line-soft);
+  border-radius: var(--r-lg);
+}
 .foryou-card-body { display: grid; grid-template-columns: auto 1fr; gap: var(--sp-3); align-items: start; }
 .foryou-card .foryou-text { margin: 0; font-size: var(--fs-base); }
 .foryou-card .card-actions { margin-top: var(--sp-2); }

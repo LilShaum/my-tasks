@@ -967,7 +967,9 @@ function forYouCard({ phase, prediction, logs, cycles, settings, today }) {
   }
   const m = moment;
 
-  return el('section', { class: 'card foryou-card', 'aria-label': 'For you' }, [
+  // The quiet tier, like the tips it replaced: something to read, not an
+  // answer to "when is my period", so it must not be drawn like one.
+  return el('section', { class: 'foryou-card', 'aria-label': 'For you' }, [
     el('h3', { class: 'section-label', text: 'For you' }),
     el('div', { class: 'foryou-card-body' }, [
       el('span', { class: 'foryou-icon', 'aria-hidden': 'true', text: m.icon }),
