@@ -8,7 +8,7 @@
  * cramps, 🎈 for bloating, 😴 for fatigue. On the screen this app is used on
  * most, that meant a wall of multi-colour glyphs drawn by the operating system
  * — a different set on every phone, none of them in the palette, all of them
- * louder than the pastel they sat on. Onboarding and the sticker book ship
+ * louder than the pastel they sat on. Onboarding and the themes ship
  * original artwork; the diary was borrowing its pictures from Apple.
  *
  * ── The construction contract

@@ -14,8 +14,8 @@
  * plus aria-labels, titles, placeholders and alt text, and fails on "—".
  *
  * Screens: onboarding, Today, the check-in (every step), Calendar (and its
- * edit mode), Insights (and its guide), Settings (and the sticker book), the
- * diary sheet, the notes sheet, Help and the doctor's report.
+ * edit mode), Insights (and its guide), Settings, the diary sheet,
+ * the notes sheet, Help and the doctor's report.
  *
  * Run: npm run test:browser -- copy
  */
@@ -258,16 +258,6 @@ async function tour(page, label, { full = true } = {}) {
     const printed = await page.evaluate(() => window.__reportText ?? '');
     check(printed.length > 100, `${label}: the report was built`);
     check(!printed.includes(EM), `no em dash: ${label}, doctor's report`, context(printed));
-  }
-
-  // Settings: the sticker book.
-  await tab(page, 'settings');
-  const stickers = page.locator('#view-settings button, #view-settings .row', { hasText: 'Sticker book' }).first();
-  if (await stickers.count()) {
-    await stickers.click();
-    await page.waitForTimeout(500);
-    await scan(page, `${label}, sticker book`);
-    await closeSheets(page);
   }
 
   // The diary sheet, with a search that finds nothing and a search that does.

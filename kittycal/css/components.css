@@ -407,15 +407,6 @@
 
 .hint-sm { font-size: var(--fs-xs); color: var(--ink-3); }
 
-/* ── Sticker / die-cut treatment. Follows the alpha channel rather than
-      the bounding box, so irregular art gets a proper outline.       ── */
-.sticker {
-  filter:
-    drop-shadow(2px 0 0 var(--card))   drop-shadow(-2px 0 0 var(--card))
-    drop-shadow(0 2px 0 var(--card))   drop-shadow(0 -2px 0 var(--card))
-    drop-shadow(0 3px 3px oklch(30% 0.04 var(--h) / 0.22));
-}
-
 /* ── Entrances. A 1-3 degree tilt reads hand-placed; straight vertical
       reads corporate. Overshoot on transform only.                   ── */
 @keyframes pop-in {

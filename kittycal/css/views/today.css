@@ -734,6 +734,13 @@ button.foryou-item { cursor: pointer; transition: transform var(--dur-tap) var(-
 button.foryou-item:active { transform: translate(2px, 3px) scale(0.98); box-shadow: var(--sh-sticker-press); }
 .foryou-icon { font-size: 1.4rem; line-height: 1; }
 .foryou-text { font-size: var(--fs-sm); line-height: 1.4; }
+/* A milestone is the one celebration in the list: the app just got better
+   because she kept logging. Same card, in the theme's own colour. */
+.foryou-item.is-milestone {
+  background: var(--primary-soft);
+  border-color: var(--primary-line);
+}
+.foryou-item.is-milestone .foryou-icon { animation: pop-in var(--dur-enter) var(--ease-spring) both; }
 
 /* The single "For you" card on Today: the quiet reference tier. */
 .foryou-card {

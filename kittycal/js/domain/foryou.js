@@ -43,11 +43,16 @@ import { labelOf } from '../data/taxonomy.js';
 import { pick } from '../data/tips.js';
 import { premenstrualPatterns } from './heads-up.js';
 import { bodyMap, moodCurve, sleepCurve, goesWith, periodFingerprint } from './rhythm.js';
+import { predictionAccuracy, MIN_SCORED, CLOSE_ENOUGH } from './accuracy.js';
+import { CYCLE_LENGTH_FLOOR, CYCLE_LENGTH_CEIL } from './cycles.js';
+
+/** A milestone is news for this many days after it happens, then it is history. */
+const MILESTONE_FRESH = 10;
 
 /**
  * @typedef {Object} Moment
  * @property {string} id         stable, so it can be remembered as seen
- * @property {'timing'|'coming'|'logged'|'finding'|'tip'} kind
+ * @property {'timing'|'coming'|'logged'|'milestone'|'finding'|'tip'} kind
  * @property {string} icon       one emoji
  * @property {string} text       one or two short sentences
  * @property {string|null} anchor  an Insights card id to open, if any
@@ -196,6 +201,40 @@ export function momentsFor({ today, logs, cycles, prediction, settings, hour, ph
     });
   }
 
+  /* ── What her logging just made possible ───────────────────────────── */
+  /*
+    The only celebrations in this list, and each one is about the app getting
+    better for her rather than a count going up: her own cycle now drives the
+    forecast, there is enough history to spot repeats, the app can show how
+    often it has been right. Said once, and only while it is news, so someone
+    who already has a year of history is not congratulated on her first cycle.
+  */
+  // Only cycles the forecast actually learns from: a 150-day "cycle" is a
+  // stretch of not logging, and no milestone should be built on one.
+  const complete = cycles.filter((c) => c.complete && c.length != null
+    && c.length >= CYCLE_LENGTH_FLOOR && c.length <= CYCLE_LENGTH_CEIL);
+  /** @param {string} key @param {DateKey|null} on @param {string} text @param {string|null} anchor */
+  const milestone = (key, on, text, anchor) => {
+    if (!on) return;
+    const ago = daysBetween(on, today);
+    if (ago < 0 || ago > MILESTONE_FRESH) return;
+    out.push({ id: `milestone:${key}`, kind: 'milestone', icon: '🌟', text, anchor, weight: 4.6, cooldown: null });
+  };
+  if (complete[0]?.length != null) {
+    milestone('first-cycle', complete[0].nextStart,
+      `First full cycle logged: ${complete[0].length} days. Forecasts now lean on your own cycle, `
+      + 'and get sharper with each one you log.', 'insight-cycle');
+  }
+  milestone('three-cycles', complete[2]?.nextStart ?? null,
+    'Three full cycles logged. Forecasts now run on your own history, and Insights can start '
+    + 'spotting what repeats each month.', 'insight-cycle');
+  const record = predictionAccuracy(cycles);
+  if (record.total >= MIN_SCORED) {
+    milestone('track-record', record.scored[MIN_SCORED - 1].actual,
+      `Kittycal now keeps score of its own forecasts for you. So far: within ${CLOSE_ENOUGH} days `
+      + `on ${record.hits} of your last ${record.total} periods.`, 'insight-cycle');
+  }
+
   /* ── New in Insights ───────────────────────────────────────────────── */
   /** @param {string} key @param {string} text @param {string} anchor @param {string} icon */
   const finding = (key, text, anchor, icon) => out.push({
@@ -297,7 +336,7 @@ export function markSeen(seen, shown, today) {
   const floor = addDays(today, -60);
   for (const [id, date] of Object.entries(seen)) {
     // Once-ever moments are kept regardless of age, or they would come back.
-    if (date >= floor || id.startsWith('finding:')) next[id] = date;
+    if (date >= floor || id.startsWith('finding:') || id.startsWith('milestone:')) next[id] = date;
   }
   for (const m of shown) next[m.id] = today;
   return next;
