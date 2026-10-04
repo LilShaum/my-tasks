@@ -37,6 +37,20 @@ export const BEFORE_WINDOW = 10;
 /** Present in at least this share of complete cycles. Same as Patterns. */
 const THRESHOLD = 0.6;
 
+/**
+ * And at least this many times as common before the period as in the rest of
+ * the cycle.
+ *
+ * Without it, anything she logs all month — a headache that comes with low
+ * water, acne that is always there — also turns up in the ten days before her
+ * period, in most cycles, and was announced as something to expect. Being
+ * present is not the same as being premenstrual; being concentrated there is.
+ */
+const CONCENTRATION = 2;
+
+/** Days outside the window needed before the comparison above means anything. */
+const MIN_REST_DAYS = 5;
+
 /** Moods that are not something anyone needs warning of. */
 const NOT_A_WARNING = new Set(['calm', 'happy', 'energetic', 'playful', 'confident', 'neutral']);
 
@@ -62,6 +76,36 @@ export function premenstrualPatterns(logs, cycles) {
 
   /** @type {Map<string, {kind: PremenstrualPattern['kind'], onsets: number[]}>} */
   const found = new Map();
+
+  /*
+    How often each id shows up inside the window and outside it, as a share of
+    logged days. The period itself is left out of both: it is neither "before
+    the period" nor the quiet stretch the window is being compared with.
+  */
+  let windowDays = 0;
+  let restDays = 0;
+  /** @type {Map<string, {inWindow: number, inRest: number}>} */
+  const share = new Map();
+  for (const cycle of complete) {
+    const next = /** @type {DateKey} */ (cycle.nextStart);
+    for (let date = addDays(cycle.periodEnd, 1); date < next; date = addDays(date, 1)) {
+      const log = logs[date];
+      if (!log) continue;
+      const inWindow = date >= addDays(next, -BEFORE_WINDOW);
+      if (inWindow) windowDays += 1; else restDays += 1;
+      for (const id of new Set([...log.symptoms, ...log.moods, ...log.custom])) {
+        const entry = share.get(id) ?? { inWindow: 0, inRest: 0 };
+        if (inWindow) entry.inWindow += 1; else entry.inRest += 1;
+        share.set(id, entry);
+      }
+    }
+  }
+  /** @param {string} id */
+  const concentrated = (id) => {
+    if (restDays < MIN_REST_DAYS || !windowDays) return true;
+    const entry = share.get(id) ?? { inWindow: 0, inRest: 0 };
+    return entry.inWindow / windowDays >= CONCENTRATION * (entry.inRest / restDays);
+  };
 
   for (const cycle of complete) {
     const next = /** @type {DateKey} */ (cycle.nextStart);
@@ -98,6 +142,7 @@ export function premenstrualPatterns(logs, cycles) {
   const out = [];
   for (const [id, { kind, onsets }] of found) {
     if (onsets.length / complete.length < THRESHOLD) continue;
+    if (!concentrated(id)) continue;
     const sorted = [...onsets].sort((a, b) => a - b);
     const mid = Math.floor(sorted.length / 2);
     const typicalBefore = sorted.length % 2

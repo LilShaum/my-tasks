@@ -50,7 +50,10 @@ import { openLogSheet } from './log.js';
 import { measureRow } from '../ui/measure.js';
 import { burst } from '../ui/particles.js';
 import { mascotReact } from '../ui/mascot.js';
-import { loggingStreak, habitualMeasures } from '../domain/stats.js';
+import { loggingStreak, habitualMeasures, patternIndex, MIN_CYCLES_FOR_PATTERN } from '../domain/stats.js';
+import { premenstrualPatterns } from '../domain/heads-up.js';
+import { buildCycles, cycleDay } from '../domain/cycles.js';
+import { predict } from '../domain/predict.js';
 import { STREAK_MARKS } from '../domain/response.js';
 import { earnedIds, newlyEarned } from '../domain/stickers.js';
 import { stickerContext } from './stickers.js';
@@ -194,6 +197,47 @@ function checkinPlan() {
 /** How many questions today's check-in will ask. */
 export function checkinQuestionCount() {
   return checkinPlan().kinds.length;
+}
+
+/**
+ * Symptoms she usually has at this point in her cycle.
+ *
+ * Two kinds, from her own history and held to the same bar as Patterns (three
+ * complete cycles):
+ *   - before her period: anything that reliably starts about this many days
+ *     ahead of it, which needs a forecast, so only for today;
+ *   - during her period: anything she logged on this day of it in at least
+ *     half her cycles.
+ *
+ * @param {DateKey} date
+ * @returns {Set<string>}
+ */
+function usualNow(date) {
+  const { logs, periodDays, settings } = store.getState();
+  const cycles = buildCycles(periodDays);
+  /** @type {Set<string>} */
+  const ids = new Set();
+
+  if (date === todayKey()) {
+    const prediction = predict({ periodDays, settings, today: date, logs });
+    const until = prediction.daysUntilPeriod;
+    if (until != null && until >= 0 && !prediction.isLate) {
+      for (const p of premenstrualPatterns(logs, cycles)) {
+        if (p.kind !== 'moods' && until <= p.typicalBefore + 1) ids.add(p.id);
+      }
+    }
+  }
+
+  const day = cycleDay(cycles, date);
+  if (day != null && day <= 7) {
+    const { byId, total } = patternIndex(logs, cycles);
+    if (total >= MIN_CYCLES_FOR_PATTERN) {
+      for (const [id, entry] of byId) {
+        if ((entry.byDay.get(day) ?? 0) / total >= 0.5) ids.add(id);
+      }
+    }
+  }
+  return ids;
 }
 
 /**
@@ -428,13 +472,26 @@ export function openCheckin(date = todayKey()) {
 
   /* ── 1. Flow ───────────────────────────────────────────────────────── */
 
+  const yesterday = addDays(date, -1);
+  const before = store.getState().logs[yesterday]?.flow;
+  /** @type {string} */
+  const yesterdayNote = before && before !== 'none'
+    ? `Yesterday: ${labelFor('flow', before).toLowerCase()}.`
+    // Marked on the calendar but never logged: the level is unknown, the fact is not.
+    : !before && store.getState().periodDays.has(yesterday) ? 'Yesterday was a period day.' : '';
+
   /** @param {() => boolean} stale */
   function flowStep(stale) {
     return question({
       stale,
       title: isToday ? 'Any bleeding today?' : `Any bleeding ${whenPhrase}?`,
-      hint: 'This is the one that matters most — it is what every prediction ' +
-        'is built from.',
+      /*
+        What she logged the day before, on the days that is a useful memory
+        jog: mid-period, "was it heavier than yesterday?" is the question she
+        is actually answering. Shown, never pre-selected, so it cannot answer
+        for her.
+      */
+      hint: yesterdayNote,
       /*
         The whole day in one tap.
 
@@ -531,6 +588,22 @@ export function openCheckin(date = todayKey()) {
     }
 
     /*
+      What she usually has around now is always on the list, and says so.
+
+      Not moved to the front: a grid that reshuffles itself every day is one
+      she has to read instead of tap, so the familiar order stays and a missing
+      "usual" symptom takes the place of the last one that is not.
+    */
+    const usual = [...usualNow(date)].filter((id) => builtIn.has(id) || custom.has(id));
+    for (const id of usual) {
+      if (ids.includes(id)) continue;
+      let out = ids.length - 1;
+      while (out >= 0 && usual.includes(ids[out])) out -= 1;
+      if (out < 0) break;
+      ids[out] = id;
+    }
+
+    /*
       The rating strip, under the chips rather than inside them.
 
       Putting it on the chip itself was the obvious shape and the wrong one:
@@ -569,6 +642,7 @@ export function openCheckin(date = todayKey()) {
         return {
           id,
           label: isCustom ? id : labelFor('symptoms', id),
+          note: usual.includes(id) ? 'often now' : undefined,
           selected: (isCustom ? draft.custom : draft.symptoms).includes(id),
           onPick: () => (isCustom
             ? toggle(draft.custom, id, (l) => { draft.custom = l; })
@@ -835,7 +909,7 @@ function question({ title, hint, options, stale, shortcut, multi, current, extra
     // tabindex so the step change can move focus here; data-autofocus so the
     // sheet lands on the question rather than on its own close button.
     el('h2', { class: 'checkin-title', tabindex: '-1', 'data-autofocus': '', text: title }),
-    el('p', { class: 'hint', text: hint }),
+    hint ? el('p', { class: 'hint', text: hint }) : null,
     grid,
     extra,
 
