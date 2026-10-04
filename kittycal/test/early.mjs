@@ -129,30 +129,46 @@ async function insightsWith(shape) {
 
 console.log('\na brand-new install');
 {
-  const { ctx, headings, text, errors } = await insightsWith({ cycles: 0, loggedDays: 0 });
+  const { ctx, page, headings, text, errors } = await insightsWith({ cycles: 0, loggedDays: 0 });
   ok('still shows the empty state when there is genuinely nothing',
-    /Not enough to analyse yet/.test(text), headings.join(', '));
+    (await page.$$('#view-insights .empty')).length === 1
+    && /Your insights will grow here/.test(text), headings.join(', '));
+  ok('with a way to the calendar', /Go to the calendar/.test(text));
+  ok('and no welcome card or glance on top of it',
+    (await page.$$('.still-card, .glance-card')).length === 0);
   ok('no page errors', errors.length === 0, errors.join(' | '));
   await ctx.close();
 }
 
 /* ── A few days, no period marked ───────────────────────────────────────── */
 
+/*
+  This used to be a "What you log most" count card ("Cramps, 4 days") with a
+  line saying a count is not a pattern. The count card was removed on purpose:
+  a number she cannot do anything with is not an insight. In its place the
+  screen opens with a welcome that says what it is waiting for.
+*/
 console.log('\nfour days logged, no period marked yet');
 {
-  const { ctx, headings, text, errors } = await insightsWith({ cycles: 0, loggedDays: 4 });
+  const { ctx, page, headings, text, errors } = await insightsWith({ cycles: 0, loggedDays: 4 });
 
   ok('the screen is no longer a locked door',
-    !/Not enough to analyse yet/.test(text), text.slice(0, 80));
-  ok('it counts what she has logged', headings.includes('What you log most'),
+    !/Your insights will grow here/.test(text), text.slice(0, 80));
+  const welcome = await page.$('#view-insights .data-zone > :first-child.still-card.is-welcome');
+  ok('it opens with the welcome card', welcome != null);
+  ok('named as such',
+    /Your insights are on their way/.test(await page.$eval('#view-insights .still-card h2', (h) => h.textContent ?? '')));
+  ok('no glance list, since there is nothing to glance at',
+    (await page.$$('.glance-card')).length === 0);
+  ok('the count of what she logged is not dressed up as a card',
+    !headings.includes('What you log most') && !headings.includes('Your history'), headings.join(', '));
+  ok('and it never calls anything a pattern', !headings.includes('Patterns') && !/Not a pattern yet/i.test(text),
     headings.join(', '));
-  ok('and names the commonest thing', /Cramps/.test(text));
-  ok('but never calls it a pattern', !headings.includes('Patterns'), headings.join(', '));
-  ok('it says a count is not a pattern in so many words',
-    /Not a pattern yet/i.test(text));
-  ok('and says what is still missing', headings.includes('Still to come'),
-    headings.join(', '));
-  ok('naming the number of cycles it needs', /3 more cycles/.test(text));
+  ok('it says why it is waiting', /waits until there is enough to be sure/.test(text));
+  ok('and what each missing card needs, naming the number of cycles',
+    /Your cycle chart: after 3 more cycles/.test(text), text.slice(0, 200));
+  ok('no cycle card, fingerprint or body map is drawn from nothing',
+    (await page.$$('#insight-cycle, #insight-periods, #insight-body')).length === 0);
   ok('no page errors', errors.length === 0, errors.join(' | '));
   await ctx.close();
 }
@@ -163,13 +179,25 @@ console.log('\none period marked, mid-cycle');
 {
   const { ctx, page, headings, text, errors } = await insightsWith({ cycles: 1, loggedDays: 8 });
 
-  ok('the current cycle gets its own card', headings.includes('This cycle'),
+  /*
+    "This cycle" (cycle day, days logged) was removed: it was a counter, and
+    Today already says which cycle day it is. With one period there is still
+    nothing to compare, so the welcome card leads.
+  */
+  ok('the welcome card leads while there is only one period',
+    (await page.$$('#view-insights .data-zone > :first-child.still-card.is-welcome')).length === 1,
     headings.join(', '));
-  ok('with the cycle day on it', /Cycle day/.test(text));
+  ok('and the counter card for this cycle is gone',
+    !headings.includes('This cycle') && !/Cycle day/.test(text), headings.join(', '));
 
   // One period start means no completed cycle, so there is no length to state.
   ok('no cycle length is claimed from a single period start',
-    !headings.includes('Cycle length'), headings.join(', '));
+    (await page.$$('#insight-cycle')).length === 0 && !/Your first full cycle/.test(text),
+    headings.join(', '));
+  ok('and says the chart is three cycles away', /Your cycle chart: after 3 more cycles/.test(text),
+    text.slice(0, 200));
+  ok('and the fingerprint waits for the next period', /Your period fingerprint: after your next period/.test(text),
+    text.slice(0, 200));
 
   ok('and no chart is drawn from one point',
     (await page.$$('.chart')).length === 0);
@@ -188,19 +216,23 @@ console.log('\nthree periods marked, so two completed cycles');
 {
   const { ctx, page, headings, text, errors } = await insightsWith({ cycles: 3, loggedDays: 10 });
 
-  ok('cycle length appears', headings.includes('Cycle length'), headings.join(', '));
+  const cycleCard = await page.$('#insight-cycle');
+  ok('the cycle card appears', cycleCard != null, headings.join(', '));
   /*
-    Scoped to the cycle-length card on purpose. Three period starts give two
-    completed cycles but three finished periods, so Period length legitimately
-    has enough points to draw — asserting "no chart anywhere" would have been
-    asserting a bug.
+    Scoped to the cycle card on purpose: other cards may legitimately draw
+    something at this age, so "no chart anywhere" would be asserting the wrong
+    thing. Two dots are a line, not a pattern, so the cycle card says it in words.
   */
-  const cycleCard = await page.$('.card:has(h3:text-is("Cycle length"))');
-  ok('stated in words rather than drawn as a two-point line',
-    /Your cycles so far/.test(text) && (await cycleCard.$$('.chart')).length === 0,
-    text.match(/Your cycles so far[^.]*\./)?.[0] ?? '(not found)');
+  const title = cycleCard ? await cycleCard.$eval('h3', (h) => h.textContent ?? '') : '';
+  ok('its title states the lengths rather than drawing a two-point line',
+    /^Your cycles so far: 28 and 28 days$/.test(title) && (await cycleCard.$$('.chart')).length === 0,
+    title || '(not found)');
+  ok('it does not judge regularity from two cycles',
+    !/^Regular|vary/.test(title) && (await cycleCard.$$('.insight-note')).length === 0);
+  ok('and says one more cycle makes the chart',
+    /A chart appears after 1 more cycle/.test(await cycleCard.innerText()));
+  ok('the still-to-come list says the same', /Your cycle chart: after 1 more cycle/.test(text));
   ok('still no patterns claimed', !headings.includes('Patterns'), headings.join(', '));
-  ok('and it says one more cycle is needed', /1 more cycle/.test(text));
   ok('no page errors', errors.length === 0, errors.join(' | '));
   await ctx.close();
 }
@@ -211,25 +243,31 @@ console.log('\nfive periods marked, so four completed cycles');
 {
   const { ctx, page, headings, text, errors } = await insightsWith({ cycles: 5, loggedDays: 30 });
 
-  ok('now there is a chart', (await page.$$('.chart')).length > 0);
+  ok('now there is a chart', (await page.$$('#insight-cycle .chart')).length === 1);
+  ok('the cycle title is the finding', /^Regular: your cycles are all 28 days$/.test(
+    await page.$eval('#insight-cycle h3', (h) => h.textContent ?? '')));
   ok('and the reading guide is offered with it',
     (await page.$$('.guide-button')).length === 1);
-  ok('patterns take over', headings.includes('Patterns'), headings.join(', '));
-  ok('and the plain count card steps aside',
-    !headings.includes('What you log most'), headings.join(', '));
+  ok('findings lead, so At a glance opens the screen',
+    (await page.$$('#view-insights .data-zone > :first-child.glance-card')).length === 1,
+    headings.join(', '));
+  ok('and the welcome has stepped down to a plain "Still to come"',
+    (await page.$$('.still-card.is-welcome')).length === 0);
+  ok('and the plain count card stays gone',
+    !headings.includes('What you log most') && !headings.includes('Your history'), headings.join(', '));
 
   console.log('\n  opening the guide');
   await page.click('.guide-button');
   await page.waitForSelector('.guide-entry');
   const guide = await page.$eval('.sheet-body', (n) => n.textContent ?? '');
   ok('it explains the ringed dot', /ringed/.test(guide));
-  ok('it explains the darker strips', /darker/i.test(guide));
-  ok('it explains why the mood bars are shares', /shares/i.test(guide));
+  ok('it explains the darker dots and squares', /darker/i.test(guide));
+  ok('it explains which way the curves run', /Left is the start of your period/i.test(guide));
   ok('and it repeats that none of it is a diagnosis',
     /Nothing here is a diagnosis/i.test(guide));
 
   const entries = await page.$$eval('.guide-entry h3', (n) => n.map((h) => h.textContent));
-  ok('one entry per chart on the screen', entries.length >= 5, JSON.stringify(entries));
+  ok('one entry per kind of chart on the screen', entries.length >= 5, JSON.stringify(entries));
 
   ok('no page errors', errors.length === 0, errors.join(' | '));
   await ctx.close();

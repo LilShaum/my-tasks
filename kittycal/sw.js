@@ -67,6 +67,8 @@ const PRECACHE = [
   'js/domain/acog.js',
   'js/domain/stats.js',
   'js/domain/heads-up.js',
+  'js/domain/rhythm.js',
+  'js/ui/insight-charts.js',
   'js/domain/recap.js',
   'js/domain/response.js',
   'js/domain/notes.js',

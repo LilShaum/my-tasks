@@ -196,7 +196,13 @@ export function trendChart({
       printed "Jul" eight times in a row. The stride keeps the count sane and
       the dedupe keeps a repeated month from being said at all.
     */
-    if (i % stride === 0 || i === data.length - 1) {
+    /*
+      The last point is always labelled, because the most recent date is the
+      one she looks for. A stride label that would land within half a stride
+      of it gives way instead — the two used to print on top of each other
+      ("30 Sep1 Oct").
+    */
+    if ((i % stride === 0 && data.length - 1 - i >= stride / 2) || i === data.length - 1) {
       if (point.label !== lastLabel) {
         lastLabel = point.label;
         chart.append(svg('text', {

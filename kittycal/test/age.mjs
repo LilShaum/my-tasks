@@ -62,9 +62,14 @@ for (const [age, label] of [[16, 'a sixteen-year-old'], [31, 'an adult']]) {
 
   await page.locator('[data-tab="insights"]').click();
   await page.waitForTimeout(700);
+  // The cycle card's basis line names the band: "The shaded band is the typical 21 to 45."
   const band = await page.evaluate(() =>
-    (document.querySelector('#view-insights')?.textContent?.match(/typical (\d+)–(\d+) days/) ?? []).slice(1).join('–'));
+    (document.querySelector('#insight-cycle')?.textContent?.match(/typical (\d+) to (\d+)\b/) ?? []).slice(1).join('–'));
   check(band === (age < 18 ? '21–45' : '21–35'), 'and Insights shades the range for her age', band);
+  // And the drawn band's upper edge is numbered on the chart itself.
+  const edges = await page.$$eval('#insight-cycle .chart text', (n) => n.map((t) => t.textContent));
+  check(edges.includes(age < 18 ? '45' : '35') && !edges.includes(age < 18 ? '35' : '45'),
+    'and the chart numbers the edge of that band', JSON.stringify(edges));
 
   await page.locator('[data-tab="settings"]').click();
   await page.waitForTimeout(700);
