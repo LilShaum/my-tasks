@@ -74,6 +74,8 @@
  * @property {boolean} askSleep        the check-in asks about last night's sleep
  * @property {boolean} askWater        the check-in asks about water so far
  * @property {number} glassMl          what one tap of water adds, in ml
+ * @property {Record<string, string>} forYouSeen  "For you" moment id → DateKey last shown
+ * @property {string[]} forYouDismissed  moment ids she marked "not useful"
  * @property {boolean} onboarded
  * @property {boolean} disclaimerAck
  * @property {string[]} customSymptoms
@@ -130,6 +132,8 @@ export function defaultSettings() {
     askSleep: true,
     askWater: true,
     glassMl: 250,
+    forYouSeen: {},
+    forYouDismissed: [],
     onboarded: false,
     disclaimerAck: false,
     customSymptoms: [],
@@ -375,6 +379,10 @@ export function normalizeSettings(raw) {
   if (!Array.isArray(out.customSymptoms)) out.customSymptoms = [];
   if (!Array.isArray(out.recentChips)) out.recentChips = [];
   if (![200, 250, 330, 500].includes(out.glassMl)) out.glassMl = base.glassMl;
+  if (!out.forYouSeen || typeof out.forYouSeen !== 'object' || Array.isArray(out.forYouSeen)) {
+    out.forYouSeen = {};
+  }
+  if (!Array.isArray(out.forYouDismissed)) out.forYouDismissed = [];
 
   return out;
 }

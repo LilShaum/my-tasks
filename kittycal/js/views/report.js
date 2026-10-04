@@ -23,6 +23,7 @@ import { detectPatterns, symptomFrequency, daysLogged, severitySummary,
 import { labelFor, labelOf, isMood, severityLabel } from '../data/taxonomy.js';
 import * as acog from '../domain/acog.js';
 import { premenstrualPatterns } from '../domain/heads-up.js';
+import { moodCurve, sleepCurve } from '../domain/rhythm.js';
 import * as store from '../state/store.js';
 
 const MONTHS_COVERED = 6;
@@ -129,7 +130,12 @@ function buildReport() {
     */
     section('Recurring symptoms', recurringSection(windowLogs, recent, 'symptoms')),
 
-    section('Mood', recurringSection(windowLogs, recent, 'moods')),
+    section('Mood', [
+      ...recurringSection(windowLogs, recent, 'moods'),
+      moodTiming(windowLogs, recent),
+    ]),
+
+    sleepSection(windowLogs, recent),
 
     section('Outside typical ranges', [
       flags.length
@@ -150,6 +156,55 @@ function buildReport() {
         'logged, not a clinical assessment, and contains no diagnosis.' }),
     ]),
   ]);
+}
+
+/**
+ * Whether hard moods cluster before her periods, in one sentence.
+ *
+ * A doctor assessing PMS or PMDD asks exactly this — do the symptoms come in
+ * the days before bleeding and lift after it — and daily records are what
+ * the assessment rests on. Said only when the difference is large and backed
+ * by enough days; otherwise nothing, rather than a reassuring-sounding null.
+ *
+ * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
+ * @param {import('../domain/cycles.js').Cycle[]} cycles
+ */
+function moodTiming(logs, cycles) {
+  const f = moodCurve(logs, cycles)?.finding;
+  if (!f) return null;
+  return el('p', { text:
+    `A difficult mood (irritable, low, anxious and similar) was logged on `
+    + `${Math.round(f.windowRate * 100)}% of days in the 5 days before a period, against `
+    + `${Math.round(f.restRate * 100)}% of other days (${f.windowN} and ${f.restN} days with a mood recorded).` });
+}
+
+/**
+ * Sleep, when she has recorded it: how much, whether it changes before a
+ * period, and how many nights were restless. Sleep disturbance before a
+ * period is one of the things a clinician looks for; a daily record of it is
+ * hard to get any other way.
+ *
+ * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
+ * @param {import('../domain/cycles.js').Cycle[]} cycles
+ */
+function sleepSection(logs, cycles) {
+  const nights = Object.values(logs).filter((log) => log.sleep != null);
+  if (nights.length < 14) return null;
+  const average = nights.reduce((a, log) => a + /** @type {number} */ (log.sleep), 0) / nights.length;
+  const poor = Object.values(logs)
+    .filter((log) => log.symptoms.includes('restless-sleep') || log.symptoms.includes('insomnia')).length;
+  const f = sleepCurve(logs, cycles)?.finding;
+  /** @type {string[][]} */
+  const rows = [
+    ['Nights recorded', String(nights.length)],
+    ['Average sleep', `${average.toFixed(1)} hours`],
+  ];
+  if (f) {
+    rows.push(['In the 7 days before a period',
+      `${f.windowMean.toFixed(1)} hours (${Math.abs(f.minutes)} minutes ${f.minutes < 0 ? 'less' : 'more'} than other days)`]);
+  }
+  rows.push(['Nights marked restless or sleepless', String(poor)]);
+  return section('Sleep', [table(rows)]);
 }
 
 /**

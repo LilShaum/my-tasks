@@ -54,6 +54,9 @@ import { loggingStreak, habitualMeasures, patternIndex, MIN_CYCLES_FOR_PATTERN }
 import { premenstrualPatterns } from '../domain/heads-up.js';
 import { buildCycles, cycleDay } from '../domain/cycles.js';
 import { predict } from '../domain/predict.js';
+import { phaseFor } from '../domain/phases.js';
+import { momentsFor, fresh, markSeen } from '../domain/foryou.js';
+import { mascot } from '../ui/mascot.js';
 import { STREAK_MARKS } from '../domain/response.js';
 import { earnedIds, newlyEarned } from '../domain/stickers.js';
 import { stickerContext } from './stickers.js';
@@ -429,7 +432,17 @@ export function openCheckin(date = todayKey()) {
       return;
     }
 
-    closeSheet();
+    /*
+      "For you today", when there is something worth saying.
+
+      Most days there is not, and then the check-in closes exactly as it always
+      did — an extra screen to dismiss every evening would be the fastest way
+      to turn fifteen seconds into a chore. Only today's check-in gets it:
+      catching up last Tuesday is not the moment for this week's news.
+    */
+    const moments = isToday ? forYouToday() : [];
+    if (moments.length) sheet.body.replaceChildren(forYouView(moments));
+    else closeSheet();
     const theme = getTheme(store.getState().settings.theme);
     burst({ shape: theme.particle });
 
@@ -469,6 +482,64 @@ export function openCheckin(date = todayKey()) {
     const confirmation = isToday ? 'Checked in for today' : `Checked in for ${whenLabel}`;
     announce(won ? `${confirmation}. Sticker earned, ${won.title}` : confirmation);
   };
+
+  /* ── For you today ─────────────────────────────────────────────────── */
+
+  /** The few things worth telling her now, remembered as said. */
+  function forYouToday() {
+    const { logs, periodDays, settings } = store.getState();
+    const cycles = buildCycles(periodDays);
+    const prediction = predict({ periodDays, settings, today: date, logs });
+    const phase = phaseFor({ date, cycles, prediction }).id;
+    const dismissed = new Set(settings.forYouDismissed);
+    const all = momentsFor({ today: date, logs, cycles, prediction, settings, hour: new Date().getHours(), phase })
+      .filter((m) => !dismissed.has(m.id));
+    const shown = fresh(all, settings.forYouSeen, date);
+    if (shown.length) store.updateSettings({ forYouSeen: markSeen(settings.forYouSeen, shown, date) });
+    return shown;
+  }
+
+  /** @param {import('../domain/foryou.js').Moment[]} moments */
+  function forYouView(moments) {
+    const { theme } = store.getState().settings;
+    return el('div', { class: 'checkin-step foryou' }, [
+      el('div', { class: 'foryou-head' }, [
+        mascot(theme, { size: 64, className: 'foryou-mascot' }),
+        el('div', {}, [
+          el('h2', { class: 'checkin-title', tabindex: '-1', 'data-autofocus': '', text: 'All logged!' }),
+          el('p', { class: 'hint', text: 'Here is what matters for you today.' }),
+        ]),
+      ]),
+      el('ul', { class: 'foryou-list' }, moments.map((m) => el('li', {}, [
+        m.anchor
+          ? el('button', {
+              type: 'button',
+              class: 'foryou-item',
+              onclick: () => {
+                haptic(6);
+                closeSheet();
+                store.setView('insights');
+                const anchor = /** @type {string} */ (m.anchor);
+                setTimeout(() => document.getElementById(anchor)
+                  ?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 350);
+              },
+            }, [
+              el('span', { class: 'foryou-icon', 'aria-hidden': 'true', text: m.icon }),
+              el('span', { class: 'foryou-text', text: m.text }),
+              el('span', { class: 'row-value', 'aria-hidden': 'true', text: '›' }),
+            ])
+          : el('div', { class: 'foryou-item' }, [
+              el('span', { class: 'foryou-icon', 'aria-hidden': 'true', text: m.icon }),
+              el('span', { class: 'foryou-text', text: m.text }),
+            ]),
+      ]))),
+      el('button', {
+        type: 'button',
+        class: 'btn btn-block btn-lg checkin-next',
+        onclick: () => { haptic(); closeSheet(); },
+      }, ['See you tomorrow']),
+    ]);
+  }
 
   /* ── 1. Flow ───────────────────────────────────────────────────────── */
 
