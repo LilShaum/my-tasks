@@ -46,7 +46,7 @@ export const PHASES = {
     more:
       'Your uterus is shedding its lining. To do that it releases ' +
       'prostaglandins, chemicals that make the muscle squeeze, and that squeeze ' +
-      'is what a cramp is. It is why heat and ibuprofen help: heat relaxes the ' +
+      'is what a cramp is. That’s why heat and ibuprofen help: heat relaxes the ' +
       'muscle, and ibuprofen lowers prostaglandins. Your hormones are at their ' +
       'lowest now too, so low energy is normal.',
     token: '--period',
@@ -72,9 +72,9 @@ export const PHASES = {
       'Your fertile window. An egg is released around now.',
     more:
       'A surge of a hormone called LH releases an egg, and oestrogen is at its ' +
-      'peak. That is behind the clear, stretchy discharge and the higher sex ' +
+      'peak. That’s behind the clear, stretchy discharge and the higher sex ' +
       'drive some people notice. Pregnancy is most likely in these days, and ' +
-      'because sperm can live for up to five days the window opens before the ' +
+      'because sperm can live for up to five days, the window opens before the ' +
       'egg is released.',
     token: '--ovulation',
   },
@@ -87,8 +87,8 @@ export const PHASES = {
     more:
       'After ovulation your body makes progesterone, the hormone that gets your ' +
       'uterus ready for a possible pregnancy. It can leave you sleepier, warmer ' +
-      'and more bloated. If there is no pregnancy it drops in the last few days ' +
-      'before your period, and that drop is what brings on PMS: mood dips, sore ' +
+      'and more bloated. If there’s no pregnancy, it drops in the last few days ' +
+      'before your period. That drop is what brings on PMS: mood dips, sore ' +
       'breasts, cravings.',
     token: '--luteal',
   },
@@ -128,7 +128,7 @@ export const PHASES = {
     heading: 'Between periods',
     summary:
       'Hormonal contraception stops ovulation, so the usual follicular and ' +
-      'luteal phases do not apply. Bleeding is still tracked as normal.',
+      'luteal phases don’t apply. Bleeding is still tracked as normal.',
     token: '--line-soft',
   },
   /*
@@ -144,8 +144,8 @@ export const PHASES = {
     name: 'Predictions paused',
     heading: 'Predictions paused',
     summary:
-      'After a positive pregnancy test there is no cycle phase to name, so ' +
-      'Kittycal is not naming one.',
+      'After a positive pregnancy test there’s no cycle phase to name, so ' +
+      'Kittycal doesn’t show one.',
     token: '--line-soft',
   },
   overdue: {
@@ -153,8 +153,8 @@ export const PHASES = {
     name: 'Past your expected date',
     heading: 'Past your expected date',
     summary:
-      'Your period was expected before now, so Kittycal cannot say which phase ' +
-      'you are in. Logging it when it arrives puts everything back on track.',
+      'Your period was expected before now, so Kittycal can’t say which phase ' +
+      'you’re in. Logging it when it arrives puts everything back on track.',
     token: '--line-soft',
   },
 };

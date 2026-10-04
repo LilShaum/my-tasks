@@ -170,7 +170,7 @@ export async function checkReminders({ prediction, loggedToday, birthControl }) 
     due.push({
       id: 'period-late',
       title: `Your period is ${plural(prediction.daysLate, 'day')} late`,
-      body: 'Cycles shift for all sorts of ordinary reasons. Log it when it starts and Kittycal will recalculate.',
+      body: 'Cycles often shift for ordinary reasons. Log it when it starts and Kittycal will recalculate.',
     });
   }
 
@@ -201,7 +201,7 @@ export async function checkReminders({ prediction, loggedToday, birthControl }) 
     due.push({
       id: 'log-daily',
       title: 'Anything to log today?',
-      body: 'Flow, symptoms, mood — whatever you feel like recording.',
+      body: 'Flow, symptoms, mood. Whatever you feel like recording.',
     });
   }
 

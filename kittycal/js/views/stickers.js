@@ -54,10 +54,10 @@ export function openStickerBook() {
     title: 'Sticker book',
     body: [
       el('p', { class: 'hint', text: earned === 0
-        ? 'Fourteen to collect. They come from using Kittycal — never from '
-          + 'what your cycle happens to do.'
+        ? 'Fourteen to collect. They come from using Kittycal, never from '
+          + 'what your cycle does.'
         : `${earned} of ${STICKER_COUNT}. Once a sticker is yours it stays `
-          + 'yours, whatever you do or do not log after it.' }),
+          + 'yours, whatever you log after it.' }),
       el('div', { class: 'sticker-grid' }, book.map(slot)),
     ],
   });

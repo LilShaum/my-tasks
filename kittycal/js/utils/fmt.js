@@ -29,7 +29,7 @@ export const mlToOz = (ml) => ml / 29.5735296;
  * @param {'C'|'F'} unit
  */
 export function fmtTemp(celsius, unit) {
-  if (celsius == null) return '—';
+  if (celsius == null) return '–';
   return unit === 'F'
     ? `${cToF(celsius).toFixed(1)}°F`
     : `${celsius.toFixed(2)}°C`;
@@ -40,7 +40,7 @@ export function fmtTemp(celsius, unit) {
  * @param {'kg'|'lb'} unit
  */
 export function fmtWeight(kg, unit) {
-  if (kg == null) return '—';
+  if (kg == null) return '–';
   return unit === 'lb'
     ? `${kgToLb(kg).toFixed(1)} lb`
     : `${kg.toFixed(1)} kg`;

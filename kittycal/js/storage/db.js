@@ -56,7 +56,7 @@ export function open() {
 
     req.onerror = () => reject(req.error ?? new Error('indexedDB.open failed'));
     req.onblocked = () =>
-      reject(new Error('Kittycal is open in another tab — close it and reload.'));
+      reject(new Error('Kittycal is open in another tab. Close it and reload.'));
   });
 
   return dbPromise;

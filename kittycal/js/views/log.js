@@ -909,7 +909,7 @@ function customSection(draft, settings, chips) {
 
   const node = section(
     'Anything else',
-    'Track whatever you like — it shows up in your patterns alongside everything else.',
+    'Track whatever you like. It shows up in your patterns alongside everything else.',
     [row, symptomSeverity(draft, chips, 'custom')],
     { count: draft.custom.length },
   );
@@ -1220,7 +1220,7 @@ function commit(date, draft, before) {
     burst({ shape: getTheme(settings.theme).particle, count: 34 });
     mascotReact();
     haptic([10, 30, 10]);
-    toast(`Sticker earned — ${won.title}`, { silent: true });
+    toast(`Sticker earned: ${won.title}`, { silent: true });
     toast(summarise(draft, date));
     return;
   }

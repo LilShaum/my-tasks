@@ -94,11 +94,11 @@ function buildReport() {
         ['Cycles in this period', String(recent.length)],
         ['Days with any log', String(daysLogged(windowLogs))],
         ['Average cycle length', stats.mean != null
-          ? `${Math.round(stats.mean)} days (range ${stats.min}–${stats.max})` : '—'],
-        ['Cycle-to-cycle variation', stats.spread != null ? `${stats.spread} days` : '—'],
+          ? `${Math.round(stats.mean)} days (range ${stats.min}–${stats.max})` : '–'],
+        ['Cycle-to-cycle variation', stats.spread != null ? `${stats.spread} days` : '–'],
         ['Average period length', periods.length
-          ? `${Math.round(periods.reduce((a, b) => a + b, 0) / periods.length)} days` : '—'],
-        ['Most recent period started', prediction.lastStart ? fmtLong(prediction.lastStart) : '—'],
+          ? `${Math.round(periods.reduce((a, b) => a + b, 0) / periods.length)} days` : '–'],
+        ['Most recent period started', prediction.lastStart ? fmtLong(prediction.lastStart) : '–'],
       ]),
     ]),
 
@@ -262,7 +262,7 @@ function recurringSection(logs, cycles, kind) {
         pattern.peakDays.length ? `day ${pattern.peakDays.join(', ')}` : 'no particular day',
         ...(anyBefore ? [before.has(pattern.id)
           ? `from about ${plural(/** @type {number} */ (before.get(pattern.id)), 'day')} before`
-          : '—'] : []),
+          : '–'] : []),
         ...(anyGraded ? [severityCell(graded.get(pattern.id))] : []),
       ]),
       ['What was logged', 'Cycles affected', 'Typical cycle day',

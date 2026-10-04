@@ -57,8 +57,8 @@ async function boot() {
     so even a failure during boot has somewhere to go.
   */
   store.onSaveError(() => {
-    toast('Could not save to this device. Your last change may be lost — ' +
-      'check you are not in a private window and have some space free.',
+    toast('Couldn’t save to this device. Your last change may be lost. ' +
+      'Check you’re not in a private window and have some space free.',
       { ms: 8000 });
   });
 
@@ -67,8 +67,8 @@ async function boot() {
   } catch (err) {
     console.error('kittycal: could not open the database', err);
     showFatal(
-      'Kittycal could not open its local database. If you are in a private ' +
-      'browsing window, try a normal one — private mode blocks the storage the ' +
+      'Kittycal couldn’t open its local database. If you’re in a private ' +
+      'browsing window, try a normal one. Private mode blocks the storage the ' +
       'app needs.',
     );
     return;

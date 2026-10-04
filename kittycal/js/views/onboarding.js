@@ -187,8 +187,8 @@ function stepTheme() {
       el('div', { class: 'onb-art' }, [mascot(draft.theme, { size: 128 })]),
       el('h2', { text: 'Hi! Pick your look.' }),
       el('p', { class: 'hint', text:
-        'This sets the colours and the little friend in the corner. You can ' +
-        'change it any time, and there are fourteen of them.' }),
+        'This sets the colours and the little friend in the corner. There are ' +
+        'fourteen to pick from, and you can change it any time.' }),
       grid,
     ],
     footer: footer({ canSkip: false }),
@@ -213,7 +213,7 @@ function stepName() {
     content: [
       el('h2', { text: 'What should I call you?' }),
       el('p', { class: 'hint', text:
-        'Only used to say hello. It stays on this device — there is no account ' +
+        'Only used to say hello. It stays on this device. There’s no account ' +
         'and nothing to sign into.' }),
       el('div', { class: 'field' }, [
         el('label', { class: 'label', for: 'onb-name', text: 'Name (optional)' }),
@@ -246,9 +246,9 @@ function stepAge() {
     content: [
       el('h2', { text: 'Which year were you born?' }),
       el('p', { class: 'hint', text:
-        'In the first years of having periods, cycles run longer — up to 45 ' +
-        'days is typical under 18 — so this decides which range yours are ' +
-        'measured against. Skip it if you would rather not.' }),
+        'Cycles run longer in the first years of having periods: up to 45 ' +
+        'days is typical under 18. Your age decides which range yours are ' +
+        'measured against. Skip it if you’d rather not.' }),
       el('div', { class: 'field' }, [
         el('label', { class: 'label', for: 'onb-year', text: 'Birth year (optional)' }),
         input,
@@ -265,7 +265,7 @@ function stepLastPeriod() {
     class: 'hint',
     id: 'onb-lp-label',
     text: draft.lastPeriodStart
-      ? `${fmtLong(draft.lastPeriodStart)} — ${describeAgo(draft.lastPeriodStart)}`
+      ? `${fmtLong(draft.lastPeriodStart)}, ${describeAgo(draft.lastPeriodStart)}`
       : 'Nothing picked yet.',
   });
 
@@ -282,7 +282,7 @@ function stepLastPeriod() {
         ? /** @type {DateKey} */ (value)
         : null;
       chosen.textContent = draft.lastPeriodStart
-        ? `${fmtLong(draft.lastPeriodStart)} — ${describeAgo(draft.lastPeriodStart)}`
+        ? `${fmtLong(draft.lastPeriodStart)}, ${describeAgo(draft.lastPeriodStart)}`
         : 'Nothing picked yet.';
     },
   });
@@ -311,7 +311,7 @@ function stepLastPeriod() {
         draft.lastPeriodStart = addDays(today, -ago);
         /** @type {HTMLInputElement} */ (input).value = draft.lastPeriodStart;
         chosen.textContent =
-          `${fmtLong(draft.lastPeriodStart)} — ${describeAgo(draft.lastPeriodStart)}`;
+          `${fmtLong(draft.lastPeriodStart)}, ${describeAgo(draft.lastPeriodStart)}`;
         for (const c of quickChips) {
           c.setAttribute('aria-pressed', String(c.dataset.ago === String(ago)));
         }
@@ -334,7 +334,7 @@ function stepLastPeriod() {
     content: [
       el('h2', { text: 'When did your last period start?' }),
       el('p', { class: 'hint', text:
-        'The first day of bleeding. A rough guess is fine — every prediction ' +
+        'The first day of bleeding. A rough guess is fine. Every prediction ' +
         'gets better as you log, and you can correct this on the calendar later.' }),
       el('div', { class: 'field' }, [
         el('label', { class: 'label', for: 'onb-lastperiod', text: 'First day' }),
@@ -468,10 +468,10 @@ function stepEarlierPeriods() {
     content: [
       el('h2', { text: 'Any earlier periods you remember?' }),
       el('p', { class: 'hint', text:
-        'Every extra date is a complete cycle Kittycal can measure straight ' +
-        'away, instead of waiting a month for it. Skip this if you are not ' +
-        'sure — a guessed date is worse than none, because everything else ' +
-        'gets measured against it.' }),
+        'Every extra date gives Kittycal a complete cycle to measure straight ' +
+        'away, instead of waiting a month. Skip this if you’re not sure. ' +
+        'A guessed date is worse than none, because everything else is ' +
+        'measured against it.' }),
       list,
     ],
     footer: footer(),
@@ -532,7 +532,7 @@ function stepCycleLength() {
       el('h2', { text: 'How long is your cycle?' }),
       el('p', { class: 'hint', text:
         'First day of one period to the day before the next. If it moves ' +
-        'around, put roughly the middle — this is a starting point, not a rule.' }),
+        'around, put roughly the middle. It’s a starting point, not a rule.' }),
       stepper({
         value: draft.cycleLength,
         min: CYCLE_STATED_MIN,
@@ -576,8 +576,7 @@ function stepBirthControl() {
       el('h2', { text: 'Are you using birth control?' }),
       el('p', { class: 'hint', text:
         'Hormonal methods stop ovulation, so Kittycal hides fertility ' +
-        'estimates when one is selected rather than showing you a number that ' +
-        'does not mean anything.' }),
+        'estimates if you pick one. They wouldn’t mean anything.' }),
       list,
     ],
     footer: footer(),
@@ -595,8 +594,8 @@ function stepDisclaimer() {
         el('div', {}, [
           el('strong', { text: 'This is not birth control.' }),
           ' Predicted periods, fertile windows and ovulation days are ' +
-          'estimates based on your own logs. They are not a contraceptive ' +
-          'method and not medical advice. For anything that worries you, ' +
+          'estimates based on your own logs. They’re not a contraceptive ' +
+          'method and not medical advice. If anything worries you, ' +
           'please talk to a doctor.',
         ]),
       ]),
@@ -614,7 +613,7 @@ function stepDisclaimer() {
       el('button', {
         type: 'button',
         class: 'btn btn-block btn-lg',
-        text: 'Got it — let’s go',
+        text: 'Got it, let’s go',
         onclick: finish,
       }),
       el('button', {

@@ -36,12 +36,12 @@ export function openHelp() {
           'nothing is going on, "Nothing to report today" answers all three at ' +
           'once.'),
         p('Light, medium and heavy mark the day as a period day. Spotting does ' +
-          'not — it means bleeding outside a period, and counting it as day one ' +
+          'not. It means bleeding outside a period, and counting it as day one ' +
           'would throw your cycle lengths off.'),
         p('The first question moves on as soon as you tap. "← Back" returns to ' +
           'it with nothing lost.'),
-        p('Pick a symptom and you can say how bad it was. Skipping that is fine ' +
-          '— it only ever adds to what a symptom means, never subtracts.'),
+        p('Pick a symptom and you can say how bad it was. Skipping that is fine. ' +
+          'It only ever adds detail to a symptom.'),
       ]),
 
       section('Days you missed', [
@@ -61,7 +61,7 @@ export function openHelp() {
       ]),
 
       section('The diary', [
-        p(`Everything the check-in does not ask about — ${optionCount()} things ` +
+        p(`Everything the check-in doesn’t ask about: ${optionCount()} things ` +
           `across ${CATEGORIES.length} categories, plus your own.`),
         p('The search box understands everyday wording, so "sore boobs" and ' +
           '"tired" both work.'),
@@ -70,9 +70,9 @@ export function openHelp() {
 
       section('Insights', [
         p('After three complete cycles Kittycal starts looking for things that ' +
-          'recur, and where in the cycle they land — "cramps, 8 of 9 cycles, ' +
+          'recur, and where in the cycle they land, like "cramps, 8 of 9 cycles, ' +
           'most often on day 1 and 2". Something has to show up in most of your ' +
-          'cycles before it counts as a pattern.'),
+          'cycles to count as a pattern.'),
         p('The report for a doctor is at the bottom: a plain summary of the last ' +
           'six months, sent to your print dialogue. Choose "Save as PDF" there ' +
           'to email it instead.'),
@@ -82,12 +82,11 @@ export function openHelp() {
         p('Until you have three logged cycles it uses the average you gave it ' +
           'during setup. After that it uses your own cycles, weighting recent ' +
           'ones more heavily.'),
-        p('Ovulation is counted backwards from your next expected period, not by ' +
+        p('Ovulation is counted back from your next expected period, not by ' +
           'halving the cycle. Every prediction shows how confident it is, and ' +
-          'the fertile window is drawn wide rather than falsely precise when ' +
-          'there is not much history.'),
-        p('On hormonal birth control, ovulation and fertile windows are hidden ' +
-          'entirely. Period tracking carries on as normal.'),
+          'the fertile window is drawn wide when there isn’t much history.'),
+        p('On hormonal birth control, ovulation and fertile windows are hidden. ' +
+          'Period tracking carries on as normal.'),
         p('If your period is more than about two weeks late Kittycal stops ' +
           'naming a phase, and after three months it stops predicting and asks ' +
           'you to mark your most recent period. Nothing is lost.'),
@@ -99,21 +98,20 @@ export function openHelp() {
         p('It does not diagnose anything. It can tell you when something falls ' +
           `outside the ranges published by ACOG (cycles ${acog.CYCLE_MIN}–` +
           `${acog.CYCLE_MAX} days, bleeding ${acog.PERIOD_MIN}–` +
-          `${acog.PERIOD_MAX} days) and suggest mentioning it to a doctor. That ` +
-          'is as far as it goes, on purpose.'),
+          `${acog.PERIOD_MAX} days) and suggest mentioning it to a doctor. ` +
+          'That’s as far as it goes.'),
       ]),
 
       section('Reminders', [
-        p('In Settings. They arrive when you next open the app on the day they ' +
-          'are due — apps that buzz you out of nowhere run a server that knows ' +
-          'your cycle, and Kittycal has none.'),
+        p('In Settings. They show when you next open the app on the day they ' +
+          'are due. Kittycal has no server, so it can’t buzz you while it’s closed.'),
       ]),
 
       section('Privacy and passcode', [
         p('No account, no server, no analytics. The app makes no internet ' +
           'requests at all.'),
         p('Settings can put a four-digit code in front of the app. The code is ' +
-          'never stored, only a scrambled version. It is not encryption: ' +
+          'never stored, only a scrambled version. It isn’t encryption: ' +
           'someone determined, with your unlocked phone, could still reach the ' +
           'data underneath.'),
       ]),
@@ -122,11 +120,10 @@ export function openHelp() {
         p('Safari deletes what a website has stored if you go about a week ' +
           'without opening it. Everything Kittycal knows is in that storage, ' +
           'and there is no copy on a server to put it back.'),
-        p('A web app on your Home Screen is exempt from that rule, which is ' +
-          'why Today asks once you have a few days recorded. Tap the Share ' +
-          'button in Safari, then Add to Home Screen. "Not now" hides the ' +
-          'message for a fortnight; it comes back because the risk does not go ' +
-          'away when the message does.'),
+        p('A web app on your Home Screen is exempt from that rule, so Today ' +
+          'asks once you have a few days recorded. Tap the Share button in ' +
+          'Safari, then Add to Home Screen. "Not now" hides the message for a ' +
+          'fortnight, then it comes back.'),
       ]),
 
       section('Backups and a new phone', [
@@ -136,8 +133,8 @@ export function openHelp() {
           'of entries that are not in any backup. "Not now" hides it for a month.'),
         p('Settings → Check a backup file opens a file and says what is in it ' +
           'without importing anything: when it was made, how much it holds, ' +
-          'and what restoring it would cost you. It is safe to run on a file ' +
-          'you are unsure about.'),
+          'and what restoring it would cost you. It’s safe to run on a file ' +
+          'you’re unsure about.'),
         p('On a new phone, open Kittycal and use Import.'),
       ]),
 
@@ -148,28 +145,26 @@ export function openHelp() {
       ]),
 
       section('Using your own pictures', [
-        p('The built-in emblems are original artwork — a bow, a cloud, a star. ' +
-          'They are motifs rather than the characters the themes are named ' +
-          'after, because those characters belong to somebody else and are not ' +
-          'ours to draw or ship.'),
+        p('The built-in emblems are original artwork, like a bow, a cloud and a ' +
+          'star. They aren’t the characters the themes are named after, because ' +
+          'those characters belong to somebody else.'),
         p('Your phone is a different matter. Settings → Themes → the picture ' +
-          'row under the theme you are using lets you put any image from your ' +
-          'camera roll in its place. It is cropped in the app, stored on the ' +
-          'device, and never uploaded anywhere — Kittycal makes no internet ' +
-          'requests at all.'),
+          'row under your current theme lets you use any image from your ' +
+          'camera roll instead. It’s cropped in the app, stored on your ' +
+          'phone and never uploaded. Kittycal makes no internet requests at all.'),
       ]),
 
       section('Themes', [
         p(`${THEMES.length} themes, each with a light and dark version. Any of ` +
           'them can use your own picture instead of the built-in art.'),
-        p('The Plain theme turns off all the pattern and colour, which is handy ' +
-          'if you want to show a screen to someone.'),
+        p('The Plain theme turns off all the pattern and colour. Handy if you ' +
+          'want to show a screen to someone.'),
       ]),
 
       section('The sticker book', [
         p(`${STICKER_COUNT} stickers, under Settings. They come from using ` +
-          'Kittycal — logging days, filling in cycles, finding the corners of ' +
-          'the diary — and never from what your cycle actually did.'),
+          'Kittycal, like logging days, filling in cycles and finding the ' +
+          'corners of the diary. They never depend on what your cycle did.'),
         p('Nothing is ever taken away. Missing a week, or a month, leaves the ' +
           'ones you have exactly where they are.'),
       ]),
