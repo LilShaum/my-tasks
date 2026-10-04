@@ -53,7 +53,7 @@ export function openMascotPicker(themeId, onSaved) {
 
   const placeholder = el('div', { class: 'crop-placeholder' }, [
     emblem(themeId, { size: 96 }),
-    el('p', { class: 'hint-sm', text: 'No picture chosen yet — the built-in art is being used.' }),
+    el('p', { class: 'hint-sm', text: 'No picture chosen yet. The built-in art is in use.' }),
   ]);
 
   const zoomRow = el('div', { class: 'field', hidden: true }, [
@@ -106,7 +106,7 @@ export function openMascotPicker(themeId, onSaved) {
       return;
     }
     if (file.size > MAX_INPUT_BYTES) {
-      toast('That image is very large — try a smaller one');
+      toast('That image is very large. Try a smaller one.');
       return;
     }
 
@@ -195,8 +195,7 @@ export function openMascotPicker(themeId, onSaved) {
     body: [
       el('p', { class: 'hint', text:
         'Pick any image from this device. It is cropped to a circle, shrunk to ' +
-        '512 pixels and saved into this browser. It never leaves the device — ' +
-        'there is nowhere for it to go.' }),
+        '512 pixels and saved in this browser. It never leaves your device.' }),
       fileInput,
       placeholder,
       stage,

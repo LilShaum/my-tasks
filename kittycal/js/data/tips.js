@@ -102,8 +102,8 @@ export const TIPS = [
   {
     id: 'period-day-one',
     title: 'Day one is the first day of real bleeding',
-    body: 'Not spotting the evening before — that is why Kittycal keeps the two ' +
-      'separate. Getting day one right is most of what makes the next ' +
+    body: 'Not spotting the evening before. Kittycal keeps the two separate, ' +
+      'and getting day one right is most of what makes the next ' +
       'prediction accurate.',
     phases: ['menstrual'],
     cycleDays: [1, 2],
@@ -111,9 +111,9 @@ export const TIPS = [
   {
     id: 'period-cramps',
     title: 'Cramps are doing something',
-    body: 'They are the uterus contracting to shed its lining, which is why they ' +
-      'cluster in the first day or two and then ease off. Heat helps because it ' +
-      'relaxes the muscle.',
+    body: 'That’s the uterus contracting to shed its lining, so they ' +
+      'cluster in the first day or two and then ease off. Heat helps by ' +
+      'relaxing the muscle.',
     phases: ['menstrual'],
     whenLogged: ['cramps', 'abdominal-pain'],
   },
@@ -121,7 +121,7 @@ export const TIPS = [
     id: 'period-tired',
     title: 'Lower energy here is expected',
     body: 'Oestrogen is at its lowest point of the whole cycle during your period. ' +
-      'If you feel like doing less right now, that is the reason.',
+      'If you feel like doing less right now, that’s why.',
     phases: ['menstrual'],
     whenLogged: ['fatigue', 'low-energy', 'sad', 'low'],
   },
@@ -129,7 +129,7 @@ export const TIPS = [
     id: 'period-length',
     title: 'Most periods run three to seven days',
     body: 'Yours can sit anywhere in that range and still be completely ordinary. ' +
-      'What matters more is whether it is roughly the same each time.',
+      'What matters more is whether it’s roughly the same each time.',
     phases: ['menstrual'],
   },
 
@@ -137,8 +137,8 @@ export const TIPS = [
   {
     id: 'follicular-variable',
     title: 'This is the part that varies',
-    body: 'When a cycle runs long or short, it is usually this phase ' +
-      'stretching or shrinking — it varies about twice as much as the second ' +
+    body: 'When a cycle runs long or short, it’s usually this phase ' +
+      'stretching or shrinking. It varies about twice as much as the second ' +
       'half. A late period usually means ovulation came late, not that ' +
       'anything went wrong.',
     phases: ['follicular'],
@@ -146,8 +146,8 @@ export const TIPS = [
   {
     id: 'follicular-skin',
     title: 'Skin often settles in this phase',
-    body: 'Rising oestrogen tends to mean less oil. If you get breakouts, they ' +
-      'more often turn up later in the cycle than here.',
+    body: 'Rising oestrogen tends to mean less oil. Breakouts more often ' +
+      'turn up later in the cycle than here.',
     phases: ['follicular'],
     whenLogged: ['acne', 'oily-skin'],
   },
@@ -157,8 +157,8 @@ export const TIPS = [
     id: 'ovulatory-discharge',
     title: 'Discharge is the sign you can read without a test',
     body: 'Around ovulation it thins to something like raw egg white, then turns ' +
-      'thicker and cloudier afterwards. Logging it builds a record that does ' +
-      'not depend on remembering.',
+      'thicker and cloudier afterwards. Logging it builds a record that ' +
+      'doesn’t rely on memory.',
     phases: ['ovulatory'],
     whenLogged: ['egg-white', 'watery', 'creamy', 'sticky'],
     needsFertility: true,
@@ -166,7 +166,7 @@ export const TIPS = [
   {
     id: 'ovulatory-twinge',
     title: 'A one-sided twinge around now has a name',
-    body: 'Mittelschmerz — literally "middle pain". Some people feel ovulation as ' +
+    body: 'Mittelschmerz means "middle pain". Some people feel ovulation as ' +
       'a brief ache on one side, and it can swap sides month to month.',
     phases: ['ovulatory'],
     whenLogged: ['ovulation-pain', 'abdominal-pain'],
@@ -175,9 +175,9 @@ export const TIPS = [
   {
     id: 'ovulatory-window',
     title: 'The fertile window is mostly before, not after',
-    body: 'Sperm can survive around five days; an egg lasts about one. That ' +
-      'asymmetry is why the window opens well before ovulation and closes ' +
-      'almost immediately after it.',
+    body: 'Sperm can survive around five days, while an egg lasts about one. ' +
+      'So the window opens well before ovulation and closes ' +
+      'almost straight after it.',
     phases: ['ovulatory'],
     needsFertility: true,
   },
@@ -187,17 +187,17 @@ export const TIPS = [
     id: 'luteal-fixed',
     title: 'This phase moves less than the first half',
     body: 'The stretch between ovulation and your period is around two ' +
-      'weeks, and it varies less than the first half does — which is why ' +
-      'Kittycal counts backwards from your next period to estimate ovulation ' +
-      'rather than halving the cycle. It is not the fixed number it is often ' +
-      'called, though, so Kittycal measures yours when it can.',
+      'weeks, and it varies less than the first half. So ' +
+      'Kittycal counts back from your next period to estimate ovulation, ' +
+      'not by halving the cycle. It isn’t a fixed number for everyone, ' +
+      'so Kittycal measures yours when it can.',
     phases: ['luteal'],
   },
   {
     id: 'luteal-bloating',
     title: 'Bloating late in the cycle is common',
     body: 'Progesterone slows the gut down and the body holds on to a bit more ' +
-      'water. It usually resolves once your period starts.',
+      'water. It usually passes once your period starts.',
     phases: ['luteal'],
     whenLogged: ['bloating', 'swelling', 'constipation'],
   },
@@ -205,7 +205,7 @@ export const TIPS = [
     id: 'luteal-cravings',
     title: 'Appetite genuinely changes here',
     body: 'Resting metabolism rises slightly in the luteal phase, so feeling ' +
-      'hungrier is not imagined and not a lapse of willpower.',
+      'hungrier isn’t imagined and isn’t a lapse in willpower.',
     phases: ['luteal'],
     whenLogged: ['cravings', 'increased-appetite'],
   },
@@ -221,7 +221,7 @@ export const TIPS = [
     id: 'luteal-mood',
     title: 'Mood shifts here are hormonal, not a character flaw',
     body: 'The progesterone drop late in the luteal phase affects serotonin. If ' +
-      'you notice this happening at the same point every month, that pattern ' +
+      'it happens at the same point every month, the pattern ' +
       'shows up in your Insights.',
     phases: ['luteal'],
     whenLogged: ['mood-swings', 'irritable', 'sad', 'anxious', 'low'],
@@ -232,7 +232,7 @@ export const TIPS = [
     id: 'any-bbt',
     title: 'Temperature confirms ovulation after the fact',
     body: 'A sustained rise of about 0.2°C over three days means it has already ' +
-      'happened. It is a good record, but it cannot tell you in advance.',
+      'happened. It’s a good record, but it can’t tell you in advance.',
     whenLogged: ['bbt'],
     needsFertility: true,
   },
@@ -249,49 +249,49 @@ export const TIPS = [
     // there yet while the Patterns card on the next screen was already full.
     untilPatterns: true,
     title: 'Patterns need about three cycles',
-    body: 'That is the point where Kittycal can tell a real pattern from a ' +
-      'coincidence. Even a couple of taps a day is enough to get there.',
+    body: 'That’s when Kittycal can tell a real pattern from a ' +
+      'coincidence. A couple of taps a day is enough to get there.',
   },
   {
     id: 'any-irregular',
-    title: 'Cycles move around, and that is normal',
-    body: 'Stress, travel, illness, a change in sleep — all of them can shift a ' +
-      'cycle by days. A single unusual month on its own means very little.',
+    title: 'Cycles move around, and that’s normal',
+    body: 'Stress, travel, illness or a change in sleep can all shift a ' +
+      'cycle by days. One unusual month on its own means very little.',
   },
   {
     id: 'any-range',
-    title: 'There is no such thing as a 28-day rule',
-    body: 'Anywhere from 21 to 35 days is considered typical for an adult. The ' +
-      'number that matters is not 28, it is whether yours is roughly the same ' +
-      'each time.',
+    title: 'There’s no such thing as a 28-day rule',
+    body: 'Anywhere from 21 to 35 days is considered typical for an adult. ' +
+      'What matters is whether yours is roughly the same each time, not ' +
+      'whether it’s 28.',
   },
   {
     id: 'any-spotting',
     title: 'Spotting is not the start of a period',
-    body: 'That is why Kittycal keeps them apart — counting spotting as day one ' +
+    body: 'Kittycal keeps them apart. Counting spotting as day one ' +
       'would quietly stretch every cycle length and skew what comes next. Log ' +
       'it as spotting and the maths stays honest.',
   },
   {
     id: 'any-backfill',
     title: 'Old periods are worth filling in',
-    body: 'Editing period dates on any past month feeds straight back into the ' +
-      'predictions. Three remembered cycles improve things more than three ' +
+    body: 'Editing period dates in any past month feeds straight into the ' +
+      'predictions. Three remembered cycles help more than three ' +
       'perfectly logged days.',
   },
   {
     id: 'any-report',
     title: 'You can print a summary for an appointment',
-    body: 'Insights has a report covering the last six months — cycle lengths, ' +
-      'recurring symptoms and anything outside the typical ranges. Doctors get ' +
-      'a lot more from that than from "a bit irregular, I think".',
+    body: 'Insights has a report covering the last six months: cycle lengths, ' +
+      'recurring symptoms and anything outside the typical ranges. It tells a ' +
+      'doctor a lot more than "a bit irregular, I think".',
   },
   {
     id: 'any-export',
     title: 'Your data is yours to take',
     body: 'Settings can export everything as a plain file you can read, keep or ' +
-      'move to another device. Nothing here is locked in, because nothing here ' +
-      'is anywhere but this device.',
+      'move to another device. Nothing is locked in, because nothing is ' +
+      'anywhere but your device.',
   },
   {
     id: 'any-not-contraception',

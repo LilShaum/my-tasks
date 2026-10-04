@@ -179,7 +179,7 @@ export function momentsFor({ today, logs, cycles, prediction, settings, hour, ph
     && p.daysUntilPeriod != null && p.daysUntilPeriod >= 1 && p.daysUntilPeriod <= 7) {
     out.push({
       id: `sleepdip:${p.nextStart}`, kind: 'logged', icon: '🌙',
-      text: 'A short night. Your sleep usually dips in the week before your period, so it is not just you.',
+      text: 'A short night. Your sleep usually dips in the week before your period, so it’s not just you.',
       anchor: 'insight-sleep', weight: 3.2, cooldown: null,
     });
   }

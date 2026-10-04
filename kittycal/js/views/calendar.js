@@ -449,7 +449,7 @@ function editModeBar(active) {
       // because a tap here means "I bled on this day". Saying so beats a tap
       // that quietly does nothing.
       'Tap any day up to today to mark or unmark it as a period day. Drag ' +
-      'across several to do a run at once. Past months work too — filling in ' +
+      'across several to do a run at once. Past months work too. Filling in ' +
       'old periods makes every prediction better.' }),
   ]);
 }
@@ -801,7 +801,7 @@ function firstRunHint() {
     spotArt('calendar', { size: 88 }),
     el('h3', { text: 'Mark your last period' }),
     el('p', { text:
-      'Tap "Edit period dates" above, then tap the days you bled. That is all ' +
+      'Tap "Edit period dates" above, then tap the days you bled. That’s all ' +
       'Kittycal needs to start predicting.' }),
   ]);
 }

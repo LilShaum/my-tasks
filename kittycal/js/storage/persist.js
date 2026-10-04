@@ -175,7 +175,7 @@ export async function checkStorage() {
  * @param {number|null} bytes
  */
 export function fmtBytes(bytes) {
-  if (bytes == null) return '—';
+  if (bytes == null) return '–';
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;

@@ -400,7 +400,7 @@ export function parseCSVImport(text) {
   notes.push(`Read the "${headers[dateCol].trim()}" column as dates` +
     (order === 'iso' ? '.' : order === 'dmy' ? ', day first.' : ', month first.'));
   notes.push(flowCol === -1
-    ? 'No flow or period column found, so no period days were read — only the days themselves.'
+    ? 'No flow or period column found, so no period days were read. Only the days themselves came in.'
     : `Read "${headers[flowCol].trim()}" as flow.`);
   if (symptomCol !== -1) {
     notes.push(`Read "${headers[symptomCol].trim()}" as symptoms. They come in as ` +

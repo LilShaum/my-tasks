@@ -477,7 +477,7 @@ export function openCheckin(date = todayKey()) {
       the part that must never be lost.
     */
     const won = newlyEarned(stickersBefore, stickerContext());
-    if (won) toast(`Sticker earned — ${won.title}`, { silent: true });
+    if (won) toast(`Sticker earned: ${won.title}`, { silent: true });
 
     const confirmation = isToday ? 'Checked in for today' : `Checked in for ${whenLabel}`;
     announce(won ? `${confirmation}. Sticker earned, ${won.title}` : confirmation);
@@ -507,7 +507,7 @@ export function openCheckin(date = todayKey()) {
         mascot(theme, { size: 64, className: 'foryou-mascot' }),
         el('div', {}, [
           el('h2', { class: 'checkin-title', tabindex: '-1', 'data-autofocus': '', text: 'All logged!' }),
-          el('p', { class: 'hint', text: 'Here is what matters for you today.' }),
+          el('p', { class: 'hint', text: 'Here’s what matters for you today.' }),
         ]),
       ]),
       el('ul', { class: 'foryou-list' }, moments.map((m) => el('li', {}, [
@@ -767,7 +767,7 @@ export function openCheckin(date = todayKey()) {
     return question({
       stale,
       title: isToday ? 'How did you sleep last night?' : `How did you sleep, the night before ${whenLabel}?`,
-      hint: 'Roughly is fine. Leave either part blank if you are not sure.',
+      hint: 'Roughly is fine. Leave either part blank if you’re not sure.',
       multi: true,
       columns: 3,
       current: () => { const n = nearest(); return n ? [n] : []; },
@@ -895,9 +895,9 @@ function measureStep(ids, draft, settings, stale, onNext, lastStep, onMore) {
     */
     hint: ids.includes('bbt')
       ? (ids.length === 1
-        ? 'Didn’t take it today? Leave it blank and tap Done — that’s fine.'
-        : 'Leave blank anything you didn’t measure today — that’s fine.')
-      : 'Leave blank anything you didn’t measure today — that’s fine.',
+        ? 'Didn’t take it today? Leave it blank and tap Done. That’s fine.'
+        : 'Leave blank anything you didn’t measure today. That’s fine.')
+      : 'Leave blank anything you didn’t measure today. That’s fine.',
     multi: true,
     options: [],
     extra: rows,

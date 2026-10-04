@@ -180,8 +180,8 @@ export function showLockScreen(themeId) {
       // phone, and locking her out of her own health data to slow them down
       // is a bad trade.
       message.textContent = attempts === 1
-        ? 'That is not right. Try again.'
-        : `That is not right. ${attempts} attempts so far.`;
+        ? 'That’s not right. Try again.'
+        : `That’s not right. ${attempts} attempts so far.`;
       const pad = host.querySelector('.pin-pad');
       if (pad instanceof HTMLElement && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
         pad.animate(
@@ -255,8 +255,8 @@ export async function promptForNewPin() {
     title: 'Choose a passcode',
     body: [
       'Four digits, asked for whenever Kittycal opens.',
-      'It keeps the app shut to whoever picks up your phone. It is not ' +
-      'encryption — someone determined, with your unlocked device, could ' +
+      'It keeps the app shut to whoever picks up your phone. It isn’t ' +
+      'encryption: someone determined, with your unlocked device, could ' +
       'still reach the data underneath.',
     ],
     label: 'New passcode',
@@ -270,13 +270,13 @@ export async function promptForNewPin() {
 
   const second = await promptSheet({
     title: 'Once more',
-    body: ['Enter the same four digits again, so a typo cannot lock you out.'],
+    body: ['Enter the same four digits again, so a typo can’t lock you out.'],
     label: 'Confirm passcode',
     confirmLabel: 'Set passcode',
     mode: 'numeric',
     maxLength: 4,
     secret: true,
-    validate: (v) => (v === first ? null : 'Those do not match.'),
+    validate: (v) => (v === first ? null : 'Those don’t match.'),
   });
   if (second == null) return false;
 

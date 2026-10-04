@@ -4,10 +4,12 @@ A free, private cycle tracker. Everything Flo's period tracker does, none of the
 network.
 
 Your data lives in your browser's local database on your own device. There is no
-account, no server, no analytics, and no subscription. The app makes **no
-outbound network requests at all** — the fonts and every image are part of the
-app itself, and a Content Security Policy enforces it rather than us just
-promising it.
+account, no analytics, and no subscription. The app makes **no outbound network
+requests** unless she turns on partner sharing — the fonts and every image are
+part of the app itself, and a Content Security Policy enforces it rather than
+us just promising it. Partner sharing, when she opts in, sends one summary of
+what she chose to share, encrypted on her phone with a key that never reaches
+the server (see `js/storage/share.js` and `supabase/partner-sharing.sql`).
 
 ## Why
 

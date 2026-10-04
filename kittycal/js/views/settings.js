@@ -155,8 +155,8 @@ function mascotRow(themeId) {
     el('span', { class: 'row-label' }, [
       `${theme.name} picture`,
       el('span', { class: 'choice-sub', text:
-        `Put any picture from your phone here instead of the ${theme.name} `
-        + 'emblem — it is cropped on the device and never leaves it' }),
+        `Use any photo from your phone instead of the ${theme.name} emblem. `
+        + 'It’s cropped on your phone and never leaves it.' }),
     ]),
     el('span', { class: 'row-value', 'aria-hidden': 'true', text: '›' }),
   ]);
@@ -165,7 +165,7 @@ function mascotRow(themeId) {
   repo.loadMascot(themeId).then((blob) => {
     if (!blob) return;
     const label = row.querySelector('.choice-sub');
-    if (label) label.textContent = 'Using your picture — tap to change or remove';
+    if (label) label.textContent = 'Using your photo. Tap to change or remove it.';
   }).catch(() => { /* the default label is fine */ });
 
   return row;
@@ -250,10 +250,10 @@ function lutealHint() {
   const { periodDays, logs } = store.getState();
   const measured = measuredLuteal(logs, buildCycles(periodDays));
   return measured.days == null
-    ? 'Fourteen is typical. Leave it unless you have been told otherwise.'
+    ? 'Fourteen is typical. Leave it unless you’ve been told otherwise.'
     : `Your own cycles measure ${plural(measured.days, 'day')}, from `
-      + `${plural(measured.samples, 'confirmed ovulation')}. That is what the app `
-      + 'is using; this box is the fallback.';
+      + `${plural(measured.samples, 'confirmed ovulation')}. That’s what Kittycal `
+      + 'uses. This box is the fallback.';
 }
 
 /**
@@ -314,10 +314,9 @@ function packRows(settings) {
     tracking && el('div', { class: 'alert alert-info', style: { marginTop: 'var(--sp-3)' } }, [
       el('span', { class: 'alert-icon', text: 'i', 'aria-hidden': 'true' }),
       el('div', { text:
-        'Kittycal shows where you are in the pack and which days you have not ' +
-        'marked. It cannot tell whether you actually took one, and it does not ' +
-        'advise on missed pills — that is what the leaflet in the packet and ' +
-        'your pharmacist are for.' }),
+        'Kittycal shows where you are in the pack and which days aren’t ' +
+        'marked. It can’t tell whether you actually took a pill, and it doesn’t ' +
+        'advise on missed ones. The leaflet in the packet and your pharmacist can.' }),
     ]),
   ]);
 }
@@ -427,9 +426,8 @@ function cycleRows(settings) {
       el('span', { class: 'alert-icon', text: 'i', 'aria-hidden': 'true' }),
       el('div', { text:
         'Hormonal birth control stops ovulation, so ovulation days and fertile ' +
-        'windows are hidden. Kittycal would only be guessing, and a guess ' +
-        'dressed up as a prediction is worse than nothing. Period tracking and ' +
-        'symptom logging carry on as normal.' }),
+        'windows are hidden. Kittycal would only be guessing. Period tracking ' +
+        'and symptom logging carry on as normal.' }),
     ]),
   ]);
 }
@@ -507,7 +505,7 @@ function reminderRows() {
           without knowing is how she misses a reminder she thought she had.
         */
         toggle.setAttribute('aria-checked', 'mixed');
-        toggle.setAttribute('aria-label', `${label} — could not read this setting`);
+        toggle.setAttribute('aria-label', `${label}, could not read this setting`);
         console.error('kittycal: could not read reminder settings', err);
       });
 
@@ -538,7 +536,7 @@ function reminderRows() {
         el('span', { class: 'alert-icon', text: '!', 'aria-hidden': 'true' }),
         el('div', {}, [
           el('strong', { text: 'Reminders show when you open Kittycal. ' }),
-          'There is no server, so they cannot arrive while it is closed.',
+          'There’s no server, so they can’t arrive while it’s closed.',
         ]),
       ]),
 
@@ -670,7 +668,7 @@ function storageHealthCard() {
       // it gets nagged about — gently, and only once it's genuinely stale.
       el('p', { class: 'hint-sm', style: { marginTop: 'var(--sp-2)' }, text:
         daysSince == null
-          ? 'You have never exported a backup. An export is the only copy that ' +
+          ? 'You haven’t exported a backup yet. An export is the only copy that ' +
             'survives losing or replacing this phone.'
           : daysSince === 0
             ? 'You exported a backup today.'
@@ -798,8 +796,8 @@ async function doImport(file) {
     body: [
       `The backup holds ${plural(result.logCount ?? 0, 'logged day')} and ` +
       `${plural(result.periodCount ?? 0, 'period day')}.`,
-      'Everything currently in Kittycal is replaced by it, and what is here ' +
-      'now is gone. Export first if you are not sure.',
+      'Everything in Kittycal right now is replaced by it and gone for good. ' +
+      'Export first if you’re not sure.',
     ],
     confirmLabel: 'Replace with the backup',
     danger: true,
@@ -847,7 +845,7 @@ async function doCsvImport(file) {
     title: `Bring in ${plural(result.understood ?? 0, 'day')}?`,
     body: [
       ...(result.notes ?? []),
-      'Days you have already logged in Kittycal are kept as they are — this ' +
+      'Days you’ve already logged in Kittycal stay as they are. This ' +
       'only fills the gaps.',
     ],
     confirmLabel: 'Bring them in',
@@ -951,8 +949,8 @@ function verdict(check) {
 function contents(check) {
   if (!check.ok) {
     return ['A backup can only be restored by Kittycal if it is the JSON file ' +
-      'that "Export everything" produced. Renaming another file does not make ' +
-      'it one.'];
+      'that "Export everything" produced. Renaming another file won’t turn ' +
+      'it into one.'];
   }
 
   const lines = [
@@ -1031,7 +1029,7 @@ function privacyNote() {
       + 'No account, no analytics. Your logs stay on this phone.',
     ] : [
       el('strong', { text: 'Nothing here is sent anywhere. ' }),
-      'No account, no analytics, no server, and no internet requests at all. ' +
+      'No account, no analytics, and no internet requests at all. ' +
       'The only copies of your data are the ones you export yourself.',
     ]),
   ]);
@@ -1121,15 +1119,15 @@ function birthYearRow(value) {
     el('div', { class: 'row-label-group' }, [
       el('label', { class: 'row-label', for: 'set-birth-year', text: 'Year of birth' }),
       el('span', { class: 'row-hint', text:
-        'Optional. Under 18, cycles up to 45 days count as typical rather than '
-        + 'being flagged. Also printed on the report for a doctor.' }),
+        'Optional. Under 18, cycles up to 45 days count as typical and aren’t '
+        + 'flagged. Also printed on the report for a doctor.' }),
     ]),
     el('input', {
       class: 'input num',
       id: 'set-birth-year',
       type: 'number',
       inputmode: 'numeric',
-      placeholder: '—',
+      placeholder: '–',
       value: value ? String(value) : '',
       min: String(thisYear - 80),
       max: String(thisYear - 8),

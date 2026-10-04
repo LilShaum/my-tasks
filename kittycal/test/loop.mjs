@@ -368,7 +368,7 @@ await withPage(async (p) => {
   check(await logsOnDisk(p) === 1, 'an answer of "nothing" is still stored');
 
   const today = (await p.locator('.log-cta').innerText()).replace(/\n+/g, ' ');
-  check(today.includes('nothing to report'),
+  check(/nothing to report/i.test(today),
     'Today says so without pretending something was logged', today);
 
   await p.reload({ waitUntil: 'networkidle' });

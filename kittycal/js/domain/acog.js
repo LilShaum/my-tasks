@@ -125,9 +125,8 @@ export function evaluate({ cycleLengths, periodLengths, daysSinceLastPeriod, spo
       id: 'spotting',
       title: `Bleeding between periods on ${spotting.days} days, across `
         + `${spotting.cycles} cycles`,
-      detail: 'Spotting outside a period now and then is common, but when it '
-        + 'keeps happening it is one of the things worth mentioning at an '
-        + 'appointment.',
+      detail: 'Spotting outside a period now and then is common. If it keeps '
+        + 'happening, it’s worth mentioning at an appointment.',
     });
   }
 
@@ -159,8 +158,8 @@ export function evaluate({ cycleLengths, periodLengths, daysSinceLastPeriod, spo
         id: 'variation',
         title: `Your cycles have ranged from ${min} to ${max} days`,
         detail: `A spread wider than about ${VARIATION_IRREGULAR} days between ` +
-          'your shortest and longest cycle counts as irregular. It is common, ' +
-          'and it is also the kind of thing worth mentioning.',
+          'your shortest and longest cycle counts as irregular. That’s common, ' +
+          'and still worth mentioning.',
       });
     }
   }
@@ -173,7 +172,7 @@ export function evaluate({ cycleLengths, periodLengths, daysSinceLastPeriod, spo
         title: `${heavy} of your periods lasted more than ${PERIOD_MAX} days`,
         detail: `Bleeding usually lasts ${PERIOD_MIN}–${PERIOD_MAX} days. ` +
           'Longer or heavier bleeding has causes that are very treatable, so ' +
-          'it is worth asking about.',
+          'it’s worth asking about.',
       });
     }
   }
@@ -188,8 +187,8 @@ export function evaluate({ cycleLengths, periodLengths, daysSinceLastPeriod, spo
   if (!explained && daysSinceLastPeriod != null && daysSinceLastPeriod >= AMENORRHEA_DAYS) {
     flags.push({
       id: 'no-period',
-      title: `It has been ${daysSinceLastPeriod} days since your last logged period`,
-      detail: 'Three months without a period, when you are not pregnant or on ' +
+      title: `It’s been ${daysSinceLastPeriod} days since your last logged period`,
+      detail: 'Three months without a period, when you’re not pregnant or on ' +
         'a method that stops them, is a good reason to book an appointment.',
     });
   }

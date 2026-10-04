@@ -636,8 +636,8 @@ function goesWithCard(items, settings, findings) {
           + `against ${item.withoutHits} of ${item.withoutN}.`).join(' '),
       }),
       el('p', { class: 'hint-sm', text:
-        'These go together in your logs. That does not prove one causes the other, '
-        + 'but it is a pattern worth knowing about.' }),
+        'These show up together in your logs. That doesn’t mean one causes the other, '
+        + 'but it’s worth knowing about.' }),
     ]);
 }
 
@@ -693,7 +693,7 @@ function stillToCome({ cycles, complete, logs, settings, map, mood, sleep, pairs
     ]) : el('h3', { text: 'Still to come' }),
     el('ul', { class: 'coming-list' }, waiting.map((line) => el('li', { text: line }))),
     el('p', { class: 'hint-sm', text:
-      'Kittycal waits until there is enough to be sure, so what it does tell you is worth trusting.' }),
+      'Kittycal waits until it has enough data to be sure.' }),
   ]);
 }
 
@@ -748,8 +748,8 @@ function bbtCard(logs, cycles, settings) {
           el('div', { text:
             `Your temperature rose on day ${shiftPoint.day} (${fmtDayMonth(shiftPoint.date)}) ` +
             `and stayed up. That normally means ovulation had already happened ` +
-            `a day or two earlier. It confirms it after the fact rather than ` +
-            `predicting it.` }),
+            `a day or two earlier. It confirms ovulation after the fact. ` +
+            `It can’t predict it.` }),
         ])
       : el('p', { class: 'hint-sm', text:
           'No sustained rise yet. Three readings in a row at least 0.2°C above ' +

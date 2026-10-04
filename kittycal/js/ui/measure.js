@@ -102,7 +102,7 @@ export function measureRow({ measure, settings, get, set }) {
     step: String(measure.step),
     min: String(lo),
     max: String(hi),
-    placeholder: '—',
+    placeholder: '–',
     value: toDisplay(get()),
     'aria-label': `${measure.name} in ${unitLabel}`,
     oninput: (/** @type {Event} */ e) => {

@@ -164,7 +164,7 @@ console.log('\nfour days logged, no period marked yet');
     !headings.includes('What you log most') && !headings.includes('Your history'), headings.join(', '));
   ok('and it never calls anything a pattern', !headings.includes('Patterns') && !/Not a pattern yet/i.test(text),
     headings.join(', '));
-  ok('it says why it is waiting', /waits until there is enough to be sure/.test(text));
+  ok('it says why it is waiting', /waits until it has enough data to be sure/.test(text));
   ok('and what each missing card needs, naming the number of cycles',
     /Your cycle chart: after 3 more cycles/.test(text), text.slice(0, 200));
   ok('no cycle card, fingerprint or body map is drawn from nothing',

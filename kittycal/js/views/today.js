@@ -606,8 +606,8 @@ function logButton(log, today, logs, cycles) {
         // the cycle maths cares about. It just needs saying differently from a
         // day with three symptoms on it.
         el('p', { text: nothingRecorded(log)
-          ? 'Checked in for today — nothing to report.'
-          : `Logged today — ${summariseLog(log)}` }),
+          ? 'Checked in for today. Nothing to report.'
+          : `Logged today: ${summariseLog(log)}` }),
         said && el('p', { class: 'today-said', text: said }),
       ]),
     ]),
@@ -716,7 +716,7 @@ function weekStrip(logs, periodDays, today) {
   return el('section', { class: 'week-strip', 'aria-label': 'The last seven days' }, [
     el('div', { class: 'week-strip-row' }, days),
     el('p', { class: 'hint-sm week-strip-note', text: missed
-      ? `${plural(missed, 'day')} not logged — tap to catch up.`
+      ? `${plural(missed, 'day')} not logged. Tap to catch up.`
       // Not "every day this week is logged": today usually is not, and saying
       // so would be wrong for most of the day, every day.
       : 'Nothing to catch up on.' }),
@@ -817,7 +817,7 @@ function greeting(name, today) {
 function ringHeadline(prediction) {
   // Not "not enough data", which is what this fell through to: there is
   // plenty of data, and the forecast has been stopped on purpose.
-  if (prediction.expecting) return { value: '—', caption: 'predictions paused' };
+  if (prediction.expecting) return { value: '–', caption: 'predictions paused' };
 
   /*
     Nothing to count down to. What goes in the middle depends on why.
@@ -835,7 +835,7 @@ function ringHeadline(prediction) {
         caption: 'days since your period',
       };
     }
-    return { value: '—', caption: 'no recent period logged' };
+    return { value: '–', caption: 'no recent period logged' };
   }
 
   if (prediction.isLate && prediction.daysLate != null) {
@@ -882,7 +882,7 @@ function ringHeadline(prediction) {
     };
   }
 
-  return { value: '—', caption: 'not enough data' };
+  return { value: '–', caption: 'not enough data' };
 }
 
 /**
@@ -1055,10 +1055,10 @@ function confidenceLine(prediction) {
   /** @type {Record<string, string>} */
   const copy = {
     none: 'No cycles logged yet, so this is only your stated average.',
-    low: `Low confidence — based on ${plural(prediction.cyclesLogged, 'complete cycle')}.`,
-    medium: `Reasonable confidence — based on ${plural(prediction.cyclesLogged, 'complete cycle')}.`,
-    high: `Good confidence — based on ${plural(prediction.cyclesLogged, 'complete cycle')}` +
-      (prediction.recalibrated ? ', re-anchored to your new cycle length.' : '.'),
+    low: `Low confidence, based on ${plural(prediction.cyclesLogged, 'complete cycle')}.`,
+    medium: `Reasonable confidence, based on ${plural(prediction.cyclesLogged, 'complete cycle')}.`,
+    high: `Good confidence, based on ${plural(prediction.cyclesLogged, 'complete cycle')}` +
+      (prediction.recalibrated ? ' and re-anchored to your new cycle length.' : '.'),
   };
 
   return el('p', {
@@ -1096,7 +1096,7 @@ function headsUpCard(logs, cycles, prediction) {
         + `${p.cyclesWith} of your last ${p.cyclesTotal} cycles` }),
     ]))),
     el('p', { class: 'hint-sm', text:
-      'From what you have logged, not a prediction about this month in particular.' }),
+      'Based on what you’ve logged. Not a prediction for this month.' }),
   ]);
 }
 
@@ -1127,19 +1127,17 @@ function expectingCard(prediction) {
       ? el('p', { class: 'big-value num', text: `Day ${prediction.cycleDay}` })
       : null,
     el('p', { class: 'hint-sm', text:
-      'You logged a positive pregnancy test this cycle. Every date Kittycal '
-      + 'shows is worked out from your next period arriving, so it has stopped '
-      + 'saying when that is rather than counting down to something it can no '
-      + 'longer stand behind.' }),
+      'You logged a positive pregnancy test this cycle. Kittycal’s dates all '
+      + 'count down to your next period, so it has stopped giving them.' }),
     el('p', { class: 'hint-sm', text:
       prediction.cycleDay != null
-        ? 'The day count above is measured from your last period, which is the '
-          + 'figure a doctor or midwife will ask for. A test at home is worth '
-          + 'confirming with them.'
-        : 'A test at home is worth confirming with a doctor or midwife.' }),
+        ? 'The day count above runs from your last period, which is what a '
+          + 'doctor or midwife will ask for. It’s worth confirming a home test '
+          + 'with them.'
+        : 'It’s worth confirming a home test with a doctor or midwife.' }),
     el('p', { class: 'hint-sm', text:
-      'Keep logging whatever you want to keep. If you mark a period, the '
-      + 'forecast picks back up on its own.' }),
+      'Keep logging whatever you like. If you mark a period, the forecast '
+      + 'picks back up on its own.' }),
   ]);
 }
 
@@ -1185,10 +1183,9 @@ function staleCard(prediction) {
       el('h3', { text: 'No period logged for a while' }),
       el('p', { class: 'big-value num', text: plural(days, 'day') }),
       el('p', { class: 'hint-sm', text:
-        'Since your last one started. Your records are fine \u2014 there is just ' +
-        'nothing to predict from until the next one, so the forecast is paused ' +
-        'rather than guessing. Keep logging as usual and it picks straight ' +
-        'back up.' }),
+        'Since your last one started. Your records are fine. There’s just ' +
+        'nothing to predict from until the next one, so the forecast is ' +
+        'paused. Keep logging as usual and it picks straight back up.' }),
     ]);
   }
 
@@ -1197,7 +1194,7 @@ function staleCard(prediction) {
     el('p', { class: 'hint-sm', text:
       `Your last logged period was ${plural(months, 'month')} ago, which is too ` +
       'far back to predict from. Mark when your most recent period started and ' +
-      'everything starts working again.' }),
+      'predictions start working again.' }),
     el('button', {
       type: 'button',
       class: 'btn',
@@ -1230,8 +1227,8 @@ function dueCard(prediction) {
       ? `${fmtDayMonth(window.from)} \u2013 ${fmtDayMonth(window.to)}`
       : 'Any day now' }),
     el('p', { class: 'hint-sm', text: window
-      ? 'You are inside the window your own cycles point at, so this is on ' +
-        'time rather than late.'
+      ? 'You’re inside the window your own cycles point to, so this is on ' +
+        'time, not late.'
       : 'Around now, going by your average.' }),
 
     el('button', {
@@ -1264,9 +1261,9 @@ function lateCard(prediction) {
       (prediction.startWindow
         ? `Past the ${fmtDayMonth(prediction.startWindow.from)} – ` +
           `${fmtDayMonth(prediction.startWindow.to)} window your cycles point at. `
-        : `Expected around ${prediction.nextStart ? fmtDayMonth(prediction.nextStart) : '—'}. `) +
-      'Cycles shift for all sorts of ordinary reasons — stress, travel, illness, ' +
-      'a change in sleep. Kittycal will update once you log your next period.' }),
+        : (prediction.nextStart ? `Expected around ${fmtDayMonth(prediction.nextStart)}. ` : '')) +
+      'Stress, travel, illness or a change in sleep can all shift a cycle. ' +
+      'Kittycal will update once you log your next period.' }),
 
     /*
       The card said "will update once you log your next period" and gave her no
@@ -1369,10 +1366,10 @@ function fertileCard(prediction, today, mode) {
       */
       : el('div', {}, [
         el('p', { class: 'hint-sm', text: prediction.lutealSamples === 1
-          ? `Placed ${plural(prediction.lutealDays, 'day')} before your period — still the `
-            + 'average. One cycle of yours is measured; one more and Kittycal uses yours.'
-          : `Placed ${plural(prediction.lutealDays, 'day')} before your period — an `
-            + 'average, not measured from you, so yours could sit a few days either side.' }),
+          ? `Placed ${plural(prediction.lutealDays, 'day')} before your period. `
+            + 'That’s still the average. One of your cycles is measured, and one more means Kittycal uses yours.'
+          : `Placed ${plural(prediction.lutealDays, 'day')} before your period. `
+            + 'That’s an average, not measured from you, so yours could sit a few days either side.' }),
         mode === 'cycle' && el('button', {
           type: 'button',
           class: 'btn-link',
@@ -1384,9 +1381,8 @@ function fertileCard(prediction, today, mode) {
     prediction.fertileWidened && el('div', { class: 'alert alert-warn', style: { marginTop: 'var(--sp-3)' } }, [
       el('span', { class: 'alert-icon', text: '!', 'aria-hidden': 'true' }),
       el('div', { text:
-        'This window is deliberately wide. There is not enough cycle history yet ' +
-        'to narrow it down, and a narrow window here would look more certain ' +
-        'than it is.' }),
+        'This window is wide on purpose. There isn’t enough cycle history yet ' +
+        'to narrow it down.' }),
     ]),
   ]);
 }
@@ -1429,9 +1425,9 @@ function ovulationSignalCard(logs, cycles, today) {
     return el('div', { class: 'card data-zone' }, [
       el('h3', { text: 'Has ovulation happened?' }),
       el('p', { class: 'hint-sm', text:
-        'Nothing recorded this cycle that can date it yet. A positive ovulation ' +
+        'Nothing logged this cycle can date it yet. A positive ovulation ' +
         'test, or a temperature taken each morning, turns the estimate above ' +
-        'into an observation — and after two cycles, Kittycal places your ' +
+        'into something observed. After two cycles, Kittycal can place your ' +
         'window from your own body instead of the average.' }),
       el('div', { class: 'card-actions' }, [
         el('button', {
@@ -1467,17 +1463,17 @@ function ovulationSignalCard(logs, cycles, today) {
       that it points somewhere else, is the failure this card exists to avoid.
     */
     confirmed && el('p', { class: 'hint-sm', text: corroborated
-      ? 'Your test and your temperature both point at that day, within two days ' +
-        'of each other. That is the strongest this can get from your own data.'
+      ? 'Your test and your temperature both point to that day, within two days ' +
+        'of each other. That’s as strong as your own data gets.'
       : (peakTest && shift)
-        ? 'Your test and your temperature point at days more than two apart, so ' +
-          'this is the test’s answer — it observes the surge directly, where a ' +
-          'temperature rise is an inference. Both are listed below.'
+        ? 'Your test and your temperature are more than two days apart, so ' +
+          'this uses the test. It sees the surge directly, while a ' +
+          'temperature rise is only a clue. Both are listed below.'
         : source === 'test'
           ? 'From a positive ovulation test. A temperature taken each morning ' +
-            'would corroborate it.'
+            'would back it up.'
           : 'From a sustained temperature rise. A bad night’s sleep or a fever ' +
-            'can produce one, so an ovulation test would corroborate it.' }),
+            'can cause one, so an ovulation test would back it up.' }),
 
     el('ul', { class: 'flag-list' }, [
       peakTest && el('li', { text: `Peak test on ${fmtDayMonth(peakTest)}` }),
@@ -1485,8 +1481,8 @@ function ovulationSignalCard(logs, cycles, today) {
       // Mucus is shown and never used to date anything: it marks the fertile
       // stretch approaching ovulation, not the event.
       eggWhite && el('li', { text:
-        `Egg-white discharge on ${fmtDayMonth(eggWhite)} — the fertile stretch, ` +
-        'not the day itself' }),
+        `Egg-white discharge on ${fmtDayMonth(eggWhite)}. It marks the fertile ` +
+        'stretch, not ovulation itself.' }),
     ].filter(Boolean)),
   ]);
 }
@@ -1553,8 +1549,8 @@ function packCard(settings, logs, today) {
       el('span', { class: 'alert-icon', text: 'i', 'aria-hidden': 'true' }),
       el('div', { text:
         `Nothing marked on ${unmarked.map(fmtDayMonth).join(', ')}. That may just ` +
-        'mean the app was not open — Kittycal only knows what is in its own ' +
-        'records. If you think you did miss one, the leaflet in the packet says ' +
+        'mean you didn’t open the app. Kittycal only knows what you’ve logged. ' +
+        'If you think you did miss one, the leaflet in the packet says ' +
         'what to do.' }),
     ]) : null,
   ]);
@@ -1584,10 +1580,9 @@ function acogCards(cycles, today, prediction, logs) {
     el('div', { class: 'card data-zone' }, [
       el('h3', { text: 'Worth mentioning to a doctor' }),
       el('p', { class: 'hint-sm', text:
-        'These are observations from your own logs, measured against the ' +
-        'typical ranges published by ACOG. They are not a diagnosis and not a ' +
-        'cause for alarm — just things a professional is better placed to ' +
-        'interpret than an app.' }),
+        'These come from your own logs, compared with typical ranges published ' +
+        'by ACOG. They aren’t a diagnosis or a cause for alarm. They’re just ' +
+        'worth running past a professional.' }),
       el('ul', { class: 'flag-list' }, flags.map((flag) =>
         el('li', {}, [
           el('strong', { text: flag.title }),
@@ -1637,8 +1632,8 @@ function emptyState(name) {
     spotArt('calendar'),
     el('h3', { text: name ? `Hi ${name}!` : 'Nothing logged yet' }),
     el('p', { text:
-      'Mark the days of your last period on the calendar and Kittycal can ' +
-      'start working out your cycle. A rough guess is enough to begin with.' }),
+      'Mark your last period on the calendar and Kittycal can start working ' +
+      'out your cycle. A rough guess is enough.' }),
     el('button', {
       type: 'button',
       class: 'btn',
