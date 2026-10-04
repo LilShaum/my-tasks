@@ -8,7 +8,7 @@
  * onboarding and the app proper, and renders on every store change.
  */
 
-import { need, $, announce } from './utils/dom.js';
+import { need, $, announce, el } from './utils/dom.js';
 import { todayKey } from './utils/date.js';
 import * as store from './state/store.js';
 import { applyTheme, readStoredTheme, watchSystemMode } from './ui/theme.js';
@@ -27,6 +27,9 @@ import { loadLock, showLockScreen } from './ui/lock.js';
 import { checkReminders } from './ui/reminders.js';
 import { requestPersistence, refreshStorageSnapshot } from './storage/persist.js';
 import { buildCycles } from './domain/cycles.js';
+import { parseShareHash } from './storage/share.js';
+import { adoptShareLink, renderPartner, openPartnerSheet } from './views/partner.js';
+import { startPartnerSync } from './state/partner-sync.js';
 import { predict } from './domain/predict.js';
 
 /** view id → renderer */
@@ -85,10 +88,32 @@ async function boot() {
     await showLockScreen(settings.theme);
   }
 
+  /*
+    A partner's share link carries its key in the fragment. Take it, then take
+    it out of the address bar, so a screenshot or a shared URL bar does not
+    pass the key on by accident.
+  */
+  const link = parseShareHash(location.hash);
+  if (link) {
+    adoptShareLink(link);
+    history.replaceState(null, '', location.pathname + location.search);
+  }
+  addEventListener('hashchange', () => {
+    const later = parseShareHash(location.hash);
+    if (!later) return;
+    adoptShareLink(later);
+    history.replaceState(null, '', location.pathname + location.search);
+    if (store.getState().settings.onboarded) openPartnerSheet();
+  });
+
   if (!settings.onboarded) {
-    startOnboarding();
+    // Someone who only opened a partner's link does not need to set up a
+    // cycle of their own to see it.
+    if (store.getState().settings.partnerOf) startPartnerOnly();
+    else startOnboarding();
   } else {
     startApp();
+    if (link) openPartnerSheet();
   }
 
   hideBootScreen();
@@ -102,6 +127,27 @@ async function boot() {
     .then(refreshStorageSnapshot)
     .then(() => { if (store.getState().ready) render(); })
     .catch(() => { /* the warning simply stays hidden; nothing else depends on it */ });
+}
+
+/**
+ * The whole app, for a phone that only follows a partner's share: their view,
+ * and a way to set up a cycle of its own if that is wanted.
+ */
+function startPartnerOnly() {
+  const host = need('#onboarding-root');
+  host.hidden = false;
+  need('#app-root').hidden = true;
+  const page = el('div', { class: 'partner-page' });
+  host.replaceChildren(page);
+  const setUp = () => { host.replaceChildren(); startOnboarding(); };
+  renderPartner(page, { onSetUp: setUp });
+  // Removing the share from this phone leaves nothing to show.
+  const stop = store.subscribe(() => {
+    if (!store.getState().settings.partnerOf && !store.getState().settings.onboarded) {
+      if (typeof stop === 'function') stop();
+      setUp();
+    }
+  });
 }
 
 function startOnboarding() {
@@ -131,6 +177,7 @@ function startApp() {
     if (help) help.addEventListener('click', () => openHelp());
     store.subscribe(render);
     watchDayRollover();
+    startPartnerSync();
   }
 
   render();

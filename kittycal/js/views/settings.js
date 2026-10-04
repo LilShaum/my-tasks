@@ -31,6 +31,7 @@ import { openSheet } from '../ui/sheet.js';
 import { releaseMascotUrls, mascot } from '../ui/mascot.js';
 import { openMascotPicker } from '../ui/image-picker.js';
 import { openHelp } from './help.js';
+import { openShareSheet, openPartnerSheet } from './partner.js';
 import { openStickerBook, stickerCounts } from './stickers.js';
 import { exportEverything, exportCSV } from '../storage/export-action.js';
 import * as store from '../state/store.js';
@@ -81,6 +82,11 @@ export function renderSettings(host) {
     el('div', { class: 'section' }, [
       el('div', { class: 'section-title' }, [el('h2', { text: 'Reminders' })]),
       reminderRows(),
+    ]),
+
+    el('div', { class: 'section' }, [
+      el('div', { class: 'section-title' }, [el('h2', { text: 'Partner' })]),
+      partnerRows(settings),
     ]),
 
     el('div', { class: 'section' }, [
@@ -1016,13 +1022,46 @@ async function doErase() {
 }
 
 function privacyNote() {
+  const sharing = Boolean(store.getState().settings.partnerShare);
   return el('div', { class: 'note', style: { marginTop: 'var(--sp-3)' } }, [
     el('span', { class: 'note-icon', text: '♥', 'aria-hidden': 'true' }),
-    el('div', {}, [
+    el('div', {}, sharing ? [
+      el('strong', { text: 'Only your partner summary leaves this phone. ' }),
+      'It is encrypted here first, and holds only what you chose to share. '
+      + 'No account, no analytics. Your logs stay on this phone.',
+    ] : [
       el('strong', { text: 'Nothing here is sent anywhere. ' }),
       'No account, no analytics, no server, and no internet requests at all. ' +
       'The only copies of your data are the ones you export yourself.',
     ]),
+  ]);
+}
+
+/**
+ * Partner sharing: hers to start and stop, and theirs to open.
+ *
+ * @param {import('../domain/model.js').Settings} settings
+ */
+function partnerRows(settings) {
+  const share = settings.partnerShare;
+  const of = settings.partnerOf;
+  return el('div', { class: 'rows' }, [
+    el('button', { type: 'button', class: 'row', onclick: () => { haptic(); openShareSheet(); } }, [
+      el('span', { class: 'row-label' }, [
+        'Share with your partner',
+        el('span', { class: 'choice-sub', text: share
+          ? 'On. They see only what you picked'
+          : 'Let someone see when your period’s coming, and what helps' }),
+      ]),
+      el('span', { class: 'row-value', 'aria-hidden': 'true', text: '›' }),
+    ]),
+    of ? el('button', { type: 'button', class: 'row', onclick: () => { haptic(); openPartnerSheet(); } }, [
+      el('span', { class: 'row-label' }, [
+        of.snapshot?.name ? `${of.snapshot.name}’s cycle` : 'Your partner’s cycle',
+        el('span', { class: 'choice-sub', text: of.gone ? 'They stopped sharing' : 'Shared with you' }),
+      ]),
+      el('span', { class: 'row-value', 'aria-hidden': 'true', text: '›' }),
+    ]) : null,
   ]);
 }
 

@@ -12,9 +12,11 @@
   tries to phone home, the browser blocks it rather than trusting us to have
   been careful.
 
-  connect-src is 'self' rather than 'none' only so the app can read its own
-  optional assets/mascots/manifest.json. Same-origin still means no outbound
-  request can leave the device.
+  connect-src is 'self' so the app can read its own optional
+  assets/mascots/manifest.json, plus exactly one other host: the Supabase
+  project partner sharing uses. Nothing is sent there unless she turns sharing
+  on, and what is sent is encrypted on her phone first (js/storage/share.js).
+  No other host on the internet is reachable.
 -->
 <meta http-equiv="Content-Security-Policy" content="
   default-src 'none';
@@ -22,7 +24,7 @@
   style-src 'self' 'unsafe-inline';
   font-src 'self';
   img-src 'self' blob: data:;
-  connect-src 'self';
+  connect-src 'self' https://uepxpnqgrwvqruzexxsg.supabase.co;
   form-action 'none';
   base-uri 'none';
   manifest-src 'self';
@@ -56,6 +58,7 @@
 <link rel="stylesheet" href="css/print.css"/>
 <link rel="stylesheet" href="css/views/lock.css"/>
 <link rel="stylesheet" href="css/views/help.css"/>
+<link rel="stylesheet" href="css/views/partner.css"/>
 
 <script>
 /*

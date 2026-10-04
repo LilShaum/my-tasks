@@ -28,7 +28,7 @@
  * @typedef {import('./model.js').DayLog} DayLog
  */
 
-import { addDays } from '../utils/date.js';
+import { addDays, daysBetween } from '../utils/date.js';
 import { MIN_CYCLES_FOR_PATTERN } from './stats.js';
 
 /** How far before a period counts as "before your period". */
@@ -50,6 +50,17 @@ const CONCENTRATION = 2;
 
 /** Days outside the window needed before the comparison above means anything. */
 const MIN_REST_DAYS = 5;
+
+/**
+ * And on at least this share of the logged days from its usual start to the
+ * period.
+ *
+ * A rare symptom — acne one day in twenty — still lands somewhere in a ten-day
+ * window in most cycles, and with so few days a chance cluster can pass the
+ * ratio above. Something that "usually starts 8 days before" but is there on
+ * one of those eight days is not a pattern worth a heads-up.
+ */
+const MIN_RATE = 0.3;
 
 /** Moods that are not something anyone needs warning of. */
 const NOT_A_WARNING = new Set(['calm', 'happy', 'energetic', 'playful', 'confident', 'neutral']);
@@ -86,6 +97,10 @@ export function premenstrualPatterns(logs, cycles) {
   let restDays = 0;
   /** @type {Map<string, {inWindow: number, inRest: number}>} */
   const share = new Map();
+  /** Logged days, and days with each id, by how many days before the period. */
+  const daysAt = new Array(BEFORE_WINDOW + 1).fill(0);
+  /** @type {Map<string, number[]>} */
+  const hitsAt = new Map();
   for (const cycle of complete) {
     const next = /** @type {DateKey} */ (cycle.nextStart);
     for (let date = addDays(cycle.periodEnd, 1); date < next; date = addDays(date, 1)) {
@@ -93,10 +108,17 @@ export function premenstrualPatterns(logs, cycles) {
       if (!log) continue;
       const inWindow = date >= addDays(next, -BEFORE_WINDOW);
       if (inWindow) windowDays += 1; else restDays += 1;
+      const before = daysBetween(date, next);
+      if (inWindow) daysAt[before] += 1;
       for (const id of new Set([...log.symptoms, ...log.moods, ...log.custom])) {
         const entry = share.get(id) ?? { inWindow: 0, inRest: 0 };
         if (inWindow) entry.inWindow += 1; else entry.inRest += 1;
         share.set(id, entry);
+        if (inWindow) {
+          const hits = hitsAt.get(id) ?? new Array(BEFORE_WINDOW + 1).fill(0);
+          hits[before] += 1;
+          hitsAt.set(id, hits);
+        }
       }
     }
   }
@@ -148,6 +170,11 @@ export function premenstrualPatterns(logs, cycles) {
     const typicalBefore = sorted.length % 2
       ? sorted[mid]
       : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+    const hits = hitsAt.get(id) ?? [];
+    let hit = 0;
+    let logged = 0;
+    for (let b = 1; b <= typicalBefore; b += 1) { hit += hits[b] ?? 0; logged += daysAt[b]; }
+    if (logged && hit / logged < MIN_RATE) continue;
     out.push({ id, kind, cyclesWith: onsets.length, cyclesTotal: complete.length, typicalBefore });
   }
 

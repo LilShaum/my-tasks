@@ -38,6 +38,7 @@ const PRECACHE = [
   'css/print.css',
   'css/views/lock.css',
   'css/views/help.css',
+  'css/views/partner.css',
 
   'assets/fonts/nunito.woff2',
   'assets/fonts/fredoka.woff2',
@@ -70,6 +71,10 @@ const PRECACHE = [
   'js/domain/rhythm.js',
   'js/ui/insight-charts.js',
   'js/domain/foryou.js',
+  'js/domain/partner.js',
+  'js/storage/share.js',
+  'js/state/partner-sync.js',
+  'js/views/partner.js',
   'js/domain/recap.js',
   'js/domain/response.js',
   'js/domain/notes.js',
