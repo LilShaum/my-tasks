@@ -497,6 +497,33 @@ console.log('\nthe calendar says which day of the cycle she is on');
     'a month she has paged away to does not claim to be now');
 }
 
+/* ── 8. A future day in the next expected period ───────────────────────── */
+console.log('\na day in the next expected period is labelled as one');
+{
+  if (await page.locator('.sheet[data-open="true"]').count()) {
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(450);
+  }
+  const target = await page.evaluate(async () => {
+    const store = await import('/js/state/store.js');
+    const { predict } = await import('/js/domain/predict.js');
+    const { todayKey, addDays } = await import('/js/utils/date.js');
+    const { periodDays, settings, logs } = store.getState();
+    const p = predict({ periodDays, settings, today: todayKey(), logs });
+    if (!p.nextStart || p.nextStart <= todayKey()) return null;
+    const day = addDays(p.nextStart, 1);
+    (await import('/js/views/log.js')).openLogSheet(day);
+    return day;
+  });
+  await page.waitForTimeout(600);
+  const label = target ? await page.locator('.day-summary-phase').first().innerText() : '';
+  check(target !== null, 'the fixture has a next period still ahead', String(target));
+  check(label === 'Day 2 · Period expected',
+    'its second day reads "Day 2 · Period expected", not a day of the current cycle', label);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(450);
+}
+
 await browser.close();
 console.log(`\nscreens: ${checks - failures}/${checks} checks passed\n`);
 process.exit(failures ? 1 : 0);

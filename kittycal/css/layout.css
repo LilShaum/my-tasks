@@ -147,6 +147,7 @@
   margin: 0 auto var(--sp-2);
   animation: float-y 4.5s var(--ease-soft) infinite;
 }
+.onb-art-sm { width: 72px; margin-bottom: 0; }
 
 .onb-foot {
   flex: none;

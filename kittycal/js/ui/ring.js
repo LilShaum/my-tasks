@@ -14,6 +14,7 @@
 
 import { svg, el } from '../utils/dom.js';
 import { ringSegments, PHASES } from '../domain/phases.js';
+import { emblem } from './mascot.js';
 
 const SIZE = 240;
 const STROKE = 18;
@@ -41,9 +42,10 @@ function pointAt(fraction) {
  * @param {string} opts.headline    the big number or short word
  * @param {string} opts.caption     the line under it
  * @param {string} [opts.eyebrow]   the small line above it
+ * @param {string} [opts.theme]     whose character marks today
  * @returns {HTMLElement}
  */
-export function cycleRing({ prediction, headline, caption, eyebrow }) {
+export function cycleRing({ prediction, headline, caption, eyebrow, theme = 'plain' }) {
   const segments = ringSegments(prediction);
   const total = prediction.avgCycleLength || 28;
 
@@ -86,16 +88,30 @@ export function cycleRing({ prediction, headline, caption, eyebrow }) {
     }));
   }
 
-  // Today's marker.
+  /*
+    Today's marker: her theme's character, riding the ring.
+
+    This was a target symbol, the most generic mark on the most-looked-at
+    screen. The white bubble and its outline stay exactly where they were, so
+    the marker still pins the day as precisely; only the dot inside became the
+    bow, the bunny, the crown. The Plain theme's emblem is a plain dot, so
+    that theme keeps its no-decoration promise.
+  */
   if (prediction.cycleDay != null) {
     const { x, y } = pointAt(progress);
+    const BUBBLE = STROKE / 2 + 6;
+    const ART = 22;
     ring.append(svg('circle', {
-      cx: x, cy: y, r: STROKE / 2 + 4,
+      cx: x, cy: y, r: BUBBLE,
       fill: 'var(--card)',
       stroke: 'var(--ink)',
-      'stroke-width': 3,
+      'stroke-width': 2.5,
+      class: 'ring-marker',
     }));
-    ring.append(svg('circle', { cx: x, cy: y, r: 4, fill: 'var(--ink)' }));
+    const art = emblem(theme, { size: ART, className: 'ring-marker-art' });
+    art.setAttribute('x', String(x - ART / 2));
+    art.setAttribute('y', String(y - ART / 2));
+    ring.append(art);
   }
 
   return el('div', { class: 'ring-wrap' }, [

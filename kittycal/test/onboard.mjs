@@ -125,6 +125,14 @@ console.log('\nskipping it leaves the old behaviour exactly as it was');
   const out = await finish(page, next, heading);
   ok('one period, no complete cycle', out.cycles === 1 && out.lengths.length === 0,
     JSON.stringify(out));
+
+  // The period she remembered is history, not days she skipped: a new user is
+  // not told to catch up on a week from before she installed the app.
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(400);
+  const note = await page.locator('.week-strip-note').textContent().catch(() => '');
+  ok('Today does not ask her to catch up on days before she started',
+    /Nothing to catch up on/.test(note ?? ''), note ?? '');
   ok('no page errors', errors.length === 0, errors.join(' | '));
   await ctx.close();
 }

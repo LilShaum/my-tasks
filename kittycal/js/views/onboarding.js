@@ -91,7 +91,22 @@ function render() {
 
   const step = STEPS[stepIndex]();
 
-  replace(body, [el('div', { class: 'onb-step pop-in' }, step.content)]);
+  /*
+    Her character comes along for the whole setup, not only the first screen.
+
+    Most steps are one question and a field, which left the top half of the
+    phone empty and made setup read as a form. A smaller copy of the mascot
+    she just picked fills that space and makes each question feel asked by
+    someone. Not on the steps that already carry art, and not on the
+    birth-control list, which is long enough that art would push the choices
+    off the screen.
+  */
+  const hasArt = step.content.some((node) => node instanceof Element && node.classList.contains('onb-art'));
+  const crowded = STEPS[stepIndex] === stepBirthControl;
+  const art = hasArt || crowded ? null
+    : el('div', { class: 'onb-art onb-art-sm', 'aria-hidden': 'true' }, [mascot(draft.theme, { size: 72 })]);
+
+  replace(body, [el('div', { class: 'onb-step pop-in' }, [art, ...step.content])]);
   replace(foot, step.footer);
 
   // Move focus to the step heading so a screen reader announces the new
@@ -700,6 +715,8 @@ function finish() {
     birthControl: draft.birthControl,
     onboarded: true,
     disclaimerAck: true,
+    // The periods she remembers below are history, not days she skipped.
+    startedOn: todayKey(),
   });
 
   // Seed the periods from her answers, so the app has real data to predict from
