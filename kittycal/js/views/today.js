@@ -24,6 +24,7 @@ import {
   labelFor, labelOf, CATEGORIES, DEFAULT_CHIPS, GLASS_SIZES, glassMl,
 } from '../data/taxonomy.js';
 import { pick } from '../data/tips.js';
+import { momentsFor } from '../domain/foryou.js';
 import { loggedIds, spottingBetweenPeriods, MIN_CYCLES_FOR_PATTERN } from '../domain/stats.js';
 import { premenstrualPatterns, headsUpToday } from '../domain/heads-up.js';
 import { nothingRecorded } from '../domain/model.js';
@@ -215,7 +216,7 @@ function renderTodayInner(host) {
     /* Tips teach how a cycle works — "a late period usually means ovulation
        came late", "a single unusual month means very little". After a
        positive test none of that is about her. */
-    prediction.expecting ? null : tipsRow({ phase, prediction, log: logs[today], today }),
+    prediction.expecting ? null : forYouCard({ phase, prediction, logs, cycles, settings, today }),
     installCard,
     installCard ? null : backupPrompt({ logs, periodDays, settings, today }),
     disclaimerNote(),
@@ -885,58 +886,112 @@ function ringHeadline(prediction) {
 }
 
 /**
- * The daily insight cards — Flo's "My daily insights" row.
+ * The ranked moments, worked out again only when her data has changed.
  *
- * A horizontal scroller, because these are worth glancing at and not worth
- * three screens of vertical space. Cards are chosen by phase and by what she
- * actually logged today, and they rotate day to day so the same one doesn't
- * become wallpaper.
- *
- * @param {Object} opts
- * @param {import('../domain/phases.js').PhaseInfo} opts.phase
- * @param {import('../domain/predict.js').Prediction} opts.prediction
- * @param {import('../domain/model.js').DayLog|undefined} opts.log
- * @param {DateKey} opts.today
+ * Today redraws on every store change — a dismissed card, a theme switch, a
+ * glass of water — and the analyses behind these moments read her whole
+ * history. The logs and period days are replaced, never mutated, so their
+ * identity says whether anything they hold has changed.
  */
-function tipsRow({ phase, prediction, log, today }) {
-  // loggedIds only covers the chip categories. Tips can also key off the
-  // numeric trackers, so add a pseudo-id for each one that has a value —
-  // without this the temperature tip could never fire.
-  const loggedToday = log
-    ? [
-        ...loggedIds(log),
-        ...(log.bbt != null ? ['bbt'] : []),
-        ...(log.weight != null ? ['weight'] : []),
-        ...(log.sleep != null ? ['sleep'] : []),
-        ...(log.water ? ['water'] : []),
-      ]
-    : [];
+/** @type {{logs: object|null, periods: object|null, key: string, value: import('../domain/foryou.js').Moment[]}} */
+let momentCache = { logs: null, periods: null, key: '', value: [] };
 
-  const tips = pick({
-    phase: phase.id,
-    cycleDay: prediction.cycleDay,
-    loggedToday,
-    showFertility: prediction.showFertility,
-    dateSeed: today,
-    patternsReady: prediction.cyclesLogged >= MIN_CYCLES_FOR_PATTERN,
-  });
+/**
+ * @param {Object} input
+ * @param {import('../domain/phases.js').PhaseInfo} input.phase
+ * @param {import('../domain/predict.js').Prediction} input.prediction
+ * @param {Record<DateKey, import('../domain/model.js').DayLog>} input.logs
+ * @param {import('../domain/cycles.js').Cycle[]} input.cycles
+ * @param {import('../domain/model.js').Settings} input.settings
+ * @param {DateKey} input.today
+ */
+function cachedMoments({ phase, prediction, logs, cycles, settings, today }) {
+  const hour = new Date().getHours();
+  const periods = store.getState().periodDays;
+  const key = `${today}|${hour >= 15}|${phase.id}|${settings.mode}|${settings.showFertility}`;
+  if (momentCache.logs === logs && momentCache.periods === periods && momentCache.key === key) {
+    return momentCache.value;
+  }
+  const value = momentsFor({ today, logs, cycles, prediction, settings, hour, phase: phase.id });
+  momentCache = { logs, periods, key, value };
+  return value;
+}
 
-  if (!tips.length) return null;
+/**
+ * One thing worth knowing, chosen for her rather than for her phase.
+ *
+ * This was "Worth knowing": a sideways carousel of three general articles,
+ * picked by phase and rotated at random — the same paragraph about luteal
+ * phases to everyone on day twenty, and a scroller nobody scrolls. It now
+ * reads the same ranked list as the end of the check-in, and shows the single
+ * most useful thing that is not already on this screen: something new in
+ * Insights, something about what she logged, or a tip keyed to it. The
+ * timing and the "coming up" moments are left out because the cards above
+ * already say them.
+ *
+ * When none of those applies, one tip for where she is in her cycle, so the
+ * slot is never empty filler and never a wall of three. "Not useful" hides a
+ * moment for good.
+ *
+ * @param {Object} input
+ * @param {import('../domain/phases.js').PhaseInfo} input.phase
+ * @param {import('../domain/predict.js').Prediction} input.prediction
+ * @param {Record<DateKey, import('../domain/model.js').DayLog>} input.logs
+ * @param {import('../domain/cycles.js').Cycle[]} input.cycles
+ * @param {import('../domain/model.js').Settings} input.settings
+ * @param {DateKey} input.today
+ */
+function forYouCard({ phase, prediction, logs, cycles, settings, today }) {
+  const dismissed = new Set(settings.forYouDismissed);
+  // Not what the end of today's check-in has just said, a minute ago.
+  const saidToday = (/** @type {string} */ id) => settings.forYouSeen[id] === today;
+  let moment = cachedMoments({ phase, prediction, logs, cycles, settings, today })
+    .find((m) => (m.kind === 'finding' || m.kind === 'logged' || m.kind === 'tip')
+      && !dismissed.has(m.id) && !saidToday(m.id));
 
-  return el('section', { class: 'tips', 'aria-label': 'Things to know today' }, [
-    el('h3', { class: 'section-label', text: 'Worth knowing' }),
-    el('ul', {
-      class: 'tips-scroller',
-      // A horizontal scroller is a nuisance with a keyboard unless it's
-      // focusable and scrollable in its own right.
-      tabindex: '0',
-      role: 'list',
-    }, tips.map((tip) =>
-      el('li', { class: 'tip-card' }, [
-        el('h4', { text: tip.title }),
-        el('p', { text: tip.body }),
-      ]),
-    )),
+  if (!moment) {
+    const tip = pick({
+      phase: phase.id,
+      cycleDay: prediction.cycleDay,
+      loggedToday: [],
+      showFertility: prediction.showFertility,
+      dateSeed: today,
+      patternsReady: prediction.cyclesLogged >= MIN_CYCLES_FOR_PATTERN,
+      limit: 6,
+    }).find((t) => !dismissed.has(`tip:${t.id}`) && !saidToday(`tip:${t.id}`));
+    if (!tip) return null;
+    moment = {
+      id: `tip:${tip.id}`, kind: 'tip', icon: '🎀', text: `${tip.title}. ${tip.body}`,
+      anchor: null, weight: 1, cooldown: 14,
+    };
+  }
+  const m = moment;
+
+  return el('section', { class: 'card foryou-card', 'aria-label': 'For you' }, [
+    el('h3', { class: 'section-label', text: 'For you' }),
+    el('div', { class: 'foryou-card-body' }, [
+      el('span', { class: 'foryou-icon', 'aria-hidden': 'true', text: m.icon }),
+      el('p', { class: 'foryou-text', text: m.text }),
+    ]),
+    el('div', { class: 'card-actions' }, [
+      m.anchor ? el('button', {
+        type: 'button', class: 'btn-link',
+        onclick: () => {
+          haptic();
+          store.setView('insights');
+          const anchor = /** @type {string} */ (m.anchor);
+          setTimeout(() => document.getElementById(anchor)
+            ?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 350);
+        },
+      }, ['See it in Insights']) : null,
+      el('button', {
+        type: 'button', class: 'btn-link foryou-dismiss',
+        onclick: () => {
+          haptic();
+          store.updateSettings({ forYouDismissed: [...settings.forYouDismissed, m.id] });
+        },
+      }, ['Not useful']),
+    ]),
   ]);
 }
 

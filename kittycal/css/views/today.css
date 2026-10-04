@@ -760,3 +760,37 @@
 }
 .compact-label { color: var(--ink); }
 .card-compact .hint-sm { margin: var(--sp-1) 0 0; }
+
+/* ── For you today: the end of the check-in ───────────────────────────── */
+.foryou-head { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.foryou-head .checkin-title { margin: 0; }
+.foryou-head .hint { margin: var(--sp-1) 0 0; }
+.foryou-mascot { flex: none; }
+.foryou-list { list-style: none; margin: 0 0 var(--sp-4); padding: 0; display: grid; gap: var(--sp-2); }
+.foryou-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--sp-3);
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--card);
+  box-shadow: var(--sh-sticker);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+}
+div.foryou-item { grid-template-columns: auto 1fr; }
+button.foryou-item { cursor: pointer; transition: transform var(--dur-tap) var(--ease-bounce), box-shadow var(--dur-tap) var(--ease-soft); }
+button.foryou-item:active { transform: translate(2px, 3px) scale(0.98); box-shadow: var(--sh-sticker-press); }
+.foryou-icon { font-size: 1.4rem; line-height: 1; }
+.foryou-text { font-size: var(--fs-sm); line-height: 1.4; }
+
+/* The single "For you" card on Today. */
+.foryou-card-body { display: grid; grid-template-columns: auto 1fr; gap: var(--sp-3); align-items: start; }
+.foryou-card .foryou-text { margin: 0; font-size: var(--fs-base); }
+.foryou-card .card-actions { margin-top: var(--sp-2); }
+.foryou-dismiss { color: var(--ink-3); }
