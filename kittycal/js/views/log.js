@@ -1017,14 +1017,24 @@ function waterRow(draft, settings, chips) {
     readout.textContent =
       `${fmtWater(draft.water, settings.unitWater)} of ${fmtWater(WATER_GOAL_ML, settings.unitWater)}`;
     glasses.replaceChildren();
-    for (let i = 0; i < goalGlasses; i++) {
+    /*
+      Drops, and always one more than she has had.
+
+      It was a row of eight diamonds that stopped at the goal, so a day of ten
+      glasses could not be entered here at all — and a diamond is not a thing
+      anyone drinks. There is now always one empty drop past the last full one,
+      up to a sensible ceiling.
+    */
+    const shown = Math.min(16, Math.max(goalGlasses, total() + 1));
+    for (let i = 0; i < shown; i++) {
       const filled = i < total();
       glasses.append(el('button', {
         type: 'button',
         class: `water-glass${filled ? ' is-filled' : ''}`,
         'aria-label': `${i + 1} ${i === 0 ? 'glass' : 'glasses'}`,
         'aria-pressed': String(filled),
-        text: filled ? '◆' : '◇',
+        html: '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">'
+          + '<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg>',
         onclick: () => {
           // Tapping the last filled glass empties it; otherwise fill to here.
           draft.water = (total() === i + 1) ? i * size : (i + 1) * size;

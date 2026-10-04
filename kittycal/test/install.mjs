@@ -130,9 +130,9 @@ console.log('\non an exposed iPhone it says why, and how');
   ok('the warning is on Today', Boolean(el));
 
   const text = await page.$eval('.install-nudge', (n) => n.textContent ?? '');
-  ok('it names the actual risk', /deletes what a website has stored/i.test(text));
+  ok('it names the actual risk', /deletes a website.s data/i.test(text));
   ok('it says there is no server copy', /no server copy/i.test(text));
-  ok('it gives the taps', /Share button/i.test(text) && /Add to\s+Home Screen/i.test(text));
+  ok('it gives the taps', /tap Share/i.test(text) && /Add to\s+Home Screen/i.test(text));
   ok('it holds alert contrast rather than blending in',
     Boolean(await page.$('.install-nudge .alert-warn')));
   ok('no page errors', errors.length === 0, errors.join(' | '));

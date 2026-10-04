@@ -255,21 +255,27 @@ function installPrompt({ logs, periodDays, settings, today }) {
 
   const platform = installPlatform();
 
+  /*
+    Two sentences: what can happen, and the fix. It was four paragraphs, and a
+    warning nobody finishes reading protects nobody.
+  */
   const risk = platform === 'ios'
-    ? 'Safari deletes what a website has stored if you go about a week ' +
-      'without opening it. Everything you have logged lives in that storage, ' +
-      'and Kittycal has no server copy to restore it from.'
-    : 'This browser has not promised to keep this app’s data, so it may clear ' +
-      'it to free up space. Kittycal has no server copy to restore it from.';
+    ? 'Safari deletes a website’s data after about a week without a visit, and '
+      + 'there is no server copy to restore. On your Home Screen, Kittycal is safe from that.'
+    : 'This browser may clear Kittycal’s data to free up space, and there is no server '
+      + 'copy to restore. Installing it keeps it safe.';
 
   const how = platform === 'ios'
-    ? 'On your Home Screen it is exempt. In Safari, tap the Share button — ' +
-      'the square with an arrow coming out of it — then Add to Home Screen.'
+    ? 'In Safari, tap Share (the square with an arrow), then Add to Home Screen.'
     : platform === 'android'
-      ? 'Installing it fixes that. Open the browser menu and choose Install ' +
-        'app, or Add to Home screen.'
-      : 'Installing it fixes that. Use the install icon in the address bar, ' +
-        'or the browser menu.';
+      ? 'Open the browser menu and choose Install app.'
+      : 'Use the install icon in the address bar, or the browser menu.';
+
+  /*
+    A backup she made this week already covers the worst case, so the card
+    says so instead of asking for another one.
+  */
+  const backedUp = settings.lastBackup && daysBetween(settings.lastBackup, today) <= 7;
 
   return el('div', { class: 'card-quiet data-zone install-nudge' }, [
     el('h3', { text: 'Keep Kittycal on your Home Screen' }),
@@ -278,18 +284,10 @@ function installPrompt({ logs, periodDays, settings, today }) {
       el('div', { text: risk }),
     ]),
     el('p', { class: 'hint-sm', text: how }),
-    /*
-      The card is headed with a fix she has to perform herself, in the browser
-      chrome, where no button here can reach — there is no API to open that
-      sheet, which is the whole reason this card exists. So the only thing it
-      can offer to do is the other protection, and without a sentence joining
-      the two the card read as a heading about installing above a button about
-      something else entirely.
-    */
-    el('p', { class: 'hint-sm', text:
-      'Until you do, an exported file is the only copy that would survive.' }),
+    backedUp ? el('p', { class: 'hint-sm', text:
+      `Your backup from ${fmtRelative(settings.lastBackup).toLowerCase()} would bring everything back if it happened.` }) : null,
     el('div', { class: 'backup-nudge-actions' }, [
-      el('button', {
+      backedUp ? null : el('button', {
         type: 'button', class: 'btn',
         onclick: async (/** @type {Event} */ e) => {
           haptic();
@@ -309,7 +307,7 @@ function installPrompt({ logs, periodDays, settings, today }) {
           haptic();
           store.updateSettings({ installSnoozed: today });
         },
-      }, ['Not now']),
+      }, [backedUp ? 'Got it' : 'Not now']),
     ]),
   ]);
 }
@@ -534,15 +532,25 @@ function phaseLine(phase) {
       el('h3', { text: phase.heading }),
     ]),
     /*
-      Left whole, having tried it clamped.
+      One line every day, and the why behind a tap.
 
-      Four lines of static prose in the best position on the screen looks like
-      an obvious cut, and a two-line clamp with a "What this means" button
-      underneath measured the same height — the button costs a touch target
-      and the clamp costs an ellipsis, so the trade was a truncated paragraph
-      for no space at all.
+      The paragraph that used to sit here was the same four lines on every
+      visit, in the best position on the screen. A clamp with a button under
+      it was tried and saved nothing. What works is shorter writing: the line
+      says what she will notice, in a sentence, and the line itself opens the
+      explanation, so there is no extra button to make room for. The hormone
+      words stay, because knowing them is worth something, but they are
+      explained by what they do to her rather than defined.
     */
-    el('p', { class: 'hint', text: phase.summary }),
+    phase.more
+      ? el('details', { class: 'phase-more' }, [
+          el('summary', { class: 'hint' }, [
+            phase.summary,
+            el('span', { class: 'phase-more-cue', 'aria-hidden': 'true', text: ' Why?' }),
+          ]),
+          el('p', { class: 'phase-more-body', text: phase.more }),
+        ])
+      : el('p', { class: 'hint', text: phase.summary }),
   ]);
 }
 
@@ -1244,6 +1252,25 @@ function fertileCard(prediction, today, mode) {
     luteal phase legible. Only the framing was wrong.
   */
   const passed = prediction.fertileWindow.end < today;
+
+  /*
+    Once it has passed, and she is not trying to conceive, it shrinks to a line.
+
+    For the next two weeks the full card was the same dates, the same
+    provenance and the same link, every day, about a window that no longer
+    mattered to her — the biggest card on the screen for the least useful fact
+    on it. The date is still worth a glance; the rest waits for the next one.
+  */
+  if (passed && mode === 'cycle') {
+    return el('div', { class: 'card data-zone card-compact' }, [
+      el('p', { class: 'compact-line' }, [
+        el('span', { class: 'compact-label', text: 'Fertile window' }),
+        el('span', { class: 'num', text:
+          `${fmtDayMonth(prediction.fertileWindow.start)} – ${fmtDayMonth(prediction.fertileWindow.end)}, passed` }),
+      ]),
+      el('p', { class: 'hint-sm', text: `Today: ${chance.label.toLowerCase()}.` }),
+    ]);
+  }
 
   return el('div', { class: 'card data-zone' }, [
     el('h3', { text: passed ? 'Fertile window has passed' : 'Fertile window' }),

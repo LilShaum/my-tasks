@@ -326,3 +326,7 @@
 @media (max-width: 380px) {
   .year-grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* The occasional job, under the calendar: a pill, not a banner. */
+.cal-editbar:not(.is-editing) { flex-direction: row; justify-content: center; align-items: center; margin: var(--sp-2) 0 var(--sp-3); }
+.cal-edit-btn { width: auto; min-height: var(--tap); padding: var(--sp-1) var(--sp-4); font-size: var(--fs-sm); }

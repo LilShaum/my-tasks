@@ -224,55 +224,38 @@ console.log('\nedit mode does not offer a tap that does nothing');
 }
 
 /* ── 3. The month she paged to can say what happened in it ────────────── */
+/*
+  Only months with a period get a summary, and it says only that: the dates and
+  how many days. It used to count "logged something on 2 of 3 days" as well,
+  a number the grid already shows and nobody can act on.
+*/
 console.log('\nthe calendar answers for the month on screen');
 {
-  const recall = page.locator('.cal-recall');
-  check(await recall.count() === 1, 'this month has a summary under the grid');
+  check(!/Logged something on/.test(await page.locator('#view-calendar').innerText()),
+    'no count of logged days on the calendar');
 
-  const summary = await recall.innerText();
-  check(/day of bleeding|days of bleeding|No period days marked/.test(summary),
-    'which says whether she bled', summary.replace(/\n/g, ' | '));
-  check(/Logged something on \d+ of \d+ days?\./.test(summary),
-    'and how much of it she logged', summary.replace(/\n/g, ' | '));
+  // Page back to the nearest month that had a period.
+  let found = false;
+  let paged = 0;
+  for (; paged < 3 && !found; paged += 1) {
+    if (await page.locator('.cal-recall').count()) { found = true; break; }
+    await page.locator('[aria-label="Previous month"]').click();
+    await page.waitForTimeout(400);
+  }
+  check(found, 'a month with a period has a summary under the grid');
+  const summary = found ? await page.locator('.cal-recall').innerText() : '';
+  check(/\d+ days? of bleeding/.test(summary), 'which gives the dates and days of bleeding',
+    summary.replace(/\n/g, ' | '));
 
-  /*
-    The figures have to move with the month, not describe today wherever she
-    is. Paging back a month and getting the same sentence would be worse than
-    no card at all.
-  */
-  const here = await recall.innerText();
+  // And it moves with the month, not describing the same one wherever she is.
   await page.locator('[aria-label="Previous month"]').click();
-  await page.waitForTimeout(450);
-  const back = await page.locator('.cal-recall').innerText();
-  check(here !== back, 'and it changes when she pages back', `${here} === ${back}`);
-
-  /*
-    A month still running is only counted as far as today; a finished one is
-    counted whole. The heading is the only thing that says which.
-  */
-  await page.locator('[aria-label="Next month"]').click();
-  await page.waitForTimeout(450);
-  const heading = await page.locator('.cal-recall h3').innerText();
-
-  /*
-    "so far" marks a month counted only as far as today. Asserting the current
-    month always carries it is wrong on the last day of the month, when every
-    day of it has happened and the count really is the whole month — which is
-    what made this fail on the 30th. The contract is the relationship, so read
-    both numbers out of the card and check that instead: the card says how many
-    days it counted, and the calendar knows how many the month has.
-  */
-  const counted = Number((await page.locator('.cal-recall').innerText()).match(/of (\d+) days?\./)?.[1]);
-  const inMonth = await page.evaluate(() => {
-    const dates = [...document.querySelectorAll('.cal-cell[data-date]')]
-      .map((c) => c.getAttribute('data-date') ?? '');
-    const [y, m] = (dates[0] ?? '').split('-').map(Number);
-    return new Date(y, m, 0).getDate();
-  });
-  check(Number.isFinite(counted) && counted > 0, 'the recall card says how many days it counted', String(counted));
-  check(/ so far$/.test(heading) === (counted < inMonth),
-    `the heading says "so far" exactly when the month is only counted part-way (${counted} of ${inMonth})`,
-    heading);
+  await page.waitForTimeout(400);
+  const before = (await page.locator('.cal-recall').count()) ? await page.locator('.cal-recall').innerText() : '';
+  check(before !== summary, 'and it changes when she pages back', `${before} === ${summary}`);
+  for (let i = 0; i <= paged; i += 1) {
+    await page.locator('[aria-label="Next month"]').click();
+    await page.waitForTimeout(300);
+  }
 
   // Forward into months she has not lived yet: nothing to recall, so nothing.
   for (let i = 0; i < 3; i += 1) {
@@ -281,6 +264,9 @@ console.log('\nthe calendar answers for the month on screen');
   }
   check(await page.locator('.cal-recall').count() === 0,
     'and a month that has not happened yet stays quiet');
+  // Back to now for the sections below.
+  const back = page.locator('.cal-today-btn', { hasText: 'today' });
+  if (await back.count()) { await back.click(); await page.waitForTimeout(400); }
 }
 
 /* ── 4. The legend names what is on screen, and nothing else ──────────── */
