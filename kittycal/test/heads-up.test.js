@@ -93,3 +93,18 @@ test('said from a day before it usually starts until the period arrives', () => 
   assert.equal(at(-2, { isLate: true }), 0);
   assert.equal(at(/** @type {any} */ (null)), 0, 'nothing to count back from');
 });
+
+test('something logged all month is not announced as a pre-period symptom', () => {
+  /*
+    Headaches every few days, all cycle long. They land in the ten days before
+    each period in every cycle too, so presence alone called them premenstrual.
+    Bloating only in the last four days is the real pattern, and the only one.
+  */
+  const everyFewDays = Array.from({ length: 8 }, (_, i) => 3 + i * 3); // 3, 6, … 24 days before
+  const { logs, cycles } = history([28, 28, 28], {
+    headache: { kind: 'symptoms', before: everyFewDays },
+    bloating: { kind: 'symptoms', before: [4, 3, 2, 1] },
+  });
+  const ids = premenstrualPatterns(logs, cycles).map((p) => p.id);
+  assert.deepEqual(ids, ['bloating']);
+});
