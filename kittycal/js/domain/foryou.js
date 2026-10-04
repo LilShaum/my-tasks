@@ -222,7 +222,7 @@ export function momentsFor({ today, logs, cycles, prediction, settings, hour, ph
   };
   if (complete[0]?.length != null) {
     milestone('first-cycle', complete[0].nextStart,
-      `Your first full cycle is in: ${complete[0].length} days. Forecasts now lean on your own cycle, `
+      `First full cycle logged: ${complete[0].length} days. Forecasts now lean on your own cycle, `
       + 'and get sharper with each one you log.', 'insight-cycle');
   }
   milestone('three-cycles', complete[2]?.nextStart ?? null,

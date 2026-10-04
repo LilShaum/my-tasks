@@ -386,7 +386,7 @@ console.log('\nher first full cycle closed three days ago');
   await ensureCheckin(page);
   await answer(page);
   const items = await itemTexts(page);
-  check(items.some((t) => /first full cycle is in: 28 days/.test(t)),
+  check(items.some((t) => /First full cycle logged: 28 days/.test(t)),
     'the check-in ends by saying her first full cycle is in, with its length', JSON.stringify(items));
   check(await page.locator('.foryou-item.is-milestone').count() === 1, 'drawn as the one milestone');
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/milestone.png` });
