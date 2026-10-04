@@ -78,6 +78,7 @@
  * @property {string[]} forYouDismissed  moment ids she marked "not useful"
  * @property {PartnerShare|null} partnerShare  her own share, when she is sharing
  * @property {PartnerOf|null} partnerOf        a share someone sent her phone
+ * @property {string|null} startedOn  the day she finished setting up; nothing before it counts as missed
  * @property {boolean} onboarded
  * @property {boolean} disclaimerAck
  * @property {string[]} customSymptoms
@@ -159,6 +160,7 @@ export function defaultSettings() {
     forYouDismissed: [],
     partnerShare: null,
     partnerOf: null,
+    startedOn: null,
     onboarded: false,
     disclaimerAck: false,
     customSymptoms: [],
@@ -408,6 +410,8 @@ export function normalizeSettings(raw) {
     out.forYouSeen = {};
   }
   if (!Array.isArray(out.forYouDismissed)) out.forYouDismissed = [];
+  const started = /** @type {any} */ (raw).startedOn;
+  out.startedOn = typeof started === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(started) ? started : null;
 
   // Null by default, so the type loop above cannot vouch for them.
   const share = /** @type {any} */ (raw).partnerShare;

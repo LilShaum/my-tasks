@@ -96,7 +96,7 @@ function renderTodayInner(host) {
       greeting(settings.name, today),
       emptyState(settings.name),
       logButton(logs[today], today, logs, cycles),
-      weekStrip(logs, periodDays, today),
+      weekStrip(logs, periodDays, today, settings.startedOn),
       waterStrip(settings, logs[today], today),
       disclaimerNote(),
     ]);
@@ -152,6 +152,7 @@ function renderTodayInner(host) {
     greeting(settings.name, today),
 
     cycleRing({
+      theme: settings.theme,
       prediction,
       headline: headline.value,
       caption: headline.caption,
@@ -162,7 +163,7 @@ function renderTodayInner(host) {
     // would, and saying it twice on one screen reads as the app repeating itself.
     prediction.expecting ? null : phaseLine(phase),
     logButton(logs[today], today, logs, cycles),
-    weekStrip(logs, periodDays, today),
+    weekStrip(logs, periodDays, today, settings.startedOn),
     waterStrip(settings, logs[today], today),
 
     /*
@@ -650,8 +651,9 @@ function checkinPromise() {
  * @param {Record<DateKey, import('../domain/model.js').DayLog>} logs
  * @param {Set<DateKey>} periodDays
  * @param {DateKey} today
+ * @param {string|null} startedOn
  */
-function weekStrip(logs, periodDays, today) {
+function weekStrip(logs, periodDays, today, startedOn) {
   const days = [];
   let missed = 0;
 
@@ -666,9 +668,16 @@ function weekStrip(logs, periodDays, today) {
     on two comments below.
 
     Reproduced on a fresh profile before fixing.
+
+    The day she set up, when it is known. Onboarding asks when her last
+    period started and stores those days as logs, so the earliest record put a
+    new user's start four weeks back and the nag came straight back the moment
+    she finished setting up. A period date she remembers is history, not a day
+    she skipped. Installs from before `startedOn` existed fall back to the
+    earliest record.
   */
   const everKnown = [...Object.keys(logs), ...periodDays].sort();
-  const firstEver = everKnown.length ? everKnown[0] : today;
+  const firstEver = startedOn ?? (everKnown.length ? everKnown[0] : today);
 
   for (let back = 6; back >= 0; back -= 1) {
     const key = addDays(today, -back);
@@ -1615,6 +1624,9 @@ function summariseLog(log) {
   if (named.length <= 3) bits.push(...named);
   else bits.push(...named.slice(0, 2), `${named.length - 2} more`);
 
+  // Sleep is part of the check-in now, so the line that confirms the
+  // check-in says it; water has its own strip right below.
+  if (log.sleep != null) bits.push(`${log.sleep}h sleep`);
   if (log.bbt != null) bits.push('temperature');
   if (log.notes.trim()) bits.push('a note');
   return bits.length ? `${listJoin(bits)}.` : 'You can add to it any time.';

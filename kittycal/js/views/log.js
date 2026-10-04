@@ -14,7 +14,7 @@
  */
 
 import { el, svg, haptic, announce } from '../utils/dom.js';
-import { fmtRelative, fmtLong, todayKey } from '../utils/date.js';
+import { fmtRelative, fmtLong, todayKey, daysBetween } from '../utils/date.js';
 import {
   CATEGORIES, TESTS, MEASURES, WATER_GOAL_ML, glassMl, labelFor,
   optionMatches, fieldMatches, FIELD_TERMS, normalizeQuery, DEFAULT_CHIPS, severityLabel,
@@ -33,8 +33,8 @@ import {
   cToF, fToC, kgToLb, lbToKg, mlToOz, fmtWater, fmtTemp, fmtWeight, round,
 } from '../utils/fmt.js';
 import { buildCycles, cycleDay } from '../domain/cycles.js';
-import { predict } from '../domain/predict.js';
-import { phaseFor } from '../domain/phases.js';
+import { predict, upcomingPeriods, upcomingFertile } from '../domain/predict.js';
+import { phaseFor, PHASES } from '../domain/phases.js';
 import * as store from '../state/store.js';
 
 /** How many recently-used chips float to the top of a category. */
@@ -220,8 +220,26 @@ function daySummary(date, log) {
   const { settings, periodDays, logs } = store.getState();
   const cycles = buildCycles(periodDays);
   const prediction = predict({ periodDays, settings, today: todayKey(), logs });
-  const phase = phaseFor({ date, cycles, prediction });
-  const day = cycleDay(cycles, date);
+  let phase = phaseFor({ date, cycles, prediction });
+  let day = cycleDay(cycles, date);
+
+  /*
+    A future day past the next expected start belongs to the forecast cycle,
+    not the current one. Counting on from the last period put "Day 33 ·
+    Luteal" over a day the calendar behind it draws as an expected period.
+    The same projections the calendar draws decide the label here.
+  */
+  // Only a start still in the future: when she is late, no new cycle has
+  // begun, and numbering days from one would claim it had.
+  const ahead = upcomingPeriods(prediction)
+    .filter((span) => span.start <= date && span.start > todayKey()).pop();
+  if (ahead && !prediction.stale && !prediction.expecting) {
+    day = daysBetween(ahead.start, date) + 1;
+    const fertile = upcomingFertile(prediction).some((w) => date >= w.start && date <= w.end);
+    phase = date <= ahead.end ? { ...PHASES.menstrual, name: 'Period expected' }
+      : fertile ? { ...PHASES.ovulatory, name: 'Fertile window' }
+        : { ...PHASES.unknown, name: 'Forecast' };
+  }
 
   const logged = !nothingRecorded(log);
 
