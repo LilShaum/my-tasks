@@ -115,19 +115,44 @@ if (!selected.length) {
   process.exit(1);
 }
 
+/*
+  Three at a time, each printed whole when it finishes.
+
+  These ran one after another, on the belief that several probes seed the same
+  IndexedDB origin and would overwrite each other's fixture. They cannot: every
+  probe launches its own Chromium with a fresh, non-persistent context, so each
+  has its own storage. Sequential only cost time, and the suite outgrew the
+  twenty-minute limit CI gives it.
+
+  Output is buffered per probe so the log still reads as one probe at a time.
+  PROBE_JOBS=1 restores the old behaviour, for chasing a timing flake.
+*/
+const JOBS = Math.max(1, Number(process.env.PROBE_JOBS) || 3);
+
 /** @type {string[]} */
 const failed = [];
 
-for (const probe of selected) {
-  console.log(`\n── ${probe} ${'─'.repeat(Math.max(0, 60 - probe.length))}`);
-  const code = await new Promise((resolve) => {
-    // Sequential on purpose: several probes seed the same IndexedDB origin,
-    // so running them at once would have them overwrite each other's fixture.
-    spawn(process.execPath, [join(TEST_DIR, probe), BASE], { stdio: 'inherit' })
-      .on('close', resolve);
+/** @param {string} probe */
+function run(probe) {
+  return new Promise((resolve) => {
+    /** @type {Buffer[]} */
+    const out = [];
+    const child = spawn(process.execPath, [join(TEST_DIR, probe), BASE], { stdio: ['ignore', 'pipe', 'pipe'] });
+    child.stdout.on('data', (d) => out.push(d));
+    child.stderr.on('data', (d) => out.push(d));
+    child.on('close', (code) => {
+      console.log(`\n── ${probe} ${'─'.repeat(Math.max(0, 60 - probe.length))}`);
+      process.stdout.write(Buffer.concat(out));
+      if (code !== 0) failed.push(probe);
+      resolve(undefined);
+    });
   });
-  if (code !== 0) failed.push(probe);
 }
+
+const queue = [...selected];
+await Promise.all(Array.from({ length: Math.min(JOBS, queue.length) }, async () => {
+  for (let probe = queue.shift(); probe; probe = queue.shift()) await run(probe);
+}));
 
 server.close();
 
