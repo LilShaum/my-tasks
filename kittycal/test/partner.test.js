@@ -15,7 +15,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  SHARE_ITEMS, defaultChoices, buildSnapshot, partnerModel, icsFor,
+  SHARE_ITEMS, defaultChoices, buildSnapshot, partnerModel, icsFor, cleanSnapshot,
 } from '../js/domain/partner.js';
 import {
   newSecrets, encrypt, decrypt, shareLink, parseShareHash,
@@ -490,4 +490,42 @@ test('parseShareHash rejects anything that is not a share link', () => {
     '#partner=<script>.alert(1)',
   ];
   for (const hash of bad) assert.equal(parseShareHash(hash), null, JSON.stringify(hash));
+});
+
+/* ── cleanSnapshot: what arrives from a link is untrusted ───────────────── */
+
+test('cleanSnapshot: a real summary passes through unchanged', () => {
+  const snap = snapshot();
+  assert.deepEqual(cleanSnapshot(JSON.parse(JSON.stringify(snap))), snap);
+  const paused = snapshot({ prediction: { expecting: true } });
+  assert.deepEqual(cleanSnapshot(paused), paused);
+});
+
+test('cleanSnapshot: anything that is not a summary is refused', () => {
+  for (const junk of [null, 42, 'hi', [], {}, { v: 2, updated: TODAY }, { v: 1, updated: 'yesterday' }]) {
+    assert.equal(cleanSnapshot(junk), null, JSON.stringify(junk));
+  }
+});
+
+test('cleanSnapshot: hand-made fields are typed, ranged and capped, and the view still draws', () => {
+  const bad = cleanSnapshot({
+    v: 1, updated: TODAY, name: { evil: true }, lastStart: addDays(TODAY, -3), nextStart: 'soon',
+    cycleLength: 9999, periodLength: -1, lutealDays: 'x', phase: 'yes', fertile: 1,
+    patterns: [{ label: '<img src=x onerror=alert(1)>', before: 500 }, 'nope', null, { before: 2 }],
+    mood: 'lots', helps: 'x'.repeat(5000),
+  });
+  assert.ok(bad);
+  assert.equal(bad.name, null);
+  assert.equal(bad.nextStart, null);
+  assert.equal(bad.paused, true, 'no forecast without both dates');
+  assert.equal(bad.cycleLength, 28);
+  assert.equal(bad.periodLength, 5);
+  assert.equal(bad.lutealDays, 14);
+  assert.equal(bad.phase, false);
+  assert.equal(bad.fertile, false);
+  // Kept as text: the view sets textContent, so markup is shown, never run.
+  assert.deepEqual(bad.patterns, [{ label: '<img src=x onerror=alert(1)>'.slice(0, 40), before: 3 }]);
+  assert.equal(bad.mood, null);
+  assert.equal(bad.helps.length, 600);
+  assert.doesNotThrow(() => partnerModel(bad, TODAY));
 });

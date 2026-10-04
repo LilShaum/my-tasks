@@ -15,6 +15,8 @@
 --                                         made it with (stored here as a hash).
 --       kittycal_delete_share(id, token)  stops sharing, with the same token.
 --   * Nothing here touches any other table in the project.
+--   * At most 2,000 shares exist at once, and shares untouched for six months
+--     are cleared, so the public key cannot be used to fill the project.
 
 create table if not exists public.kittycal_shares (
   id          text primary key check (char_length(id) between 16 and 64),
@@ -51,6 +53,14 @@ begin
   end if;
   select s.token_hash into existing from public.kittycal_shares s where s.id = p_id;
   if existing is null then
+    -- The publishable key is public by design, so anyone could call this in a
+    -- loop and fill the project's free storage. New shares are capped, and a
+    -- share nobody has refreshed in six months (her app updates it whenever
+    -- she opens it) is cleared first to make room.
+    delete from public.kittycal_shares where updated_at < now() - interval '180 days';
+    if (select count(*) from public.kittycal_shares) >= 2000 then
+      raise exception 'too many shares';
+    end if;
     insert into public.kittycal_shares (id, token_hash, blob) values (p_id, hashed, p_blob);
   elsif existing = hashed then
     update public.kittycal_shares set blob = p_blob, updated_at = now() where id = p_id;

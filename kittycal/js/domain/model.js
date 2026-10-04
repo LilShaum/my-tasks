@@ -7,6 +7,8 @@
  *
  * @typedef {import('../utils/date.js').DateKey} DateKey
  */
+import { cleanSnapshot } from './partner.js';
+
 
 /**
  * One logged day. Absent fields mean "not logged", which is distinct from a
@@ -434,7 +436,7 @@ export function normalizeSettings(raw) {
   out.partnerOf = of && typeof of.id === 'string' && typeof of.key === 'string'
     ? {
         id: of.id, key: of.key,
-        snapshot: of.snapshot && typeof of.snapshot === 'object' ? of.snapshot : null,
+        snapshot: cleanSnapshot(of.snapshot),
         fetchedAt: typeof of.fetchedAt === 'number' ? of.fetchedAt : 0,
         gone: of.gone === true,
       }

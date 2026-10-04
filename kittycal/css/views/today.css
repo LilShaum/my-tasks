@@ -732,7 +732,7 @@
 div.foryou-item { grid-template-columns: auto 1fr; }
 button.foryou-item { cursor: pointer; transition: transform var(--dur-tap) var(--ease-bounce), box-shadow var(--dur-tap) var(--ease-soft); }
 button.foryou-item:active { transform: translate(2px, 3px) scale(0.98); box-shadow: var(--sh-sticker-press); }
-.foryou-icon { font-size: 1.4rem; line-height: 1; }
+.foryou-icon { font-size: 1.4rem; line-height: 1; color: var(--primary-line); flex: none; }
 .foryou-text { font-size: var(--fs-sm); line-height: 1.4; }
 /* A milestone is the one celebration in the list: the app just got better
    because she kept logging. Same card, in the theme's own colour. */

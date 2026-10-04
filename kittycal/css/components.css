@@ -308,8 +308,10 @@
   display: flex;
   gap: var(--sp-3);
   padding: var(--sp-3) var(--sp-4);
-  border-radius: var(--r-md);
-  border-left: 4px solid;
+  border-radius: var(--r-lg);
+  /* An outline all the way round, not a thick left stripe: the stripe is the
+     stock "callout card" of generated UI, and nothing else here uses it. */
+  border: var(--bw-data) solid;
   font-size: var(--fs-sm);
   line-height: 1.45;
 }
@@ -338,8 +340,8 @@
   display: flex;
   gap: var(--sp-3);
   padding: var(--sp-3) var(--sp-4);
-  border-radius: var(--r-md);
-  border-left: 4px solid var(--primary-line);
+  border-radius: var(--r-lg);
+  border: var(--bw-data) solid var(--line-soft);
   background: var(--surface-2);
   color: var(--ink);
   font-size: var(--fs-sm);

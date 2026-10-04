@@ -19,6 +19,8 @@
  * endpoint with plain `fetch`: no client library, so the app stays at zero
  * dependencies.
  */
+import { cleanSnapshot } from '../domain/partner.js';
+
 
 export const SUPABASE_URL = 'https://uepxpnqgrwvqruzexxsg.supabase.co';
 /** Publishable by design: it identifies the project, and grants only what the functions allow. */
@@ -129,13 +131,17 @@ export async function putShare(share, snapshot) {
 /**
  * Read a share. Null when it no longer exists — she stopped sharing.
  * @param {{id: string, key: string}} share
- * @returns {Promise<{snapshot: any, updatedAt: string}|null>}
+ * @returns {Promise<{snapshot: import('../domain/partner.js').Snapshot, updatedAt: string}|null>}
  */
 export async function getShare(share) {
   const rows = await rpc('kittycal_get_share', { p_id: share.id });
   const row = Array.isArray(rows) ? rows[0] : null;
   if (!row) return null;
-  return { snapshot: await decrypt(row.blob, share.key), updatedAt: row.updated_at };
+  // Untrusted until checked: a forwarded or hand-made link decrypts to
+  // whatever its maker put in it.
+  const snapshot = cleanSnapshot(await decrypt(row.blob, share.key));
+  if (!snapshot) throw new Error('unreadable share');
+  return { snapshot, updatedAt: row.updated_at };
 }
 
 /** @param {{id: string, token: string}} share */

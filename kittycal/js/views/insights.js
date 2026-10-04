@@ -37,7 +37,7 @@ import * as acog from '../domain/acog.js';
 import { trendChart, lineChart } from '../ui/chart.js';
 import { rhythmCurve, bodyMapGrid, fingerprint, pairedBars } from '../ui/insight-charts.js';
 import { openSheet } from '../ui/sheet.js';
-import { spotArt, emblem } from '../ui/mascot.js';
+import { spotArt, emblem, momentIcon } from '../ui/mascot.js';
 import { openReport } from './report.js';
 import { openNotes, noteCount } from './notes.js';
 import * as store from '../state/store.js';
@@ -167,7 +167,7 @@ function glanceCard(findings, themeId) {
             ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         },
       }, [
-        el('span', { class: 'glance-icon', 'aria-hidden': 'true', text: finding.icon }),
+        momentIcon(finding.icon, 'glance-icon'),
         el('span', { class: 'glance-text', text: finding.text }),
         el('span', { class: 'row-value', 'aria-hidden': 'true', text: '›' }),
       ]),

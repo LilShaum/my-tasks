@@ -14,6 +14,7 @@
 
 import { el, svg } from '../utils/dom.js';
 import { EMBLEMS, SPOT_ART } from '../data/mascots.js';
+import { momentMark } from '../data/icons.js';
 import * as repo from '../storage/repo.js';
 
 /** Object URLs we've handed out, so they can be revoked on theme change.
@@ -54,6 +55,23 @@ export function emblem(themeId, opts = {}) {
   });
 
   return node;
+}
+
+/**
+ * A "For you" or "At a glance" icon, drawn in the theme's colour.
+ * Falls back to the emoji itself for anything without a mark.
+ * @param {string} emoji
+ * @param {string} className
+ * @returns {Element}
+ */
+export function momentIcon(emoji, className) {
+  const mark = momentMark(emoji);
+  if (!mark) return el('span', { class: className, 'aria-hidden': 'true', text: emoji });
+  return svg('svg', {
+    class: className, viewBox: '0 0 24 24', width: 22, height: 22, fill: 'none',
+    stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+    'aria-hidden': 'true', html: mark,
+  });
 }
 
 /**
