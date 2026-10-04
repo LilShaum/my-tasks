@@ -47,6 +47,30 @@ const MIN_CYCLES = 3;
 const PRESENCE = 0.6;
 /** A rate below this is background noise, not a concentration. */
 const MIN_PEAK = 0.3;
+/** How unlikely a run must be, from her usual rate alone, to be called a timing. */
+const CHANCE = 0.001;
+/** Her usual rate is never taken as below this, so "never on other days" is not "impossible". */
+const MIN_BASE_RATE = 0.02;
+
+/**
+ * P(X ≥ k) for X ~ Binomial(n, p), summed in log space so long histories do
+ * not overflow.
+ * @param {number} k
+ * @param {number} n
+ * @param {number} p
+ */
+export function binomialTail(k, n, p) {
+  if (k <= 0) return 1;
+  if (k > n) return 0;
+  let logC = 0;
+  for (let i = 1; i <= k; i += 1) logC += Math.log((n - k + i) / i);
+  let total = 0;
+  for (let i = k; i <= n; i += 1) {
+    total += Math.exp(logC + i * Math.log(p) + (n - i) * Math.log(1 - p));
+    logC += Math.log((n - i) / (i + 1));
+  }
+  return Math.min(1, total);
+}
 
 /** Moods nobody needs warning about. Everything else is a "hard" mood. */
 const PLEASANT_MOODS = new Set(['calm', 'happy', 'energetic', 'playful', 'confident', 'neutral']);
@@ -205,11 +229,22 @@ function merge(...groups) {
  *     is null. "From 7 days before" would imply it carries on to the period
  *     when it does not, and this module does not guess.
  *
- * @param {(number|null)[]} after
- * @param {(number|null)[]} before
+ * And before any of that, the run has to be more than luck. Something she
+ * logs on one day in eight, scattered anywhere, will land on the same cycle
+ * day in two of six cycles somewhere in a 28-day span, and that slot clears
+ * the 30% floor. This printed "Headache: day 5 of your period" over a grid
+ * that showed headaches everywhere. So the run's count is tested against her
+ * own rate for that thing on every other day: if her usual rate could
+ * plausibly have produced it (one chance in a thousand, which allows for the
+ * thirty-odd slots searched), it is not a timing.
+ *
+ * @param {Slot[]} afterSlots
+ * @param {Slot[]} beforeSlots
  * @returns {When|null}
  */
-function whenItHappens(after, before) {
+function whenItHappens(afterSlots, beforeSlots) {
+  const after = means(afterSlots);
+  const before = means(beforeSlots);
   let peak = 0;
   /** @type {'after'|'before'} */
   let side = 'after';
@@ -228,6 +263,13 @@ function whenItHappens(after, before) {
   let hi = at;
   while (lo > 0 && ok(lo - 1)) lo -= 1;
   while (hi < arr.length - 1 && ok(hi + 1)) hi += 1;
+
+  const slots = side === 'after' ? afterSlots : beforeSlots;
+  const run = pool(slots, lo + 1, hi + 1);
+  const all = merge(pool(afterSlots, 1, AFTER), pool(beforeSlots, 1, BEFORE));
+  const restN = all.n - run.n;
+  const base = Math.max(MIN_BASE_RATE, restN > 0 ? (all.sum - run.sum) / restN : 0);
+  if (binomialTail(run.sum, run.n, base) > CHANCE) return null;
 
   if (side === 'after') {
     if (at + 1 > 7) return { where: 'middle' };
@@ -296,7 +338,7 @@ export function bodyMap(logs, cycles, limit = 8) {
     const peak = Math.max(0, ...after.map((r) => r ?? 0), ...before.map((r) => r ?? 0));
     rows.push({
       id, kind, cyclesWith, cyclesTotal: complete.length,
-      after, before, when: whenItHappens(after, before), peak,
+      after, before, when: whenItHappens(series.after, series.before), peak,
     });
   }
 

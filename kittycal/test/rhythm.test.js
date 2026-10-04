@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 import {
   AFTER, BEFORE, HARD_MOOD, align, alignedSeries, bodyMap, moodCurve,
   sleepCurve, goesWith, periodFingerprint,
+  binomialTail,
 } from '../js/domain/rhythm.js';
 import { buildCycles } from '../js/domain/cycles.js';
 import { emptyLog } from '../js/domain/model.js';
@@ -168,6 +169,31 @@ test('bodyMap: a peak below 30% gives no timing, and a mid-cycle peak says middl
   // Always on after-day 11: the middle of the cycle, not the period.
   const middle = world([28, 28, 28], ({ after }) => ({ symptoms: after === 11 ? ['ovulation-pain'] : [] }));
   assert.deepEqual(bodyMap(middle.logs, middle.cycles)[0].when, { where: 'middle' });
+});
+
+test('bodyMap: something logged on random days gets no timing, even when one day peaks by chance', () => {
+  // Headache on about one day in eight, anywhere: six cycles of noise. Before
+  // the chance test this printed "Day 5 of your period, 6 of 6 cycles".
+  let seed = 7;
+  const rand = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+  const { logs, cycles } = world([29, 27, 30, 28, 31, 28], ({ after }) => ({
+    symptoms: [...(after <= 2 ? ['cramps'] : []), ...(rand() < 0.12 ? ['headache'] : [])],
+  }));
+  const rows = bodyMap(logs, cycles);
+  const headache = rows.find((r) => r.id === 'headache');
+  assert.ok(headache, 'it is still listed: she logs it most cycles');
+  assert.equal(headache?.when, null);
+  // A real pattern beside it still gets its timing.
+  assert.deepEqual(rows.find((r) => r.id === 'cramps')?.when, { where: 'period', from: 1, to: 2 });
+});
+
+test('binomialTail: matches hand-worked values', () => {
+  assert.equal(binomialTail(0, 5, 0.3), 1);
+  assert.equal(binomialTail(6, 5, 0.3), 0);
+  assert.ok(Math.abs(binomialTail(5, 5, 0.5) - 1 / 32) < 1e-12);
+  // P(X ≥ 2), n = 3, p = 0.5: (3 + 1) / 8.
+  assert.ok(Math.abs(binomialTail(2, 3, 0.5) - 0.5) < 1e-12);
+  assert.ok(binomialTail(200, 400, 0.5) > 0.5 && binomialTail(200, 400, 0.5) < 0.53);
 });
 
 test('HARD_MOOD: the pleasant six are not hard, everything else is', () => {
