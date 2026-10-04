@@ -260,9 +260,10 @@ function installPrompt({ logs, periodDays, settings, today }) {
     warning nobody finishes reading protects nobody.
   */
   const risk = platform === 'ios'
-    ? 'Safari deletes a website’s data after about a week without a visit. '
-      + 'On your Home Screen, Kittycal is safe from that.'
-    : 'This browser may clear Kittycal’s data to free up space. Installing it keeps it safe.';
+    ? 'Safari deletes a website’s data after about a week without a visit, and '
+      + 'there is no server copy to restore. On your Home Screen, Kittycal is safe from that.'
+    : 'This browser may clear Kittycal’s data to free up space, and there is no server '
+      + 'copy to restore. Installing it keeps it safe.';
 
   const how = platform === 'ios'
     ? 'In Safari, tap Share (the square with an arrow), then Add to Home Screen.'

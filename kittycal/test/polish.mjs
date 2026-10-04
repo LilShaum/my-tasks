@@ -91,10 +91,14 @@ console.log('\nthe fertile window, once it has been and gone');
 
   ok('the card is still there, because when ovulation was is worth knowing',
     /Fertile window/.test(text), text.slice(0, 60));
-  ok('but the heading no longer offers a past window as news',
-    /Fertile window has passed/.test(text), dates);
-  ok('and the estimate is in the past tense too',
-    /Ovulation was estimated/.test(text));
+  ok('but it no longer offers a past window as news: it says it has passed',
+    /Fertile window[^]*passed/.test(text), text.slice(0, 200));
+  /*
+    And it shrinks to a line. Outside conceive mode, a window that has been
+    and gone was the biggest card on the screen for two weeks.
+  */
+  const compact = await page.$('#view-today .card-compact');
+  ok('and it shrinks to a single line until the next one', Boolean(compact) && !dates, dates);
 }
 
 console.log('\nthe calendar legend covers what the calendar draws');
