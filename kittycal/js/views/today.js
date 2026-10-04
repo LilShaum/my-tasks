@@ -306,7 +306,7 @@ function installPrompt({ logs, periodDays, settings, today }) {
           haptic();
           store.updateSettings({ installSnoozed: today });
         },
-      }, ['Not now']),
+      }, [backedUp ? 'Got it' : 'Not now']),
     ]),
   ]);
 }
