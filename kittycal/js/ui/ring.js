@@ -43,10 +43,13 @@ function pointAt(fraction) {
  * @param {string} opts.caption     the line under it
  * @param {string} [opts.eyebrow]   the small line above it
  * @param {string} [opts.theme]     whose character marks today
+ * @param {{id: import('../domain/phases.js').PhaseId, from: number, to: number}[]} [opts.segments]
+ *   drawn instead of the ones the prediction implies (a partner's view of
+ *   phases she chose not to share)
  * @returns {HTMLElement}
  */
-export function cycleRing({ prediction, headline, caption, eyebrow, theme = 'plain' }) {
-  const segments = ringSegments(prediction);
+export function cycleRing({ prediction, headline, caption, eyebrow, theme = 'plain', segments: given }) {
+  const segments = given ?? ringSegments(prediction);
   const total = prediction.avgCycleLength || 28;
 
   // Where today sits on the ring. Clamped to just under a full turn so a late
@@ -109,6 +112,9 @@ export function cycleRing({ prediction, headline, caption, eyebrow, theme = 'pla
       class: 'ring-marker',
     }));
     const art = emblem(theme, { size: ART, className: 'ring-marker-art' });
+    // In that character's own colours, whatever theme the ring sits in: on a
+    // partner's phone the ring is in his theme and the marker is still her.
+    art.setAttribute('data-theme', theme);
     art.setAttribute('x', String(x - ART / 2));
     art.setAttribute('y', String(y - ART / 2));
     ring.append(art);

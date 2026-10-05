@@ -214,6 +214,8 @@ console.log('\nthe question every prediction is built on');
   onb.on('pageerror', (e) => errors.push(String(e)));
   await onb.goto(BASE, { waitUntil: 'networkidle' });
   await onb.waitForTimeout(400);
+  await onb.locator('.door-card', { hasText: 'Tracking my own cycle' }).click();
+  await onb.waitForTimeout(400);
 
   // Theme, name, year, then the date.
   for (let i = 0; i < 3; i += 1) {

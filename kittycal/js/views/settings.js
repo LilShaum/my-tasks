@@ -31,7 +31,7 @@ import { openSheet } from '../ui/sheet.js';
 import { releaseMascotUrls, mascot } from '../ui/mascot.js';
 import { openMascotPicker } from '../ui/image-picker.js';
 import { openHelp } from './help.js';
-import { openShareSheet, openPartnerSheet } from './partner.js';
+import { openShareSheet, switchToPartnerMode } from './partner.js';
 import { exportEverything, exportCSV } from '../storage/export-action.js';
 import * as store from '../state/store.js';
 import * as repo from '../storage/repo.js';
@@ -1016,17 +1016,19 @@ function partnerRows(settings) {
         'Share with your partner',
         el('span', { class: 'choice-sub', text: share
           ? 'On. They see only what you picked'
-          : 'Let someone see when your period’s coming, and what helps' }),
+          : 'Give your partner their own view of your cycle' }),
       ]),
       el('span', { class: 'row-value', 'aria-hidden': 'true', text: '›' }),
     ]),
-    of ? el('button', { type: 'button', class: 'row', onclick: () => { haptic(); openPartnerSheet(); } }, [
+    el('button', { type: 'button', class: 'row', onclick: () => { haptic(); void switchToPartnerMode(); } }, [
       el('span', { class: 'row-label' }, [
-        of.snapshot?.name ? `${of.snapshot.name}’s cycle` : 'Your partner’s cycle',
-        el('span', { class: 'choice-sub', text: of.gone ? 'They stopped sharing' : 'Shared with you' }),
+        of?.snapshot?.name ? `Follow ${of.snapshot.name}’s cycle` : 'Partner mode',
+        el('span', { class: 'choice-sub', text: of
+          ? 'Switch this phone to the partner app for her cycle'
+          : 'Use this phone to follow your partner’s cycle instead' }),
       ]),
       el('span', { class: 'row-value', 'aria-hidden': 'true', text: '›' }),
-    ]) : null,
+    ]),
   ]);
 }
 

@@ -724,3 +724,76 @@ export function periodFingerprint(logs, cycles, limit = 6) {
     longPeriods: rows.filter((r) => r.length > 7).length,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Easier days
+// ---------------------------------------------------------------------------
+
+/** Shortest and longest stretch worth calling "her easier days". */
+const EASY_MIN = 4;
+const EASY_MAX = 9;
+
+/**
+ * The stretch of her cycle where she usually logs the least going wrong.
+ *
+ * A day "has something" when she logged any symptom or a hard mood. Each
+ * aligned day after her period starts gets the share of her cycles in which
+ * it had something; the quietest run of at least four days, outside her
+ * period, is a candidate. It is only claimed when it is clearly quieter than
+ * the rest of her cycle (at most 60% of her usual rate, and at least one
+ * chance in a thousand short of what her usual rate would give by luck), so
+ * someone who logs little, or logs evenly, gets no window rather than a
+ * random one.
+ *
+ * Counted from the first day of her period: `{from: 7, to: 12}` is cycle days
+ * 7 to 12.
+ *
+ * @param {Record<DateKey, DayLog>} logs
+ * @param {Cycle[]} cycles
+ * @returns {{from: number, to: number}|null}
+ */
+export function easierDays(logs, cycles) {
+  const complete = completeOnly(cycles);
+  if (complete.length < MIN_CYCLES) return null;
+  const series = alignedSeries(logs, complete, (log) => {
+    if (!log.checkedIn && !log.symptoms?.length && !log.moods?.length) return null;
+    const rough = (log.symptoms ?? []).some((id) => id !== 'none') || (log.moods ?? []).some(HARD_MOOD);
+    return rough ? 1 : 0;
+  });
+  const all = merge(pool(series.after, 1, AFTER), pool(series.before, 1, BEFORE));
+  if (all.n < 30) return null;
+  const usual = all.sum / all.n;
+  if (usual < 0.15) return null;
+
+  // Never inside her period: the quiet run is about the days between.
+  const periodLen = Math.round(complete.reduce((a, c) => a + c.periodLength, 0) / complete.length);
+  const first = Math.max(periodLen + 1, 2);
+  const rate = means(series.after);
+
+  /** @type {{from: number, to: number, mean: number}|null} */
+  let best = null;
+  for (let from = first; from + EASY_MIN - 1 <= AFTER; from += 1) {
+    const slots = rate.slice(from - 1, from - 1 + EASY_MIN);
+    if (slots.some((r) => r == null)) continue;
+    const mean = /** @type {number[]} */ (slots).reduce((a, b) => a + b, 0) / EASY_MIN;
+    if (!best || mean < best.mean) best = { from, to: from + EASY_MIN - 1, mean };
+  }
+  if (!best || best.mean > usual * 0.6) return null;
+
+  // Grow it while the next day is just as quiet.
+  const limit = usual * 0.6;
+  while (best.to < AFTER && best.to - best.from + 1 < EASY_MAX) {
+    const r = rate[best.to];
+    if (r == null || r > limit) break;
+    best.to += 1;
+  }
+
+  // And make sure it is not luck: few enough rough days in the run that her
+  // usual rate would rarely produce so few.
+  const run = pool(series.after, best.from, best.to);
+  const roughAtMost = run.sum;
+  const quietTail = binomialTail(run.n - roughAtMost, run.n, 1 - usual);
+  if (quietTail > CHANCE) return null;
+
+  return { from: best.from, to: best.to };
+}

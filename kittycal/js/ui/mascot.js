@@ -14,7 +14,7 @@
 
 import { el, svg } from '../utils/dom.js';
 import { EMBLEMS, SPOT_ART } from '../data/mascots.js';
-import { momentMark } from '../data/icons.js';
+import { momentMark, iconFor } from '../data/icons.js';
 import * as repo from '../storage/repo.js';
 
 /** Object URLs we've handed out, so they can be revoked on theme change.
@@ -65,7 +65,8 @@ export function emblem(themeId, opts = {}) {
  * @returns {Element}
  */
 export function momentIcon(emoji, className) {
-  const mark = momentMark(emoji);
+  // A moment's emoji, or a symptom id drawn from the diary's own set.
+  const mark = momentMark(emoji) ?? iconFor(emoji);
   if (!mark) return el('span', { class: className, 'aria-hidden': 'true', text: emoji });
   return svg('svg', {
     class: className, viewBox: '0 0 24 24', width: 22, height: 22, fill: 'none',

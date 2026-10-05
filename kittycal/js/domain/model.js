@@ -80,6 +80,7 @@ import { cleanSnapshot } from './partner.js';
  * @property {string[]} forYouDismissed  moment ids she marked "not useful"
  * @property {PartnerShare|null} partnerShare  her own share, when she is sharing
  * @property {PartnerOf|null} partnerOf        a share someone sent her phone
+ * @property {'self'|'partner'|null} role  what this phone is for: her own cycle, or someone else's
  * @property {string|null} startedOn  the day she finished setting up; nothing before it counts as missed
  * @property {boolean} onboarded
  * @property {boolean} disclaimerAck
@@ -94,6 +95,8 @@ import { cleanSnapshot } from './partner.js';
  * @property {string} id
  * @property {string} key
  * @property {string} token
+ * @property {string} code      the short code that stands for the link; '' on shares made before codes
+ * @property {{id: string, at: number}|null} status  what she last told them in one tap
  * @property {import('./partner.js').ShareChoices} choices
  * @property {string} helps
  * @property {string} since     DateKey sharing started
@@ -105,6 +108,7 @@ import { cleanSnapshot } from './partner.js';
  * @typedef {Object} PartnerOf
  * @property {string} id
  * @property {string} key
+ * @property {string} code      shown in his Settings so he can connect another phone
  * @property {import('./partner.js').Snapshot|null} snapshot  the last one fetched
  * @property {number} fetchedAt  epoch ms
  * @property {boolean} gone      she stopped sharing
@@ -163,6 +167,7 @@ export function defaultSettings() {
     partnerShare: null,
     partnerOf: null,
     startedOn: null,
+    role: null,
     onboarded: false,
     disclaimerAck: false,
     customSymptoms: [],
@@ -412,6 +417,8 @@ export function normalizeSettings(raw) {
     out.forYouSeen = {};
   }
   if (!Array.isArray(out.forYouDismissed)) out.forYouDismissed = [];
+  const role = /** @type {any} */ (raw).role;
+  out.role = role === 'self' || role === 'partner' ? role : null;
   const started = /** @type {any} */ (raw).startedOn;
   out.startedOn = typeof started === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(started) ? started : null;
 
@@ -421,6 +428,9 @@ export function normalizeSettings(raw) {
     && typeof share.token === 'string' && share.choices && typeof share.choices === 'object'
     ? {
         id: share.id, key: share.key, token: share.token,
+        code: typeof share.code === 'string' ? share.code : '',
+        status: share.status && typeof share.status.id === 'string' && typeof share.status.at === 'number'
+          ? { id: share.status.id, at: share.status.at } : null,
         choices: {
           phase: share.choices.phase !== false, patterns: share.choices.patterns !== false,
           helps: share.choices.helps !== false, name: share.choices.name !== false,
@@ -435,7 +445,7 @@ export function normalizeSettings(raw) {
   const of = /** @type {any} */ (raw).partnerOf;
   out.partnerOf = of && typeof of.id === 'string' && typeof of.key === 'string'
     ? {
-        id: of.id, key: of.key,
+        id: of.id, key: of.key, code: typeof of.code === 'string' ? of.code : '',
         snapshot: cleanSnapshot(of.snapshot),
         fetchedAt: typeof of.fetchedAt === 'number' ? of.fetchedAt : 0,
         gone: of.gone === true,

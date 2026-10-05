@@ -116,6 +116,16 @@ export function openHelp() {
           'data underneath.'),
       ]),
 
+      section('Sharing with a partner', [
+        p('Settings, then Share with your partner, gives you a code. On their phone they ' +
+          'open Kittycal, choose “Following my partner’s cycle” and enter it, or tap the ' +
+          'link you send. They get their own app: where you are in your cycle, what your ' +
+          'own patterns say is likely each day, and small ways to help.'),
+        p('You pick what they see, and can preview it. Your logs, notes and tests are never ' +
+          'shared. While you share, Today has a row to tell them how you are in one tap; it ' +
+          'clears itself by the next day.'),
+      ]),
+
       section('Why it asks you to install it', [
         p('Safari deletes what a website has stored if you go about a week ' +
           'without opening it. Everything Kittycal knows is in that storage, ' +

@@ -84,24 +84,117 @@ export async function decrypt(blob, key) {
   return JSON.parse(new TextDecoder().decode(plain));
 }
 
-/**
- * The link she sends. The key rides in the fragment, so it reaches his phone
- * and never a server.
- *
- * @param {{id: string, key: string}} share
- * @param {string} [base]
- */
-export function shareLink(share, base = `${location.origin}${location.pathname}`) {
-  return `${base}#partner=${share.id}.${share.key}`;
+/* ── The code ───────────────────────────────────────────────────────────── */
+
+/*
+  A short code he can type, standing in for the whole link.
+
+  Needed because on an iPhone a link opens in Safari, and an app added to the
+  Home Screen from there starts with its own, empty storage: whatever the link
+  set up in Safari is not in the installed app. So the installed app has to be
+  able to connect from something a person can read off one screen and type on
+  another.
+
+  The code is the only secret. Both the share's id and its key are derived
+  from it, so the server still never holds anything that decrypts her
+  summary: the id is a hash of the code, and the key is stretched from it
+  with PBKDF2. Ten characters from a 32-letter alphabet is 50 bits; guessing
+  one through the server is out of reach, and stretching makes guessing
+  against a stolen copy of the table slow as well.
+
+  Crockford's alphabet: no I, L, O or U, so nothing reads as another
+  character, and typing an O or an I is forgiven as 0 or 1.
+*/
+const CODE_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+/** A fresh code, shown as ABCDE-FGHJK. */
+export function newCode() {
+  const bytes = random(10);
+  let out = '';
+  for (const b of bytes) out += CODE_ALPHABET[b % 32];
+  return `${out.slice(0, 5)}-${out.slice(5)}`;
 }
 
 /**
+ * Whatever he typed, as a code, or null if it cannot be one.
+ * @param {string} input
+ */
+export function normalizeCode(input) {
+  const raw = input.toUpperCase().replace(/[^0-9A-Z]/g, '')
+    .replace(/O/g, '0').replace(/[IL]/g, '1').replace(/U/g, 'V');
+  if (raw.length !== 10 || [...raw].some((ch) => !CODE_ALPHABET.includes(ch))) return null;
+  return `${raw.slice(0, 5)}-${raw.slice(5)}`;
+}
+
+/**
+ * The share's id and key, from its code.
+ * @param {string} code  normalised
+ * @returns {Promise<{id: string, key: string}>}
+ */
+export async function secretsFromCode(code) {
+  const enc = new TextEncoder();
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(`kittycal-share-id:${code}`)));
+  const base = await crypto.subtle.importKey('raw', enc.encode(code), 'PBKDF2', false, ['deriveBits']);
+  const bits = new Uint8Array(await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode('kittycal-share-key-v1'), iterations: 150_000 },
+    base, 256));
+  return { id: toB64url(digest.slice(0, 16)), key: toB64url(bits) };
+}
+
+/**
+ * Fresh secrets for a new share, built around a code.
+ * @returns {Promise<{code: string, id: string, key: string, token: string}>}
+ */
+export async function newCodeSecrets() {
+  const code = newCode();
+  return { code, ...(await secretsFromCode(code)), token: toB64url(random(32)) };
+}
+
+/**
+ * The link she sends. The secret rides in the fragment, so it reaches his
+ * phone and never a server.
+ *
+ * @param {{id: string, key: string, code?: string}} share
+ * @param {string} [base]
+ */
+export function shareLink(share, base = `${location.origin}${location.pathname}`) {
+  return share.code ? `${base}#partner=${share.code}` : `${base}#partner=${share.id}.${share.key}`;
+}
+
+/**
+ * A share link's fragment: a code, or (from before codes) an id and key.
  * @param {string} hash  location.hash
- * @returns {{id: string, key: string}|null}
+ * @returns {{code: string}|{id: string, key: string}|null}
  */
 export function parseShareHash(hash) {
   const m = /^#partner=([A-Za-z0-9_-]{16,64})\.([A-Za-z0-9_-]{40,64})$/.exec(hash);
-  return m ? { id: m[1], key: m[2] } : null;
+  if (m) return { id: m[1], key: m[2] };
+  const c = /^#partner=([0-9A-Za-z-]{10,12})$/.exec(hash);
+  const code = c ? normalizeCode(c[1]) : null;
+  return code ? { code } : null;
+}
+
+/**
+ * The id and key a link or a typed code stands for.
+ * @param {{code: string}|{id: string, key: string}} link
+ * @returns {Promise<{id: string, key: string, code: string}>}
+ */
+export async function resolveLink(link) {
+  if ('code' in link) return { ...(await secretsFromCode(link.code)), code: link.code };
+  return { id: link.id, key: link.key, code: '' };
+}
+
+/**
+ * Anything he might paste or type: the whole link, its fragment, or the code.
+ * @param {string} text
+ * @returns {{code: string}|{id: string, key: string}|null}
+ */
+export function parseShareInput(text) {
+  const t = text.trim();
+  const hashAt = t.indexOf('#partner=');
+  if (hashAt >= 0) return parseShareHash(t.slice(hashAt));
+  const code = normalizeCode(t);
+  return code ? { code } : null;
 }
 
 /**
