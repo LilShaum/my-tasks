@@ -663,8 +663,10 @@ const INTENSITY = /** @type {Record<string, number>} */ ({
 /**
  * The shape of her recent periods, newest first.
  *
- * A bleeding day she marked on the calendar without opening it has no log; by
- * the same convention the rest of the app uses it is a medium day. The current
+ * A bleeding day she marked on the calendar without logging a flow is
+ * 'unknown', and drawn as not logged. It used to be drawn as a medium day,
+ * which put bleeding she never recorded on every period entered from memory
+ * at setup. It does not vote for the heaviest day. The current
  * period is included even though it is still open, so its row is what she has
  * logged so far.
  *
@@ -690,7 +692,10 @@ export function periodFingerprint(logs, cycles, limit = 6) {
 
   /** @type {FingerprintRow[]} */
   const rows = cycles.slice(-limit).reverse().map((cycle) => {
-    const flows = range(cycle.start, cycle.periodEnd).map((date) => logs[date]?.flow ?? 'medium');
+    const flows = range(cycle.start, cycle.periodEnd).map((date) => {
+      const flow = logs[date]?.flow;
+      return flow && flow !== 'none' ? flow : 'unknown';
+    });
     return { start: cycle.start, flows, length: flows.length };
   });
   if (rows.length < 2) return null;
@@ -699,6 +704,9 @@ export function periodFingerprint(logs, cycles, limit = 6) {
   const wins = new Map();
   let voters = 0;
   for (const row of rows) {
+    // A period with days not logged cannot say which day was heaviest: the
+    // one day she did log would win by default.
+    if (row.flows.includes('unknown')) continue;
     const levels = row.flows.map((f) => INTENSITY[f] ?? 0);
     const top = Math.max(...levels);
     if (levels.every((l) => l === top)) continue;

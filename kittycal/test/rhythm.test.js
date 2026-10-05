@@ -453,11 +453,11 @@ test('periodFingerprint: a flat period has no heaviest day', () => {
   const fp = /** @type {NonNullable<ReturnType<typeof periodFingerprint>>} */ (periodFingerprint(flat.logs, flat.cycles));
   assert.equal(fp.heaviestDay, null);
 
-  // Marked days with no log at all are medium by convention: also flat.
+  // Marked days with no log at all are unknown, and say nothing about which day is heaviest.
   const bare = periods([5, 5, 5, 5], () => 'medium');
   const emptyLogs = {};
   assert.equal(periodFingerprint(emptyLogs, bare.cycles)?.heaviestDay, null);
-  assert.deepEqual(periodFingerprint(emptyLogs, bare.cycles)?.rows[0].flows, Array(5).fill('medium'));
+  assert.deepEqual(periodFingerprint(emptyLogs, bare.cycles)?.rows[0].flows, Array(5).fill('unknown'));
 });
 
 test('periodFingerprint: length trend and long periods', () => {
@@ -528,4 +528,22 @@ test('bodyMap: periods remembered at setup, with no logs, do not hide a real pat
   const rows = bodyMap(logs, cycles);
   assert.deepEqual(rows.map((r) => r.id), ['cramps']);
   assert.equal(rows[0].cyclesTotal, 3);
+});
+
+test('periodFingerprint: a period day with no flow logged is unknown, never an invented medium', () => {
+  // Three periods entered from memory: dates only, no logs.
+  const { cycles } = world([28, 28, 28]);
+  const fp = /** @type {NonNullable<ReturnType<typeof periodFingerprint>>} */ (periodFingerprint({}, cycles));
+  assert.ok(fp.rows.every((r) => r.flows.every((f) => f === 'unknown')), JSON.stringify(fp.rows[0].flows));
+  assert.equal(fp.heaviestDay, null);
+});
+
+test('periodFingerprint: a period with days not logged does not vote for the heaviest day', () => {
+  // Day 1 logged as medium in three periods, the rest never logged: day 1
+  // would "win" every time, by default, if partial rows voted.
+  const { cycles } = world([28, 28, 28]);
+  /** @type {Record<string, any>} */
+  const logs = {};
+  for (const c of cycles) logs[c.start] = { ...emptyLog(c.start), flow: 'medium' };
+  assert.equal(periodFingerprint(logs, cycles)?.heaviestDay, null);
 });

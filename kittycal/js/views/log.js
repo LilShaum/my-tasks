@@ -236,7 +236,7 @@ function daySummary(date, log) {
   if (ahead && !prediction.stale && !prediction.expecting) {
     day = daysBetween(ahead.start, date) + 1;
     const fertile = upcomingFertile(prediction).some((w) => date >= w.start && date <= w.end);
-    phase = date <= ahead.end ? { ...PHASES.menstrual, name: 'Period expected' }
+    phase = date <= ahead.end ? { ...PHASES.menstrual, name: 'Period likely' }
       : fertile ? { ...PHASES.ovulatory, name: 'Fertile window' }
         : { ...PHASES.unknown, name: 'Forecast' };
   }
@@ -260,7 +260,7 @@ function daySummary(date, log) {
   if (log.bbt != null) entries.push(fmtTemp(log.bbt, settings.unitTemp));
   if (log.weight != null) entries.push(fmtWeight(log.weight, settings.unitWeight));
   if (log.water) entries.push(fmtWater(log.water, settings.unitWater));
-  if (log.sleep != null) entries.push(`${log.sleep}h sleep`);
+  if (log.sleep != null) entries.push(`${Math.round(log.sleep * 10) / 10}h sleep`);
   if (log.steps != null) entries.push(`${log.steps} steps`);
   if (log.pillTaken) entries.push('Birth control taken');
   if (log.testPregnancy) entries.push(`Pregnancy test: ${log.testPregnancy}`);

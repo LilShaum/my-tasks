@@ -22,7 +22,7 @@
 
 import { el, replace, haptic } from '../utils/dom.js';
 import { todayKey, fmtDayMonth, fmtMonth, addDays, range } from '../utils/date.js';
-import { plural, fmtTemp, fmtWeight, fmtWater, mlToOz } from '../utils/fmt.js';
+import { plural, fmtTemp, fmtWeight, mlToOz } from '../utils/fmt.js';
 import { buildCycles, cycleLengthPoints, summarize, currentCycle } from '../domain/cycles.js';
 import { predict } from '../domain/predict.js';
 import { detectThermalShift } from '../domain/ovulation.js';
@@ -766,29 +766,18 @@ function bbtCard(logs, cycles, settings) {
  */
 function trendCard(logs, settings) {
   const weights = series(logs, 'weight').slice(-30);
-  const sleeps = series(logs, 'sleep').slice(-30);
   /*
-    Water and steps were collectable and unreadable.
+    Weight and steps: the numbers she can log that nothing else reads back.
 
-    Both have a row in the diary, both are stored on every log, and `series`
-    has always known how to extract them — but nothing ever called it for
-    either, so no screen in the app showed them back. Step count was the purer
-    case: the only thing that ever happened to a number she typed there was
-    that it appeared in that same day's summary line. Not a chart, not a
-    pattern, not a tip. She could enter it every morning for a year and the app
-    would never once mention it.
-
-    That is worse than not offering the field. A tracker asking for something
-    daily is an implicit promise that it is being used for something, and the
-    cost is paid by exactly the people most willing to give it data.
-
-    They join the same card rather than getting their own, because they are the
-    same kind of thing — a number over time — and four of them stacked is a
-    section rather than four competing cards.
+    Sleep and water used to be here too, as a 30-night line and a sentence
+    ("about 1.4 L a day, 9 days under 1 L"). Both already have cards that say
+    something about her cycle: sleep through the cycle, and what goes with her
+    harder days. Here they were counters, the same data a second time with no
+    finding in it (PRODUCT.md, U9). Weight and steps stay because without this
+    card a number she typed every morning would never come back to her.
   */
-  const waters = series(logs, 'water').slice(-30);
   const steps = series(logs, 'steps').slice(-30);
-  if (weights.length < 3 && sleeps.length < 3 && waters.length < 3 && steps.length < 3) return null;
+  if (weights.length < 3 && steps.length < 3) return null;
 
   return el('div', { class: 'card', id: 'insight-trends' }, [
     el('h3', { text: 'Your recent numbers' }),
@@ -798,7 +787,7 @@ function trendCard(logs, settings) {
         `Weight, last ${plural(weights.length, 'reading')}. ` +
         `Now ${fmtWeight(weights[weights.length - 1].value, settings.unitWeight)}.` }),
       /*
-        The same chart as sleep below it, not a different one.
+        The same chart as steps below it, not a different one.
 
         Weight used the BBT line chart, which draws hollow markers and numbers
         only its own extremes — so two series doing the identical job, one
@@ -817,44 +806,6 @@ function trendCard(logs, settings) {
         summary: `Weight trend over the last ${weights.length} readings.`,
       }),
     ]),
-
-    sleeps.length >= 3 && el('div', { style: { marginTop: 'var(--sp-4)' } }, [
-      el('p', { class: 'hint-sm', text:
-        `Sleep, last ${plural(sleeps.length, 'night')}. Average ` +
-        `${(sleeps.reduce((a, s) => a + s.value, 0) / sleeps.length).toFixed(1)} hours. ` +
-        'The band is the recommended 7 to 9.' }),
-      trendChart({
-        data: sleeps.map((point) => ({ label: fmtDayMonth(point.date), value: point.value })),
-        height: 140,
-        unit: 'h',
-        decimals: 1,
-        /*
-          The recommended seven to nine hours, as the band. Without it the
-          scale was fitted to her own nights, so 7.5 against 8 hours filled
-          the whole chart and an ordinary week looked like a crisis.
-        */
-        normalBand: [7, 9],
-        summary: `Sleep hours over the last ${sleeps.length} nights.`,
-      }),
-    ]),
-
-    /*
-      Water is stored in millilitres and read in whatever she set, so the chart
-      is drawn in her unit rather than the storage one — a chart labelled "ml"
-      to someone who set ounces is the same number lying about its scale.
-    */
-    /*
-      Water is a sentence, not a chart. Daily water zig-zags by nature, and a
-      month of zig-zag answers nothing; the average and the number of low days
-      are the two facts in it. What water goes *with* is on its own card.
-    */
-    waters.length >= 3 && el('p', { class: 'insight-note', style: { marginTop: 'var(--sp-4)' }, text:
-      `Water: about ${fmtWater(waters.reduce((a, w) => a + w.value, 0) / waters.length, settings.unitWater)} a day `
-      + `over the last ${plural(waters.length, 'day')}`
-      + (waters.some((w) => w.value < 1000)
-        ? `, with ${plural(waters.filter((w) => w.value < 1000).length, 'day')} under `
-          + `${settings.unitWater === 'oz' ? `${Math.round(mlToOz(1000))} oz` : '1 L'}.`
-        : '.') }),
 
     steps.length >= 3 && el('div', { style: { marginTop: 'var(--sp-4)' } }, [
       el('p', { class: 'hint-sm', text:

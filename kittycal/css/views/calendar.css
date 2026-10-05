@@ -263,6 +263,17 @@
   border: 2px solid transparent;
 }
 
+.cal-legend-swatch.is-dot {
+  display: grid;
+  place-items: center;
+  border-color: var(--line-soft);
+}
+.cal-legend-swatch.is-dot::after {
+  content: '';
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--ink-3);
+}
 .cal-legend-swatch.is-period { background: var(--period); border-color: var(--period); }
 .cal-legend-swatch.is-predicted { border: 2px dashed var(--period-pred); }
 .cal-legend-swatch.is-fertile { background: var(--fertile-soft); border-color: var(--fertile-soft); }

@@ -362,12 +362,16 @@ app is willing to promise, and a pass of its own to build against it.
 
 Checked, and the answer is still no. Written down so it stays no.
 
-- **Background push reminders.** Verified rather than assumed: Notification
+- **Background push reminders for her.** Verified rather than assumed: Notification
   Triggers (`showTrigger` / `TimestampTrigger`) never left Chrome origin trial
   and is not in the Notifications standard, and Web Push — including iOS 16.4+ —
   requires a push service, which necessarily learns when her period is due.
   There is no serverless path to a notification that fires while the app is
-  closed. The README's account of this is accurate and should stay.
+  closed. *Since October 2026 partner mode does use Web Push*, for his
+  heads-ups only: the server holds wake-up times and never the words
+  (`supabase/partner-push.sql`). Whether she wants the same for her own
+  reminders is open as `PRODUCT.md` D1, because it changes what leaves her
+  phone.
 - **Wearable sync** (Oura, Apple Watch, WHOOP, Garmin). Every one is an OAuth
   handshake with a vendor cloud. A *file* import of an Apple Health export would
   be consistent with the privacy model and belongs with G3 if it's ever wanted;

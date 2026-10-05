@@ -29,6 +29,7 @@ export const MONTHS_SHORT = [
 ];
 
 /** Sunday-first; `firstDayOfWeek` in settings rotates these for display. */
+export const DOW_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 export const DOW_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 export const DOW_MIN = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 

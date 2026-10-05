@@ -487,6 +487,10 @@
   background: var(--card);
   border: 1.5px dotted var(--period);
 }
+.fp-cell.is-unknown {
+  background: transparent;
+  border: 1.5px dashed var(--ink-3);
+}
 .fp-cell.is-highlight.has-flow { box-shadow: 0 0 0 2px var(--card), 0 0 0 3.5px var(--ink-3); }
 .fp-legend {
   display: flex;

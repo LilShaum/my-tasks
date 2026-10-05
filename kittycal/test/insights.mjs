@@ -195,9 +195,11 @@ console.log('\nregular: seven cycles of 27 to 30 days');
       const cards = [...document.querySelectorAll('.insight-card')]
         .map((c) => ({ id: c.id, top: c.getBoundingClientRect().top }))
         .sort((a, b) => Math.abs(a.top) - Math.abs(b.top));
-      return { label, scrolled: window.scrollY, id: cards[0]?.id, top: cards[0]?.top };
+      // A card near the end of the page can only come up as far as the page scrolls.
+      const atEnd = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2;
+      return { label, scrolled: window.scrollY, id: cards[0]?.id, top: cards[0]?.top, atEnd };
     }, i);
-    check(result.scrolled > 0 && result.top > -4 && result.top < 160,
+    check(result.scrolled > 0 && result.top > -4 && (result.top < 160 || (result.atEnd && result.top < 420)),
       `tapping "${result.label}" scrolls ${result.id} into view`, JSON.stringify(result));
   }
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -260,15 +262,10 @@ console.log('\nregular: seven cycles of 27 to 30 days');
   // The guide appears because there are charts to explain.
   check((await page.$$('.guide-button')).length === 1, 'the reading guide is offered');
 
-  // Recent numbers.
-  check(titles.trends === 'Your recent numbers', 'the numbers card is "Your recent numbers"', String(titles.trends));
-  const trends = await page.$eval('#insight-trends', (n) => n.innerText).catch(() => '');
-  check(/Water: about [\d.]+ (L|oz|ml) a day over the last \d+ days/.test(trends), 'water is a sentence', trends.slice(0, 200));
-  const waterCharts = await page.$$eval('#insight-trends .chart', (n) =>
-    n.filter((c) => /water/i.test(c.getAttribute('aria-label') ?? '')).length);
-  check(waterCharts === 0, 'and not a chart', String(waterCharts));
-  const trendLabels = await page.$$eval('#insight-trends .chart', (n) => n.map((c) => c.getAttribute('aria-label')));
-  check(trendLabels.some((l) => /^Sleep hours/.test(l ?? '')), 'sleep is still a chart, with its 7 to 9 hour band');
+  // Sleep and water are not repeated as counters: each has its own cycle
+  // card. With no weight or steps logged, there is no numbers card at all.
+  check(titles.trends == null, 'no "recent numbers" card repeating sleep and water as counters', String(titles.trends));
+  check(titles.sleep != null, 'sleep keeps its own card, through the cycle', String(titles.sleep));
 
   check(errors.length === 0, 'no page errors', errors.join(' | '));
   await ctx.close();

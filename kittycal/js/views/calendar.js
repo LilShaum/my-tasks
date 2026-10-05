@@ -111,7 +111,9 @@ export function renderCalendar(host) {
       marks,
       editMode: ui.periodEditMode,
     }),
-    legend(statesPresent(monthKeys, shared)),
+    legend(statesPresent(monthKeys, shared),
+      // The dot under a day, named whenever one is drawn (PRODUCT.md, U10).
+      monthKeys.some((k) => logs[k] != null && !nothingRecorded(logs[k]) && !periodDays.has(k))),
     /*
       Below the calendar, and sized like the occasional job it is.
 
@@ -775,25 +777,31 @@ function onGridKeydown(e, firstDayOfWeek) {
  * the other way.
  *
  * @param {Set<string>} present state names from `statesPresent`
+ * @param {boolean} [dots]  some day this month carries the "something logged" dot
  */
-function legend(present) {
+function legend(present, dots = false) {
   /** @type {{state: string, class: string, label: string}[]} */
   const items = [
     { state: 'logged', class: 'is-period', label: 'Period logged' },
-    { state: 'predicted', class: 'is-predicted', label: 'Period expected' },
+    // "Likely", the word his app uses too: one word for one thing (U11).
+    { state: 'predicted', class: 'is-predicted', label: 'Period likely' },
     { state: 'fertile', class: 'is-fertile', label: 'Fertile window' },
     { state: 'isOvulation', class: 'is-ovulation', label: 'Ovulation estimated' },
     { state: 'luteal', class: 'is-luteal', label: 'After ovulation' },
   ].filter((item) => present.has(item.state));
 
-  if (!items.length) return null;
+  if (!items.length && !dots) return null;
 
-  return el('ul', { class: 'cal-legend' }, items.map((item) =>
-    el('li', {}, [
+  return el('ul', { class: 'cal-legend' }, [
+    ...items.map((item) => el('li', {}, [
       el('span', { class: `cal-legend-swatch ${item.class}`, 'aria-hidden': 'true' }),
       el('span', { text: item.label }),
-    ]),
-  ));
+    ])),
+    dots ? el('li', {}, [
+      el('span', { class: 'cal-legend-swatch is-dot', 'aria-hidden': 'true' }),
+      el('span', { text: 'Something logged' }),
+    ]) : null,
+  ]);
 }
 
 function firstRunHint() {

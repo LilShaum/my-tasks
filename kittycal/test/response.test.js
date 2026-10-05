@@ -269,3 +269,32 @@ test('never comments on how she feels', () => {
   const forbidden = /sorry|hope|feel better|great|well done|good job|nice|keep it up|proud/i;
   if (said) assert.doesNotMatch(said, forbidden);
 });
+
+test('a pre-period pattern is not said again after the check-in: Coming up already says it', () => {
+  // Cycles of different lengths, bloating the 3 days before every period: it
+  // lands on a different cycle day each month, so only the echo and the
+  // pre-period pattern see it. "Coming up for you" already lists it on the
+  // same screen, with the count behind it, so the echo stays quiet.
+  const lengths = [27, 30, 28, 31, 29];
+  /** @type {Set<string>} */
+  const period = new Set();
+  /** @type {Record<string, import('../js/domain/model.js').DayLog>} */
+  const logs = {};
+  let start = '2026-01-01';
+  const starts = [start];
+  for (const len of lengths) { start = addDays(start, len); starts.push(start); }
+  for (const s0 of starts) for (let d = 0; d < 5; d += 1) period.add(addDays(s0, d));
+  for (let c = 1; c < starts.length; c += 1) {
+    for (const b of [3, 2, 1]) {
+      const key = addDays(starts[c], -b);
+      logs[key] = { ...emptyLog(key), symptoms: ['bloating'], checkedIn: true };
+    }
+  }
+  const cycles = buildCycles(period);
+  // Today: 3 days before the next period, 30 days into the current cycle.
+  const date = addDays(starts[starts.length - 1], 26);
+  const log = { ...emptyLog(date), symptoms: ['bloating'], checkedIn: true };
+  logs[date] = log;
+  const said = respondToCheckin({ log, logs, cycles, today: date });
+  assert.doesNotMatch(String(said), /bloating/i, 'not repeated as an echo or as cycle days');
+});

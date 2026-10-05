@@ -89,16 +89,13 @@ console.log('\nthe fertile window, once it has been and gone');
     return card?.querySelector('.big-value')?.textContent ?? '';
   });
 
-  ok('the card is still there, because when ovulation was is worth knowing',
-    /Fertile window/.test(text), text.slice(0, 60));
-  ok('but it no longer offers a past window as news: it says it has passed',
-    /Fertile window[^]*passed/.test(text), text.slice(0, 200));
   /*
-    And it shrinks to a line. Outside conceive mode, a window that has been
-    and gone was the biggest card on the screen for two weeks.
+    Outside conceive mode, a window that has been and gone is not a card at
+    all: the phase line already says she is past ovulation, the calendar still
+    shades the window, and "low chance today" every day reads as contraception
+    advice the app does not give (PRODUCT.md, U6).
   */
-  const compact = await page.$('#view-today .card-compact');
-  ok('and it shrinks to a single line until the next one', Boolean(compact) && !dates, dates);
+  ok('a fertile window that has passed is not a card on Today', !/Fertile window/.test(text) && !dates, text.slice(0, 200));
 }
 
 console.log('\nthe calendar legend covers what the calendar draws');
