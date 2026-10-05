@@ -20,7 +20,7 @@ import { mountOnboarding } from './views/onboarding.js';
 import { openHelp } from './views/help.js';
 import { needsCheckin, openCheckin } from './views/checkin.js';
 import { openLogSheet } from './views/log.js';
-import { isSheetOpen } from './ui/sheet.js';
+import { isSheetOpen, isSheetInUse, openSheet, closeSheet } from './ui/sheet.js';
 import { toast } from './ui/toast.js';
 import { mascot } from './ui/mascot.js';
 import { loadLock, showLockScreen } from './ui/lock.js';
@@ -28,17 +28,26 @@ import { checkReminders } from './ui/reminders.js';
 import { requestPersistence, refreshStorageSnapshot } from './storage/persist.js';
 import { buildCycles } from './domain/cycles.js';
 import { parseShareHash } from './storage/share.js';
-import { adoptShareLink, renderPartner, openPartnerSheet } from './views/partner.js';
 import { startPartnerSync } from './state/partner-sync.js';
+import {
+  renderPartnerToday, renderPartnerCalendar, renderPartnerRhythm, renderPartnerSettings,
+  refreshPartner, partnerTitle, PARTNER_TABS,
+} from './views/partner-app.js';
+import { mountDoor, mountPartnerSetup, connect } from './views/partner-setup.js';
+import { emblem } from './ui/mascot.js';
 import { predict } from './domain/predict.js';
 
-/** view id → renderer */
-const VIEWS = {
-  today: renderToday,
-  calendar: renderCalendar,
-  insights: renderInsights,
-  settings: renderSettings,
+/** view id → renderer, for each of the two apps this install can be */
+const APPS = {
+  self: { today: renderToday, calendar: renderCalendar, insights: renderInsights, settings: renderSettings },
+  partner: {
+    today: renderPartnerToday, calendar: renderPartnerCalendar,
+    insights: renderPartnerRhythm, settings: renderPartnerSettings,
+  },
 };
+
+/** Which of the two is running. Set once at boot; switching reloads. */
+let mode = /** @type {'self'|'partner'} */ ('self');
 
 let started = false;
 
@@ -89,31 +98,35 @@ async function boot() {
   }
 
   /*
-    A partner's share link carries its key in the fragment. Take it, then take
-    it out of the address bar, so a screenshot or a shared URL bar does not
-    pass the key on by accident.
+    A partner's share link carries its secret in the fragment. Take it, then
+    take it out of the address bar, so a screenshot or a shared URL bar does
+    not pass it on by accident.
   */
   const link = parseShareHash(location.hash);
-  if (link) {
-    adoptShareLink(link);
-    history.replaceState(null, '', location.pathname + location.search);
-  }
+  if (link) history.replaceState(null, '', location.pathname + location.search);
   addEventListener('hashchange', () => {
     const later = parseShareHash(location.hash);
     if (!later) return;
-    adoptShareLink(later);
     history.replaceState(null, '', location.pathname + location.search);
-    if (store.getState().settings.onboarded) openPartnerSheet();
+    void arriveWithLink(later);
   });
 
-  if (!settings.onboarded) {
-    // Someone who only opened a partner's link does not need to set up a
-    // cycle of their own to see it.
-    if (store.getState().settings.partnerOf) startPartnerOnly();
-    else startOnboarding();
-  } else {
+  /*
+    Which app this phone is. Phones from before the question existed are
+    whatever they were already doing: set up for her own cycle, or following
+    someone else's from a link.
+  */
+  const role = settings.role ?? (settings.onboarded ? 'self' : settings.partnerOf ? 'partner' : null);
+  if (link) {
+    hideBootScreen();
+    await arriveWithLink(link);
+  } else if (role === 'partner') {
+    if (settings.partnerOf && settings.role === 'partner') startPartnerApp();
+    else startPartnerSetup();
+  } else if (role === 'self') {
     startApp();
-    if (link) openPartnerSheet();
+  } else {
+    startDoor();
   }
 
   hideBootScreen();
@@ -130,23 +143,144 @@ async function boot() {
 }
 
 /**
- * The whole app, for a phone that only follows a partner's share: their view,
- * and a way to set up a cycle of its own if that is wanted.
+ * Her link opened this app.
+ *
+ * On a phone set up for its own cycle, the link is connected and she or he is
+ * asked whether to switch: the phone's own data is kept either way. Anywhere
+ * else it goes straight into the partner's setup, already connected.
+ *
+ * @param {{code: string}|{id: string, key: string}} link
  */
-function startPartnerOnly() {
+async function arriveWithLink(link) {
+  const { settings } = store.getState();
+  const tracksOwn = settings.role === 'self' || (settings.role == null && settings.onboarded);
+  if (mode === 'partner' && started) {
+    await connect(link);
+    return;
+  }
+  if (!tracksOwn) {
+    showConnecting();
+    const result = await connect(link);
+    if (result !== 'ok') toast(result === 'missing'
+      ? 'That link doesn’t work any more. Ask her for her code.'
+      : 'Couldn’t connect. Check your connection, then try the link again.', { ms: 6000 });
+    startPartnerSetup();
+    return;
+  }
+  if (!started) startApp();
+  const result = await connect(link);
+  if (result !== 'ok') { toast('Couldn’t open that link. Ask her for her code.'); return; }
+  offerPartnerMode();
+}
+
+/** A phone that tracks its own cycle has just been sent someone's. */
+function offerPartnerMode() {
+  const snap = store.getState().settings.partnerOf?.snapshot;
+  if (!snap) return;
+  const art = emblem(snap.theme ?? 'plain', { size: 64, className: '' });
+  art.setAttribute('data-theme', snap.theme ?? 'plain');
+  openSheet({
+    title: 'Partner view',
+    body: [
+      el('div', { class: 'pa-offer' }, [
+        art,
+        el('h3', { text: snap.name ? `${snap.name} shared her cycle with you` : 'Someone shared their cycle with you' }),
+        el('p', { class: 'hint', text: 'Partner mode turns this phone into a companion for her cycle. '
+          + 'Your own logs stay here, and you can switch back from Settings.' }),
+      ]),
+      el('div', { class: 'dialog-actions' }, [
+        el('button', { type: 'button', class: 'btn btn-block btn-lg', onclick: async () => {
+          store.updateSettings({ role: 'partner' });
+          await store.flushNow();
+          location.reload();
+        } }, ['Switch to partner mode']),
+        el('button', { type: 'button', class: 'btn btn-ghost btn-block', onclick: () => closeSheet() }, ['Not now']),
+      ]),
+    ],
+  });
+}
+
+function showConnecting() {
   const host = need('#onboarding-root');
   host.hidden = false;
   need('#app-root').hidden = true;
-  const page = el('div', { class: 'partner-page' });
-  host.replaceChildren(page);
-  const setUp = () => { host.replaceChildren(); startOnboarding(); };
-  renderPartner(page, { onSetUp: setUp });
-  // Removing the share from this phone leaves nothing to show.
-  const stop = store.subscribe(() => {
-    if (!store.getState().settings.partnerOf && !store.getState().settings.onboarded) {
-      if (typeof stop === 'function') stop();
-      setUp();
+  host.replaceChildren(el('div', { class: 'onb' }, [
+    el('div', { class: 'onb-body' }, [el('p', { class: 'hint', style: { textAlign: 'center' }, text: 'Connecting…' })]),
+  ]));
+}
+
+/** The first question: whose cycle is this phone for? */
+function startDoor() {
+  const host = need('#onboarding-root');
+  host.hidden = false;
+  need('#app-root').hidden = true;
+  mountDoor(host, {
+    onSelf: () => startOnboarding(),
+    onPartner: () => startPartnerSetup(),
+  });
+}
+
+function startPartnerSetup() {
+  const host = need('#onboarding-root');
+  host.hidden = false;
+  need('#app-root').hidden = true;
+  const { settings } = store.getState();
+  mountPartnerSetup(host, {
+    onBack: settings.onboarded || settings.partnerOf ? undefined : () => startDoor(),
+    onDone: () => {
+      host.hidden = true;
+      host.replaceChildren();
+      startPartnerApp();
+      announce('All set. This is her cycle, for you.');
+    },
+  });
+}
+
+/** Kittycal for the person she shares with: his four screens, no tracking. */
+function startPartnerApp() {
+  mode = 'partner';
+  need('#app-root').hidden = false;
+  need('#onboarding-root').hidden = true;
+  document.documentElement.dataset.app = 'partner';
+
+  // The tab bar is shared; only the third tab's name changes.
+  for (const [tab, label] of Object.entries(PARTNER_TABS)) {
+    const span = document.querySelector(`[data-tab="${tab}"] span`);
+    if (span) span.textContent = label;
+  }
+
+  if (!started) {
+    started = true;
+    wireTabs();
+    const help = $('#help-btn');
+    if (help) {
+      help.setAttribute('aria-label', 'How partner mode works');
+      help.addEventListener('click', () => openPartnerHelp());
     }
+    store.subscribe(render);
+    watchDayRollover();
+  }
+  render();
+
+  // Fresh on open, on every return to the foreground, and every quarter hour
+  // while it is on screen.
+  void refreshPartner({ force: true });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) void refreshPartner(); });
+  setInterval(() => { if (!document.hidden) void refreshPartner(); }, 15 * 60_000);
+}
+
+function openPartnerHelp() {
+  const name = store.getState().settings.partnerOf?.snapshot?.name ?? 'She';
+  openSheet({
+    title: 'How partner mode works',
+    body: [
+      el('p', { text: `${name} logs her cycle in her own Kittycal and chooses what to share. This app shows `
+        + 'it from your side: where she is, what her own history says is likely, and what usually helps.' }),
+      el('p', { text: 'Every forecast comes from her logs, so it gets sharper the longer she uses the app. '
+        + 'It is a forecast, not a promise, and never a reason to tell her how she feels.' }),
+      el('p', { text: 'What she shares is encrypted on her phone. The server stores a locked copy it cannot read; '
+        + 'only the code unlocks it. She can stop sharing at any time.' }),
+    ],
   });
 }
 
@@ -158,6 +292,7 @@ function startOnboarding() {
   mountOnboarding(host, {
     theme: store.getState().settings.theme,
     onDone: () => {
+      store.updateSettings({ role: 'self' });
       host.hidden = true;
       host.replaceChildren();
       startApp();
@@ -236,6 +371,7 @@ function applyLaunchIntent() {
  */
 let askedFor = /** @type {string|null} */ (null);
 function maybeAskForCheckin() {
+  if (mode === 'partner') return;
   const today = todayKey();
   if (askedFor === today) return;
 
@@ -258,7 +394,7 @@ function render() {
   const { ui, ready } = store.getState();
   if (!ready) return;
 
-  for (const [name, renderer] of Object.entries(VIEWS)) {
+  for (const [name, renderer] of Object.entries(APPS[mode])) {
     const host = $(`#view-${name}`);
     if (!host) continue;
     const active = ui.view === name;
@@ -270,7 +406,7 @@ function render() {
 
   syncTabs(ui.view);
   const title = $('#app-title-text');
-  if (title) title.textContent = titleFor(ui.view);
+  if (title) title.textContent = mode === 'partner' ? partnerTitle(ui.view) : titleFor(ui.view);
   renderHeaderMascot();
 }
 
@@ -364,7 +500,7 @@ function watchDayRollover() {
  */
 async function runReminderCheck() {
   const { settings, periodDays, logs } = store.getState();
-  if (!settings.onboarded) return;
+  if (!settings.onboarded || mode === 'partner') return;
   const today = todayKey();
   try {
     await checkReminders({
@@ -429,10 +565,11 @@ function registerServiceWorker() {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!hadController || reloading) return;
 
-    // Never yank the page out from under an open sheet — nothing typed into
-    // the logging sheet is saved until Apply. She gets the update next launch,
-    // which is no worse than the old behaviour.
-    if (isSheetOpen()) return;
+    // Never yank the page out from under a sheet she is using: nothing typed
+    // into the logging sheet is saved until Apply. A sheet that opened by
+    // itself and has not been touched (the morning check-in) holds nothing,
+    // and letting it block meant the new version waited a whole launch.
+    if (isSheetInUse()) return;
 
     reloading = true;
     window.location.reload();

@@ -16,9 +16,11 @@ import assert from 'node:assert/strict';
 
 import {
   SHARE_ITEMS, defaultChoices, buildSnapshot, partnerModel, icsFor, cleanSnapshot,
+  partnerDay, helpFor, freshStatus, STATUS_HOURS,
 } from '../js/domain/partner.js';
 import {
   newSecrets, encrypt, decrypt, shareLink, parseShareHash,
+  newCode, normalizeCode, secretsFromCode, parseShareInput,
 } from '../js/storage/share.js';
 import { defaultSettings } from '../js/domain/model.js';
 import { addDays } from '../js/utils/date.js';
@@ -60,14 +62,14 @@ const snapshot = (over = {}) => {
   });
 };
 
-test('the defaults match what the sheet shows: mood and fertile start off', () => {
+test('the defaults match what the sheet shows: only the fertile window starts off', () => {
   const d = defaultChoices();
-  assert.equal(d.mood, false);
   assert.equal(d.fertile, false);
-  for (const id of ['phase', 'patterns', 'helps', 'name']) {
+  for (const id of ['phase', 'patterns', 'mood', 'helps', 'name']) {
     assert.equal(/** @type {any} */ (d)[id], true, id);
   }
-  assert.deepEqual(Object.keys(d).sort(), SHARE_ITEMS.map((i) => i.id).sort());
+  // The note is not a toggle: it goes when she writes one.
+  assert.deepEqual(Object.keys(d).sort(), [...SHARE_ITEMS.map((i) => i.id), 'helps'].sort());
 });
 
 test('with everything chosen the summary carries it', () => {
@@ -126,8 +128,8 @@ test('the summary has exactly the documented fields: no logs, notes, tests or la
     settings: { notes: 'private diary', partnerOf: null },
   });
   assert.deepEqual(Object.keys(s).sort(), [
-    'cycleLength', 'fertile', 'helps', 'lastStart', 'lutealDays', 'mood', 'name',
-    'nextStart', 'patterns', 'paused', 'periodLength', 'phase', 'updated', 'v',
+    'cycleLength', 'easy', 'fertile', 'helps', 'lanes', 'lastStart', 'lutealDays', 'mood', 'name',
+    'nextStart', 'patterns', 'paused', 'periodLength', 'phase', 'stats', 'status', 'theme', 'updated', 'v',
   ]);
   const text = JSON.stringify(s);
   for (const word of ['late', 'Late', 'pregnan', 'test', 'note', 'diary', 'log']) {
@@ -187,6 +189,7 @@ const snap = (until, over = {}) => ({
   lastStart: addDays(TODAY, until - 28), nextStart: addDays(TODAY, until),
   cycleLength: 28, periodLength: 5, lutealDays: 14,
   phase: true, fertile: true, patterns: [], mood: null, helps: '',
+  theme: 'hellokitty', lanes: [], easy: null, stats: null, status: null,
   ...over,
 });
 
@@ -265,9 +268,9 @@ test('rolling forward is by whole cycles, however long the summary sits', () => 
   assert.notEqual(modelOn(snap(0), 28 + 1).status, 'period');
 });
 
-test('upcoming: two periods, one cycle apart, each as long as her period', () => {
+test('upcoming: three periods, one cycle apart, each as long as her period', () => {
   const m = modelOn(snap(10, { cycleLength: 30, periodLength: 4 }));
-  assert.equal(m.upcoming.length, 2);
+  assert.equal(m.upcoming.length, 3);
   assert.equal(m.upcoming[0].start, addDays(TODAY, 10));
   assert.equal(m.upcoming[0].end, addDays(TODAY, 13));
   assert.equal(m.upcoming[1].start, addDays(TODAY, 40));
@@ -356,15 +359,15 @@ test('the summary is enough on its own: it agrees with a fresh one a few days la
 
 /* ── icsFor ─────────────────────────────────────────────────────────────── */
 
-test('icsFor: two all-day events, end exclusive, CRLF throughout', () => {
+test('icsFor: three all-day events, end exclusive, CRLF throughout', () => {
   const m = modelOn(snap(10, { periodLength: 5 }));
   const ics = icsFor(m, '20261004T120000Z');
 
   assert.ok(ics.startsWith('BEGIN:VCALENDAR\r\n'));
   assert.ok(ics.endsWith('END:VCALENDAR\r\n'));
   assert.equal(/(?<!\r)\n/.test(ics), false, 'every newline is CRLF');
-  assert.equal((ics.match(/^BEGIN:VEVENT$/gm) ?? []).length, 2);
-  assert.equal((ics.match(/^END:VEVENT$/gm) ?? []).length, 2);
+  assert.equal((ics.match(/^BEGIN:VEVENT$/gm) ?? []).length, 3);
+  assert.equal((ics.match(/^END:VEVENT$/gm) ?? []).length, 3);
 
   const day = (/** @type {string} */ k) => k.replace(/-/g, '');
   const [a, b] = m.upcoming;
@@ -372,11 +375,11 @@ test('icsFor: two all-day events, end exclusive, CRLF throughout', () => {
   assert.ok(ics.includes(`DTEND;VALUE=DATE:${day(addDays(a.end, 1))}\r\n`), 'exclusive end: the day after');
   assert.ok(ics.includes(`DTSTART;VALUE=DATE:${day(b.start)}\r\n`));
   assert.ok(ics.includes(`DTEND;VALUE=DATE:${day(addDays(b.end, 1))}\r\n`));
-  assert.equal((ics.match(/^DTSTAMP:20261004T120000Z$/gm) ?? []).length, 2);
+  assert.equal((ics.match(/^DTSTAMP:20261004T120000Z$/gm) ?? []).length, 3);
   assert.ok(ics.includes('SUMMARY:Sam’s period (expected)'));
   // Unique ids, or a calendar merges the two.
   const uids = ics.match(/^UID:.*$/gm) ?? [];
-  assert.equal(new Set(uids).size, 2);
+  assert.equal(new Set(uids).size, 3);
 });
 
 test('icsFor: without a name the event just says Period', () => {
@@ -502,7 +505,7 @@ test('cleanSnapshot: a real summary passes through unchanged', () => {
 });
 
 test('cleanSnapshot: anything that is not a summary is refused', () => {
-  for (const junk of [null, 42, 'hi', [], {}, { v: 2, updated: TODAY }, { v: 1, updated: 'yesterday' }]) {
+  for (const junk of [null, 42, 'hi', [], {}, { v: 3, updated: TODAY }, { v: 1, updated: 'yesterday' }]) {
     assert.equal(cleanSnapshot(junk), null, JSON.stringify(junk));
   }
 });
@@ -528,4 +531,100 @@ test('cleanSnapshot: hand-made fields are typed, ranged and capped, and the view
   assert.equal(bad.mood, null);
   assert.equal(bad.helps.length, 600);
   assert.doesNotThrow(() => partnerModel(bad, TODAY));
+});
+
+/* ── The partner app: days, help, status, codes ─────────────────────────── */
+
+const LANES = /** @type {import('../js/domain/partner.js').Lane[]} */ ([
+  { id: 'cramps', label: 'Cramps', kind: 'body', from: 1, to: 2 },
+  { id: 'bloating', label: 'Bloating', kind: 'body', from: -3, to: -1 },
+  { id: 'harder-days', label: 'Harder days', kind: 'mood', from: -4, to: -1 },
+]);
+
+test('partnerDay: lanes land on the right days, counted from either end of her cycle', () => {
+  const s = snap(3, { lanes: LANES, easy: { from: 7, to: 11 } });
+  const d = partnerDay(s, TODAY);
+  assert.ok(d);
+  assert.equal(d.untilNext, 3);
+  assert.deepEqual(d.lanes.map((l) => l.id), ['bloating', 'harder-days']);
+  assert.equal(partnerDay(s, addDays(TODAY, -1))?.lanes.map((l) => l.id).join(), 'harder-days');
+  // Day 1 and 2 of the next period: cramps, counted from the expected start.
+  const first = partnerDay(s, addDays(TODAY, 3));
+  assert.equal(first?.period, 'expected');
+  assert.equal(first?.cycleDay, 1);
+  assert.deepEqual(first?.lanes.map((l) => l.id), ['cramps']);
+  // Day 9 of the cycle that started 25 days ago: her easier stretch.
+  assert.equal(partnerDay(s, addDays(TODAY, -17))?.easy, true);
+  assert.equal(partnerDay(s, TODAY)?.easy, false);
+});
+
+test('partnerDay: nothing before her last start, and nothing while paused', () => {
+  const s = snap(10);
+  assert.equal(partnerDay(s, addDays(s.lastStart ?? '', -1)), null);
+  assert.equal(partnerDay({ ...s, paused: true }, TODAY), null);
+});
+
+test('helpFor: what she sent comes first, then her own patterns, at most three, one line each', () => {
+  const s = snap(3, { lanes: LANES });
+  const d = partnerDay(s, TODAY);
+  const help = helpFor(d, { id: 'cuddles', at: 0 }, TODAY);
+  assert.equal(help.length, 3);
+  assert.equal(help[0].key, 'status:cuddles');
+  assert.deepEqual(help.slice(1).map((h) => h.key), ['bloating', 'harder-days']);
+  for (const h of help) assert.ok(h.text.length < 90 && !h.text.includes('\n'), h.text);
+  // Stable through the day, so it does not change under him.
+  assert.deepEqual(helpFor(d, null, TODAY), helpFor(d, null, TODAY));
+});
+
+test('helpFor: a quiet day still has something useful, never a generic lecture', () => {
+  const s = snap(20, { lanes: LANES, easy: { from: 7, to: 11 } });
+  const d = partnerDay(s, TODAY);
+  const keys = helpFor(d, null, TODAY).map((h) => h.key);
+  assert.ok(keys.includes('easy'), keys.join());
+});
+
+test('freshStatus: shows for its hours, then lapses', () => {
+  const s = snap(10, { status: { id: 'tired', at: 1_000_000 } });
+  assert.ok(freshStatus(s, 1_000_000 + 3600e3));
+  assert.equal(freshStatus(s, 1_000_000 + STATUS_HOURS * 3600e3 + 1), null);
+});
+
+test('cleanSnapshot: v2 lanes, easier days, stats and status survive; bad ones are dropped', () => {
+  const good = snap(10, {
+    v: 2, lanes: LANES, easy: { from: 7, to: 11 },
+    stats: { min: 27, max: 31, cycles: 6, regularity: 'regular', hits: 4, total: 4 },
+    status: { id: 'snacks', at: 5 },
+  });
+  assert.deepEqual(cleanSnapshot(JSON.parse(JSON.stringify(good))), good);
+  const bad = cleanSnapshot({ ...good,
+    lanes: [{ id: 'x', label: 'X', kind: 'body', from: -3, to: 4 }, { id: 'y', label: 'Y', kind: 'evil', from: 2, to: 1 }],
+    easy: { from: 0, to: 99 }, status: { id: 'hack', at: 1 }, theme: '<script>' });
+  assert.deepEqual(bad?.lanes, []);
+  assert.equal(bad?.easy, null);
+  assert.equal(bad?.status, null);
+  assert.equal(bad?.theme, null);
+});
+
+test('codes: forgiving to type, and the same code always gives the same share', async () => {
+  const code = newCode();
+  assert.match(code, /^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}$/);
+  assert.equal(normalizeCode(code.toLowerCase().replace('-', ' ')), code);
+  assert.equal(normalizeCode('ABCDE-FGHIO'), 'ABCDE-FGH10');
+  assert.equal(normalizeCode('too short'), null);
+  const a = await secretsFromCode(code);
+  const b = await secretsFromCode(code);
+  assert.deepEqual(a, b);
+  assert.notEqual((await secretsFromCode(newCode())).id, a.id);
+  assert.match(a.id, /^[A-Za-z0-9_-]{22}$/);
+  // The derived key really encrypts and decrypts.
+  assert.deepEqual(await decrypt(await encrypt({ hi: 1 }, a.key), a.key), { hi: 1 });
+});
+
+test('links and typed input: a code link, a pasted link, or the bare code all connect', () => {
+  const code = 'ABCDE-FGHJK';
+  assert.deepEqual(parseShareHash(`#partner=${code}`), { code });
+  assert.equal(shareLink({ id: 'i', key: 'k', code }, 'https://x/'), `https://x/#partner=${code}`);
+  assert.deepEqual(parseShareInput(`Open this: https://x/kittycal/#partner=${code}`), { code });
+  assert.deepEqual(parseShareInput(' abcde fghjk '), { code });
+  assert.equal(parseShareInput('hello'), null);
 });

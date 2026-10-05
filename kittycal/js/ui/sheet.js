@@ -13,8 +13,22 @@ import { el, need, trapFocus, haptic } from '../utils/dom.js';
 /** Ids handed to openers that lack one, so focus can be restored by lookup. */
 let openerSeq = 0;
 
-/** @type {{root: HTMLElement, backdrop: HTMLElement, release: () => void, opener: string|null}|null} */
+/** @type {{root: HTMLElement, backdrop: HTMLElement, release: () => void, opener: string|null, touched: boolean}|null} */
 let open = null;
+
+/**
+ * Whether the open sheet has been used: tapped, typed into, or scrolled.
+ *
+ * The update path reloads the page to take a new version, and skipped that
+ * whenever any sheet was open. But the check-in opens by itself on launch, so
+ * the first launch after an update almost always had a sheet up, and the new
+ * version did not arrive until the next launch: her partner opened her link
+ * and saw the previous app until he reloaded by hand. A sheet nobody has
+ * touched holds nothing to lose, so it no longer blocks the reload.
+ */
+export function isSheetInUse() {
+  return open != null && open.touched;
+}
 
 /**
  * Whether a sheet is currently open.
@@ -114,10 +128,16 @@ export function openSheet({ title, body, footer, onClose }) {
   };
   document.addEventListener('keydown', onKeydown);
 
+  const touch = () => { if (open) open.touched = true; };
+  root.addEventListener('pointerdown', touch);
+  root.addEventListener('keydown', touch);
+  root.addEventListener('input', touch);
+
   open = {
     root,
     backdrop,
     opener,
+    touched: false,
     release: () => {
       releaseTrap();
       document.removeEventListener('keydown', onKeydown);

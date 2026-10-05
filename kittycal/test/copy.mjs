@@ -293,6 +293,15 @@ async function tour(page, label, { full = true } = {}) {
 
 {
   const { ctx, page, errors } = await open('a first launch, through every setup step', null);
+  // The first question, and the partner path's first step, then back to her setup.
+  await scan(page, 'who is this for');
+  await page.locator('.door-card', { hasText: 'partner' }).click();
+  await page.waitForTimeout(400);
+  await scan(page, 'partner setup, connect');
+  await page.locator('#onboarding-root .btn-ghost', { hasText: 'Back' }).click();
+  await page.waitForTimeout(400);
+  await page.locator('.door-card', { hasText: 'Tracking my own cycle' }).click();
+  await page.waitForTimeout(400);
   for (let i = 0; i < 14; i += 1) {
     await scan(page, `onboarding screen ${i + 1}`);
     const hidden = await page.locator('#onboarding-root').evaluate((n) => n.hidden).catch(() => true);

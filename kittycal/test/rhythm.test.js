@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import {
   AFTER, BEFORE, HARD_MOOD, align, alignedSeries, bodyMap, moodCurve,
   sleepCurve, goesWith, periodFingerprint,
-  binomialTail,
+  binomialTail, easierDays,
 } from '../js/domain/rhythm.js';
 import { buildCycles } from '../js/domain/cycles.js';
 import { emptyLog } from '../js/domain/model.js';
@@ -488,4 +488,33 @@ test('periodFingerprint: limit windows the rows; null below two periods', () => 
   const one = periods([5], () => 'medium');
   assert.equal(periodFingerprint(one.logs, one.cycles), null);
   assert.equal(periodFingerprint({}, []), null);
+});
+
+test('easierDays: a quiet stretch between period and PMS is found, inside her own data', () => {
+  let seed = 3;
+  const rand = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+  const { logs, cycles } = world([28, 29, 28, 27, 28], ({ after, before }) => {
+    /** @type {string[]} */
+    const symptoms = [];
+    if (after <= 3) symptoms.push('cramps');
+    if (before <= 6) symptoms.push('bloating');
+    // Middle days are quiet apart from the odd headache; days 15 to 22 are not.
+    if (after >= 15 && before > 6 && rand() < 0.6) symptoms.push('fatigue');
+    if (after >= 6 && after <= 13 && rand() < 0.05) symptoms.push('headache');
+    return { symptoms, checkedIn: true };
+  });
+  const easy = easierDays(logs, cycles);
+  assert.ok(easy, 'a window is found');
+  assert.ok(easy.from >= 6 && easy.to <= 14 && easy.to - easy.from >= 3, JSON.stringify(easy));
+});
+
+test('easierDays: logging evenly, or hardly at all, gives no window', () => {
+  let seed = 5;
+  const rand = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+  const even = world([28, 28, 28, 28], () => ({ symptoms: rand() < 0.4 ? ['fatigue'] : [], checkedIn: true }));
+  assert.equal(easierDays(even.logs, even.cycles), null);
+  const quiet = world([28, 28, 28, 28], () => ({ checkedIn: true }));
+  assert.equal(easierDays(quiet.logs, quiet.cycles), null);
+  const short = world([28, 28], ({ after }) => ({ symptoms: after <= 3 ? ['cramps'] : [], checkedIn: true }));
+  assert.equal(easierDays(short.logs, short.cycles), null);
 });

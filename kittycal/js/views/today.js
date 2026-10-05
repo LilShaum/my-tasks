@@ -44,6 +44,7 @@ import { packPosition, describePack, unmarkedDays } from '../domain/pill.js';
 import { cycleSignals } from '../domain/ovulation.js';
 import { cycleRing } from '../ui/ring.js';
 import { spotArt, momentIcon } from '../ui/mascot.js';
+import { statusRow } from './partner.js';
 import * as store from '../state/store.js';
 
 /**
@@ -163,6 +164,8 @@ function renderTodayInner(host) {
     // would, and saying it twice on one screen reads as the app repeating itself.
     prediction.expecting ? null : phaseLine(phase),
     logButton(logs[today], today, logs, cycles),
+    // Only while she shares: one tap to tell them how she is.
+    statusRow(),
     weekStrip(logs, periodDays, today, settings.startedOn),
     waterStrip(settings, logs[today], today),
 

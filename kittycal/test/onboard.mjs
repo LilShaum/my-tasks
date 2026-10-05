@@ -43,6 +43,9 @@ async function toEarlierStep() {
 
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.waitForTimeout(700);
+  // The first screen asks who the app is for.
+  await page.locator('.door-card', { hasText: 'Tracking my own cycle' }).click();
+  await page.waitForTimeout(400);
 
   const next = () => page.locator('#onboarding-root .btn-lg').click();
   const heading = () => page.locator('#onboarding-root h2').first().textContent();

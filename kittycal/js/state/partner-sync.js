@@ -16,7 +16,9 @@ import { todayKey } from '../utils/date.js';
 import { buildCycles } from '../domain/cycles.js';
 import { predict } from '../domain/predict.js';
 import { premenstrualPatterns } from '../domain/heads-up.js';
-import { moodCurve } from '../domain/rhythm.js';
+import { moodCurve, bodyMap, sleepCurve, easierDays } from '../domain/rhythm.js';
+import { cycleLengths } from '../domain/cycles.js';
+import { predictionAccuracy, MIN_SCORED } from '../domain/accuracy.js';
 import { buildSnapshot } from '../domain/partner.js';
 import { putShare } from '../storage/share.js';
 
@@ -30,7 +32,7 @@ let sending = false;
  * The summary her phone would send now — or, given choices she has not saved
  * yet, the one it would send with those.
  *
- * @param {{choices: import('../domain/partner.js').ShareChoices, helps: string}|null} [share]
+ * @param {{choices: import('../domain/partner.js').ShareChoices, helps: string, status?: {id: string, at: number}|null}|null} [share]
  */
 export function currentSnapshot(share = store.getState().settings.partnerShare) {
   const { settings, logs, periodDays } = store.getState();
@@ -38,6 +40,9 @@ export function currentSnapshot(share = store.getState().settings.partnerShare) 
   const today = todayKey();
   const cycles = buildCycles(periodDays);
   const prediction = predict({ periodDays, settings, today, logs });
+  const lengths = cycleLengths(cycles).slice(-6);
+  const record = predictionAccuracy(cycles);
+  const sleep = sleepCurve(logs, cycles);
   return buildSnapshot({
     settings,
     prediction,
@@ -46,6 +51,18 @@ export function currentSnapshot(share = store.getState().settings.partnerShare) 
     patterns: premenstrualPatterns(logs, cycles),
     moodWindow: moodCurve(logs, cycles)?.finding?.window ?? null,
     today,
+    rows: bodyMap(logs, cycles, 8),
+    sleepDip: Boolean(sleep?.finding && sleep.finding.minutes < 0),
+    easy: easierDays(logs, cycles),
+    stats: lengths.length ? {
+      min: Math.min(...lengths),
+      max: Math.max(...lengths),
+      cycles: cycleLengths(cycles).length,
+      regularity: prediction.regularity,
+      hits: record.total >= MIN_SCORED ? record.hits : null,
+      total: record.total >= MIN_SCORED ? record.total : null,
+    } : null,
+    status: share.status ?? null,
   });
 }
 
