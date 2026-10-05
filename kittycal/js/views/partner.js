@@ -199,8 +199,8 @@ export function openShareSheet() {
         el('p', { class: 'hint-sm', text: `Sharing since ${fmtLong(/** @type {any} */ (s.since))}. `
           + (s.sentAt ? `Updated ${fmtRelative(keyOf(s.sentAt)).toLowerCase()}.` : 'It sends when you’re online.') }),
       ]) : el('p', { class: 'hint', text:
-        'Your partner gets their own Kittycal view: where you are in your cycle, what’s likely each day '
-        + 'from your own patterns, and how they can help. They only see what you pick.' }),
+        'Your partner gets their own Kittycal view: where you are in your cycle, when your period’s '
+        + 'coming, and what’s likely each day from your own patterns. They only see what you pick.' }),
 
       el('h3', { class: 'section-label', text: 'What they see' }),
       el('div', { class: 'rows' }, [

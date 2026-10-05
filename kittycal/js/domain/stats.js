@@ -58,6 +58,31 @@ export function loggedIds(log) {
 }
 
 /**
+ * The finished cycles she logged something in: a check-in, a symptom, a
+ * mood, sleep or water. Flow alone does not count, since entering a past
+ * period writes it.
+ *
+ * Without this, periods entered from memory at setup counted as cycles in
+ * which nothing happened. Someone with four remembered periods and one month
+ * of check-ins had every symptom "in 1 of 4 cycles", under the 60% bar, and
+ * would stay under it for months of real logging. A cycle with no logs says
+ * nothing about her, so it is left out rather than counted as a blank.
+ *
+ * @param {Record<DateKey, DayLog>} logs
+ * @param {Cycle[]} cycles
+ * @returns {(Cycle & {nextStart: DateKey})[]}
+ */
+export function trackedCycles(logs, cycles) {
+  return /** @type {any} */ (cycles.filter((c) => c.complete && c.nextStart
+    && range(c.start, cycleEnd(c)).some((date) => tracked(logs[date]))));
+}
+
+/** @param {DayLog|undefined} log */
+const tracked = (log) => Boolean(log && (log.checkedIn || log.sleep != null || log.water > 0
+  || loggedIds(log).length));
+
+
+/**
  * How often each symptom appears, across all logged days.
  * @param {Record<DateKey, DayLog>} logs
  * @returns {{id: string, count: number}[]} most frequent first
@@ -108,9 +133,9 @@ export function symptomPattern(symptomId, logs, cycles) {
  * @returns {{byId: Map<string, {byDay: Map<number, number>, cycles: number}>, total: number}}
  */
 export function patternIndex(logs, cycles) {
-  // Only completed cycles: the current one is still accumulating, and counting
-  // it would understate how often a late-cycle symptom occurs.
-  const complete = cycles.filter((c) => c.complete);
+  // Only completed cycles she logged in: the current one is still
+  // accumulating, and one with no logs would count as a cycle without it.
+  const complete = trackedCycles(logs, cycles);
 
   /** @type {Map<string, {byDay: Map<number, number>, cycles: number}>} */
   const byId = new Map();
@@ -190,8 +215,7 @@ function summarize(entry, total) {
  * @returns {Pattern[]}
  */
 export function detectPatterns(logs, cycles, limit = 8) {
-  const complete = cycles.filter((c) => c.complete);
-  if (complete.length < MIN_CYCLES_FOR_PATTERN) return [];
+  if (trackedCycles(logs, cycles).length < MIN_CYCLES_FOR_PATTERN) return [];
 
   const { byId, total } = patternIndex(logs, cycles);
 

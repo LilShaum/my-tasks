@@ -482,3 +482,11 @@ test('patterns found in one pass match the per-symptom answer exactly', () => {
     assert.equal(pattern.cyclesWith, one.cyclesWith, pattern.id);
   }
 });
+
+test('cycles with nothing logged, like periods remembered at setup, do not dilute a pattern', () => {
+  // Five complete cycles; she only started logging in the last three.
+  const { logs, cyclesList } = build({ cycles: 6, onDays: { 1: ['cramps'] }, skipCycles: [0, 1] });
+  const patterns = detectPatterns(logs, cyclesList);
+  assert.equal(patterns.length, 1);
+  assert.equal(patterns[0].cyclesTotal, 3);
+});

@@ -34,7 +34,7 @@
  */
 
 import { addDays, daysBetween, range } from '../utils/date.js';
-import { loggedIds } from './stats.js';
+import { loggedIds, trackedCycles } from './stats.js';
 
 /** Days counted from a period's first day. */
 export const AFTER = 14;
@@ -109,9 +109,14 @@ export function align(cycle, date) {
   };
 }
 
-/** @param {Cycle[]} cycles @returns {(Cycle & {nextStart: DateKey})[]} */
-function completeOnly(cycles) {
-  return /** @type {any} */ (cycles.filter((c) => c.complete && c.nextStart));
+/**
+ * The finished cycles she logged in. One with no logs is not a cycle in which
+ * nothing happened, so it is not counted as one (see stats.js trackedCycles).
+ * @param {Cycle[]} cycles @param {Record<DateKey, DayLog>} logs
+ * @returns {(Cycle & {nextStart: DateKey})[]}
+ */
+function completeOnly(cycles, logs) {
+  return trackedCycles(logs, cycles);
 }
 
 /**
@@ -142,7 +147,7 @@ const emptySlots = (length) => Array.from({ length }, () => ({ n: 0, sum: 0 }));
 export function alignedSeries(logs, cycles, valueOf) {
   const after = emptySlots(AFTER);
   const before = emptySlots(BEFORE);
-  const complete = completeOnly(cycles);
+  const complete = completeOnly(cycles, logs);
 
   for (const cycle of complete) {
     for (const date of cycleDates(cycle)) {
@@ -295,7 +300,7 @@ function whenItHappens(afterSlots, beforeSlots) {
  * @returns {BodyRow[]}
  */
 export function bodyMap(logs, cycles, limit = 8) {
-  const complete = completeOnly(cycles);
+  const complete = completeOnly(cycles, logs);
   if (complete.length < MIN_CYCLES) return [];
 
   /** @type {Record<BodyRow['kind'], (log: DayLog) => string[]>} */
@@ -396,7 +401,7 @@ function smoothed(arr, i) {
  * @returns {{after: (number|null)[], before: (number|null)[], cycles: number, finding: MoodFinding|null}|null}
  */
 export function moodCurve(logs, cycles) {
-  const complete = completeOnly(cycles);
+  const complete = completeOnly(cycles, logs);
   if (complete.length < MIN_CYCLES) return null;
 
   let moodDays = 0;
@@ -469,7 +474,7 @@ const BAD_SLEEP = ['restless-sleep', 'insomnia'];
  *   cycles: number, finding: SleepFinding|null}|null}
  */
 export function sleepCurve(logs, cycles) {
-  const complete = completeOnly(cycles);
+  const complete = completeOnly(cycles, logs);
   if (complete.length < 2) return null;
 
   // Count real nights, not slot entries: a day in both arrays is one night.
@@ -753,7 +758,7 @@ const EASY_MAX = 9;
  * @returns {{from: number, to: number}|null}
  */
 export function easierDays(logs, cycles) {
-  const complete = completeOnly(cycles);
+  const complete = completeOnly(cycles, logs);
   if (complete.length < MIN_CYCLES) return null;
   const series = alignedSeries(logs, complete, (log) => {
     if (!log.checkedIn && !log.symptoms?.length && !log.moods?.length) return null;

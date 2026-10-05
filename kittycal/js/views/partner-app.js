@@ -5,10 +5,13 @@
  * His phone does not track a cycle. It follows hers, from the encrypted
  * summary she chose to share, and turns it into four screens of his own:
  *
- *   - Today: where she is, what her own patterns say is likely today, two or
- *     three things he can actually do, and the week ahead at a glance.
- *   - Calendar: her coming periods and phases, for planning.
- *   - Rhythm: her typical month as a picture, and the numbers behind it.
+ *   - Today: where she is, what her own patterns say is likely today (each
+ *     with when it usually happens for her, and one thing that helps), and
+ *     the week ahead at a glance.
+ *   - Calendar: her coming periods, harder and easier days, every look named
+ *     in a legend, and any day's detail under the month.
+ *   - Rhythm: her month unrolled as a bar, what usually happens when with the
+ *     dates it lands on, and the numbers behind it.
  *   - Settings: his look, the connection, and the way back.
  *
  * Two characters, on purpose. His theme dresses his app (header, colours,
@@ -26,7 +29,7 @@
 
 import { el, replace, haptic, announce } from '../utils/dom.js';
 import {
-  todayKey, daysBetween, fmtDayMonth, fmtLong, fmtRelative, fmtMonthYear,
+  todayKey, daysBetween, addDays, fmtDayMonth, fmtLong, fmtRelative, fmtMonthYear,
   dow, dayOfMonth, DOW_MIN, DOW_SHORT, daysInMonth, makeKey, year as yearOf, month as monthOf,
 } from '../utils/date.js';
 import { plural } from '../utils/fmt.js';
@@ -38,7 +41,7 @@ import { cycleRing } from '../ui/ring.js';
 import { themePicker, setPickerSelection } from '../ui/theme-picker.js';
 import { applyTheme } from '../ui/theme.js';
 import {
-  partnerModel, partnerDay, partnerDays, helpFor, freshStatus, icsFor, PHASE_WORDS,
+  partnerModel, partnerDay, partnerDays, dayItems, isDue, laneWhen, nextRun, statusTip, freshStatus, icsFor, PHASE_WORDS,
 } from '../domain/partner.js';
 import { STATUSES } from '../data/partner-tips.js';
 import { getShare } from '../storage/share.js';
@@ -243,19 +246,13 @@ export function partnerToday(snap, { preview = false, now = Date.now() } = {}) {
     ]);
   }
 
-  const help = helpFor(day, status, today);
+  const due = isDue(snap, day, today);
   return el('div', { class: 'pa-today' }, [
     status ? statusBubble(snap, status) : null,
-    ring(snap, day),
-    day.phase ? phaseLine(day.phase) : null,
-    likelyToday(snap, day),
-    help.length ? el('section', { class: 'pa-section' }, [
-      el('h3', { class: 'pa-h', text: 'How you can help' }),
-      el('ul', { class: 'pa-help' }, help.map((h) => el('li', {}, [
-        el('span', { class: 'pa-help-icon' }, [momentIcon(h.icon, 'pa-help-mark')]),
-        el('span', { text: h.text }),
-      ]))),
-    ]) : null,
+    ring(snap, day, due),
+    phaseKey(snap, due ? null : day.phase),
+    due ? phaseLine('due') : day.phase && snap.phase ? phaseLine(day.phase) : null,
+    likelySection(snap, day, today),
     weekAhead(snap, today, preview),
     snap.helps ? el('section', { class: 'pa-section pa-note' }, [
       el('h3', { class: 'pa-h', text: `In ${hers(snap)} words` }),
@@ -275,7 +272,8 @@ function greeting(name) {
 }
 
 /**
- * What she told him, as her character saying it.
+ * What she told him, as her character saying it, with the one thing that
+ * helps underneath.
  * @param {Snapshot} snap
  * @param {{id: string, at: number}} status
  */
@@ -284,11 +282,13 @@ function statusBubble(snap, status) {
   if (!s) return null;
   const at = new Date(status.at);
   const time = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const tip = statusTip(s.id);
   return el('div', { class: 'pa-status', role: 'status' }, [
     el('span', { class: 'pa-status-who' }, [herCharacter(snap, 40)]),
     el('div', { class: 'pa-status-bubble' }, [
       el('span', { class: 'pa-status-from', text: `${snap.name ?? 'She'} · ${time}` }),
       el('span', { class: 'pa-status-text' }, [momentIcon(s.icon, 'pa-status-mark'), s.label]),
+      tip ? el('span', { class: 'pa-status-tip', text: tip }) : null,
     ]),
   ]);
 }
@@ -297,30 +297,27 @@ function statusBubble(snap, status) {
  * Her cycle as the ring, with her character on today.
  * @param {Snapshot} snap
  * @param {PartnerDay} day
+ * @param {boolean} due
  */
-function ring(snap, day) {
+function ring(snap, day, due) {
   const len = Math.max(15, snap.cycleLength);
   const bleed = Math.max(1, snap.periodLength);
   const showPhases = snap.phase || snap.fertile;
   /** @type {any} */
   const pseudo = {
-    avgCycleLength: len, avgPeriodLength: bleed, cycleDay: Math.min(day.cycleDay, len),
+    avgCycleLength: len, avgPeriodLength: bleed, cycleDay: due ? 1 : Math.min(day.cycleDay, len),
     showFertility: snap.fertile, ovulation: snap.fertile ? day.next : null, nextStart: day.next,
     lutealDays: snap.lutealDays, fertileBefore: 5, onHormonal: false,
   };
-  const value = day.period === 'logged' ? String(day.cycleDay)
-    : day.period === 'expected' && day.untilNext <= 0 ? 'Due'
-      : day.period === 'expected' ? String(day.cycleDay)
-        : String(day.untilNext);
-  const caption = day.period === 'logged' ? `day of ${hers(snap)} period`
-    : day.period === 'expected' && day.untilNext <= 0 ? `${hers(snap)} period, any day`
-      : day.period === 'expected' ? `day of ${hers(snap)} expected period`
-        : day.untilNext === 1 ? `day until ${hers(snap)} period` : `days until ${hers(snap)} period`;
+  const onPeriod = day.period === 'logged';
   return cycleRing({
     prediction: pseudo,
-    headline: value,
-    caption,
-    eyebrow: `Day ${day.cycleDay}`,
+    headline: due ? 'Due' : onPeriod ? String(day.cycleDay) : String(day.untilNext),
+    caption: due ? `${hers(snap)} period, any day`
+      : onPeriod ? `day of ${hers(snap)} period`
+        : day.untilNext === 1 ? `day until ${hers(snap)} period` : `days until ${hers(snap)} period`,
+    // The number already is the day of her period; saying it twice is noise.
+    eyebrow: due || onPeriod ? undefined : `Day ${day.cycleDay}`,
     theme: snap.theme ?? 'plain',
     segments: showPhases ? undefined : [
       { id: 'menstrual', from: 0, to: bleed / len },
@@ -330,13 +327,70 @@ function ring(snap, day) {
 }
 
 /**
+ * Her month as spans of cycle days, in the ring's colours: what the ring
+ * shows, and what Rhythm unrolls into a bar.
+ * @param {Snapshot} snap
+ * @returns {{id: 'period'|'follicular'|'fertile'|'luteal'|'unknown', from: number, to: number}[]}
+ */
+function phaseSpans(snap) {
+  const len = Math.max(15, snap.cycleLength);
+  const bleed = Math.min(len, Math.max(1, snap.periodLength));
+  /** @type {ReturnType<typeof phaseSpans>} */
+  const out = [{ id: 'period', from: 1, to: bleed }];
+  if (!snap.phase && !snap.fertile) {
+    out.push({ id: 'unknown', from: bleed + 1, to: len });
+    return out;
+  }
+  const ov = len - snap.lutealDays;
+  if (snap.fertile) {
+    const a = Math.max(bleed + 1, ov - 5);
+    const b = Math.min(len, ov + 1);
+    if (a > bleed + 1) out.push({ id: 'follicular', from: bleed + 1, to: a - 1 });
+    out.push({ id: 'fertile', from: a, to: b });
+    if (b < len) out.push({ id: 'luteal', from: b + 1, to: len });
+  } else {
+    const l = Math.max(bleed + 1, ov + 1);
+    out.push({ id: 'follicular', from: bleed + 1, to: l - 1 });
+    out.push({ id: 'luteal', from: l, to: len });
+  }
+  return out.filter((x) => x.to >= x.from);
+}
+
+/**
+ * The ring's colours, named, with today's in bold. Without this the ring is
+ * three colours nobody explained.
+ * @param {Snapshot} snap
+ * @param {PartnerDay['phase']} now
+ */
+function phaseKey(snap, now) {
+  if (!snap.phase && !snap.fertile) return null;
+  return el('ul', { class: 'pa-key', 'aria-label': 'What the colours mean' }, phaseSpans(snap).map((x) =>
+    el('li', { class: x.id === now ? 'is-now' : '' }, [
+      el('span', { class: 'phase-dot', style: { background: `var(${PHASE_TOKEN[x.id]})` }, 'aria-hidden': 'true' }),
+      SPAN_NAMES[x.id],
+    ])));
+}
+
+const SPAN_NAMES = /** @type {const} */ ({
+  period: 'Period', follicular: 'Follicular', fertile: 'Fertile', luteal: 'Luteal', unknown: 'Rest of cycle',
+});
+
+/** Words for a period that is due but not confirmed, said like a phase. */
+const DUE_WORDS = {
+  title: 'Period due',
+  short: 'It could start any day now.',
+  more: 'Her forecast says it’s about now, and her app hasn’t had a new start logged yet. '
+    + 'Cycles move by a few days all the time, so this is normal. When it starts and she logs it, this updates.',
+};
+
+/**
  * The phase under the ring, built exactly like hers: the phase's colour, one
  * line, and the why behind a tap.
- * @param {import('../domain/partner.js').PartnerPhase} id
+ * @param {import('../domain/partner.js').PartnerPhase|'due'} id
  */
 function phaseLine(id) {
-  const words = PHASE_WORDS[id];
-  const token = PHASE_TOKEN[id];
+  const words = id === 'due' ? DUE_WORDS : PHASE_WORDS[id];
+  const token = PHASE_TOKEN[id === 'due' ? 'period' : id];
   return el('div', { class: 'phase-line', style: { '--phase': `var(${token})` } }, [
     el('div', { class: 'phase-line-head' }, [
       el('span', { class: 'phase-dot', style: { background: `var(${token})` }, 'aria-hidden': 'true' }),
@@ -354,47 +408,106 @@ function phaseLine(id) {
 
 /** Each phase's colour, the same tokens her ring uses. */
 const PHASE_TOKEN = /** @type {const} */ ({
-  period: '--period', follicular: '--follicular', fertile: '--ovulation', luteal: '--luteal',
+  period: '--period', follicular: '--follicular', fertile: '--ovulation', luteal: '--luteal', unknown: '--surface-2',
 });
 
 /**
- * The chips: what her own logs say is likely today.
- * @param {Snapshot} snap
- * @param {PartnerDay} day
+ * "Likely today", when there is anything to say under it.
+ * @param {Snapshot} snap @param {PartnerDay} day @param {DateKey} today
  */
-function likelyToday(snap, day) {
-  /** @type {{icon: string, label: string, tone: string}[]} */
-  const chips = [];
-  if (day.period === 'logged') chips.push({ icon: '🩸', label: `Period, day ${day.cycleDay}`, tone: 'period' });
-  else if (day.period === 'expected') chips.push({ icon: '🩸', label: 'Period expected', tone: 'period' });
-  for (const lane of day.lanes) {
-    chips.push({
-      icon: lane.kind === 'mood' ? '💭' : lane.kind === 'sleep' ? '🌙' : lane.id,
-      label: lane.label,
-      tone: lane.kind,
-    });
-  }
-  if (day.easy) chips.push({ icon: '🌟', label: 'One of her easier days', tone: 'easy' });
-  if (day.phase === 'fertile') chips.push({ icon: '🌷', label: 'Fertile window', tone: 'fertile' });
-
-  const basis = snap.stats?.cycles ? `From ${hers(snap)} last ${plural(snap.stats.cycles, 'cycle')}` : null;
+function likelySection(snap, day, today) {
+  const list = likelyList(snap, day, today);
+  if (!list) return null;
   return el('section', { class: 'pa-section' }, [
-    el('div', { class: 'pa-h-row' }, [
-      el('h3', { class: 'pa-h', text: 'Likely today' }),
-      basis && snap.lanes.length ? el('span', { class: 'hint-sm', text: basis }) : null,
-    ]),
-    chips.length
-      ? el('ul', { class: 'pa-chips' }, chips.map((c) => el('li', { class: `pa-chip is-${c.tone}` }, [
-        momentIcon(c.icon, 'pa-chip-mark'), c.label,
-      ])))
-      : el('p', { class: 'hint', text: snap.lanes.length
-        ? `Nothing from ${hers(snap)} usual pattern lands today.`
-        : `${snap.name ?? 'She'} hasn’t shared patterns yet, or there isn’t enough history for any.` }),
+    el('div', { class: 'pa-h-row' }, [el('h3', { class: 'pa-h', text: 'Likely today' }), basisLine(snap)]),
+    list,
   ]);
 }
 
+/** "From Mia’s last 6 cycles", when there are patterns to be from. @param {Snapshot} snap */
+function basisLine(snap) {
+  const n = snap.tracked ?? snap.stats?.cycles ?? 0;
+  return n && (snap.lanes.length || snap.easy)
+    ? el('span', { class: 'hint-sm', text: `From ${hers(snap)} last ${plural(n, 'cycle')}` })
+    : null;
+}
+
 /**
- * Seven days, each with what is expected on it. Tap one for the detail.
+ * What is likely on a day: each thing, when it usually happens for her, and
+ * one thing that helps.
+ * @param {Snapshot} snap
+ * @param {PartnerDay} day
+ * @param {DateKey} today
+ */
+function likelyList(snap, day, today) {
+  const items = dayItems(snap, day, today);
+  if (!items.length) {
+    // She shares no patterns: nothing to explain, and nothing to wait for.
+    if (snap.tracked == null && !snap.lanes.length && !snap.easy) return null;
+    const learning = !snap.lanes.length && !snap.easy && (snap.tracked ?? 0) < 3;
+    return el('p', { class: 'hint', text: learning
+      ? `Her patterns show up here once Kittycal has learned them from ${hers(snap)} check-ins. Rhythm shows how far along that is.`
+      : `Nothing from ${hers(snap)} usual pattern lands ${day.date === today ? 'today' : 'that day'}.` });
+  }
+  return el('ul', { class: 'pa-items' }, items.map((it) => el('li', { class: `pa-item is-${toneOf(it.key)}` }, [
+    el('span', { class: 'pa-item-icon' }, [momentIcon(it.icon, 'pa-item-mark')]),
+    el('span', { class: 'pa-item-body' }, [
+      el('span', { class: 'pa-item-title', text: it.title }),
+      it.text ? el('span', { class: 'pa-item-text', text: it.text }) : null,
+    ]),
+  ])));
+}
+
+/** @param {string} key */
+const toneOf = (key) => (key === 'period' || key === 'due' || key === 'soon' ? 'period'
+  : key === 'harder-days' ? 'mood' : key === 'sleep' ? 'sleep' : key === 'easy' ? 'easy'
+    : key === 'fertile' ? 'fertile' : 'body');
+
+/**
+ * How a day is drawn in the week strip and the calendar: one look per day,
+ * the most important thing on it. A due period is drawn over its expected
+ * days only; past them, while it is still due, nothing is known to draw.
+ * @param {Snapshot} snap
+ * @param {PartnerDay|null} d
+ * @param {DateKey} today
+ * @returns {'is-period'|'is-predicted'|'is-fertile'|'is-harder'|'is-easy'|null}
+ */
+function dayLook(snap, d, today) {
+  if (!d) return null;
+  if (d.period === 'logged') return 'is-period';
+  if (d.period === 'expected') {
+    return d.date >= today && daysBetween(d.next, d.date) < Math.max(1, snap.periodLength) ? 'is-predicted' : null;
+  }
+  if (d.phase === 'fertile') return 'is-fertile';
+  if (d.lanes.some((l) => l.kind === 'mood')) return 'is-harder';
+  if (d.easy) return 'is-easy';
+  return null;
+}
+
+/** What each look means, in the order the legend lists them. */
+const LOOKS = /** @type {const} */ ([
+  ['is-period', 'Period'],
+  ['is-predicted', 'Period likely'],
+  ['is-fertile', 'Fertile'],
+  ['is-harder', 'Harder days'],
+  ['is-easy', 'Easier days'],
+]);
+
+/**
+ * A legend for the looks actually on screen, so nothing is unexplained and
+ * nothing is explained that isn't there.
+ * @param {Set<string>} shown
+ */
+function looksLegend(shown) {
+  const items = LOOKS.filter(([cls]) => shown.has(cls));
+  if (!items.length) return null;
+  return el('ul', { class: 'cal-legend pa-legend' }, items.map(([cls, label]) => el('li', {}, [
+    el('span', { class: `cal-legend-swatch ${cls}`, 'aria-hidden': 'true' }), label,
+  ])));
+}
+
+/**
+ * Seven days, each in its look. Tap one for the detail.
  * @param {Snapshot} snap
  * @param {DateKey} today
  * @param {boolean} preview
@@ -402,39 +515,28 @@ function likelyToday(snap, day) {
 function weekAhead(snap, today, preview) {
   const days = partnerDays(snap, today, 7);
   if (!days.length) return null;
-  const summary = weekSummary(snap, days);
+  const summary = weekSummary(snap, days, today);
+  /** @type {Set<string>} */
+  const shown = new Set();
+  const pills = days.map((d) => {
+    const look = dayLook(snap, d, today);
+    if (look) shown.add(look);
+    return el('button', {
+      type: 'button',
+      class: ['pa-day', d.date === today ? 'is-today' : '', look ?? ''].filter(Boolean).join(' '),
+      'aria-label': `${fmtRelative(d.date)}: ${dayWords(snap, d, today)}`,
+      disabled: preview || null,
+      onclick: () => { haptic(8); openDay(snap, d, today); },
+    }, [
+      el('span', { class: 'pa-day-dow', 'aria-hidden': 'true', text: DOW_MIN[dow(d.date)] }),
+      el('span', { class: 'pa-day-num', 'aria-hidden': 'true', text: String(dayOfMonth(d.date)) }),
+    ]);
+  });
   return el('section', { class: 'pa-section' }, [
     el('h3', { class: 'pa-h', text: 'The week ahead' }),
-    el('div', { class: 'pa-week' }, days.map((d) => dayPill(snap, d, today, preview))),
+    el('div', { class: 'pa-week' }, pills),
+    looksLegend(shown),
     summary ? el('p', { class: 'pa-week-note', text: summary }) : null,
-  ]);
-}
-
-/**
- * @param {Snapshot} snap
- * @param {PartnerDay} d
- * @param {DateKey} today
- * @param {boolean} preview
- */
-function dayPill(snap, d, today, preview) {
-  const classes = ['pa-day'];
-  if (d.date === today) classes.push('is-today');
-  if (d.period === 'logged') classes.push('is-period');
-  else if (d.period === 'expected') classes.push('is-expected');
-  else if (d.phase === 'fertile') classes.push('is-fertile');
-  else if (d.easy) classes.push('is-easy');
-  const kinds = [...new Set(d.lanes.map((l) => l.kind))];
-  return el('button', {
-    type: 'button',
-    class: classes.join(' '),
-    'aria-label': `${fmtRelative(d.date)}: ${dayWords(snap, d)}`,
-    disabled: preview || null,
-    onclick: () => { haptic(8); openDay(snap, d); },
-  }, [
-    el('span', { class: 'pa-day-dow', 'aria-hidden': 'true', text: DOW_MIN[dow(d.date)] }),
-    el('span', { class: 'pa-day-num', 'aria-hidden': 'true', text: String(dayOfMonth(d.date)) }),
-    el('span', { class: 'pa-day-dots', 'aria-hidden': 'true' },
-      kinds.slice(0, 3).map((k) => el('span', { class: `pa-dot is-${k}` }))),
   ]);
 }
 
@@ -442,60 +544,65 @@ function dayPill(snap, d, today, preview) {
  * One sentence for the coming week: the first thing worth knowing.
  * @param {Snapshot} snap
  * @param {PartnerDay[]} days
+ * @param {DateKey} today
  */
-function weekSummary(snap, days) {
-  const name = (/** @type {PartnerDay} */ d) => (daysBetween(days[0].date, d.date) === 1 ? 'tomorrow' : DOW_SHORT[dow(d.date)]);
+function weekSummary(snap, days, today) {
+  const name = (/** @type {PartnerDay} */ d) => (daysBetween(days[0].date, d.date) === 1 ? 'tomorrow' : `on ${DOW_LONG[dow(d.date)]}`);
+  const Hers = cap(hers(snap));
+  if (isDue(snap, days[0], today)) return `${Hers} period is due. It could start any day.`;
   const firstPeriod = days.find((d, i) => i > 0 && d.period === 'expected' && !days[i - 1].period);
-  if (firstPeriod) return `${snap.name ? `${snap.name}’s` : 'Her'} period is likely to start ${name(firstPeriod) === 'tomorrow' ? 'tomorrow' : `on ${name(firstPeriod)}`}.`;
+  if (firstPeriod) return `${Hers} period is likely to start ${name(firstPeriod)}.`;
   const mood = days.find((d, i) => i > 0 && d.lanes.some((l) => l.kind === 'mood') && !days[i - 1].lanes.some((l) => l.kind === 'mood'));
-  if (mood) return `Harder days usually start around ${name(mood)}.`;
+  if (mood) return `Harder days usually start ${name(mood)}.`;
   const easy = days.find((d, i) => i > 0 && d.easy && !days[i - 1].easy);
-  if (easy) return `${hers(snap)[0].toUpperCase()}${hers(snap).slice(1)} easier stretch usually starts ${name(easy) === 'tomorrow' ? 'tomorrow' : `on ${name(easy)}`}.`;
+  if (easy) return `${Hers} easier stretch usually starts ${name(easy)}.`;
   if (days[0].easy) return 'Usually one of her easier weeks. Good timing for plans.';
   return null;
 }
 
+const DOW_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const cap = (/** @type {string} */ s) => `${s[0].toUpperCase()}${s.slice(1)}`;
+
 /**
- * What a day holds, in words.
+ * What a day holds, in words, for screen readers.
  * @param {Snapshot} snap
  * @param {PartnerDay} d
+ * @param {DateKey} today
  */
-function dayWords(snap, d) {
-  /** @type {string[]} */
-  const bits = [];
-  if (d.period === 'logged') bits.push(`day ${d.cycleDay} of ${hers(snap)} period`);
-  else if (d.period === 'expected') bits.push('period expected');
-  else if (d.phase) bits.push(PHASE_WORDS[d.phase].title.toLowerCase());
-  for (const l of d.lanes) bits.push(`${l.label.toLowerCase()} likely`);
-  if (d.easy) bits.push('usually an easier day');
-  return bits.join(', ') || `day ${d.cycleDay} of ${hers(snap)} cycle`;
+function dayWords(snap, d, today) {
+  const items = dayItems(snap, d, today);
+  return items.map((i) => i.title.toLowerCase()).join(', ') || `day ${d.cycleDay} of ${hers(snap)} cycle`;
 }
 
 /**
- * A day, opened from the week strip or the calendar.
+ * Where she will be on a day, and what is likely: the calendar's panel, and
+ * the sheet a day in the week strip opens.
  * @param {Snapshot} snap
  * @param {PartnerDay} d
+ * @param {DateKey} today
  */
-function openDay(snap, d) {
-  const help = helpFor(d, null, d.date, 2);
-  openSheet({
-    title: fmtLong(d.date),
-    body: [
-      el('p', { class: 'pa-day-head' }, [
-        d.phase ? el('span', { class: 'phase-dot', style: {
-          background: `var(${PHASE_TOKEN[d.phase]})`,
-        }, 'aria-hidden': 'true' }) : null,
-        `Day ${d.cycleDay} of ${hers(snap)} cycle`,
-        d.phase ? ` · ${PHASE_WORDS[d.phase].title}` : '',
-      ]),
-      likelyToday(snap, d),
-      help.length ? el('ul', { class: 'pa-help' }, help.map((h) => el('li', {}, [
-        el('span', { class: 'pa-help-icon' }, [momentIcon(h.icon, 'pa-help-mark')]),
-        el('span', { text: h.text }),
-      ]))) : null,
-      el('p', { class: 'hint-sm', text: 'A forecast from her history, not a promise.' }),
-    ],
-  });
+function dayDetail(snap, d, today) {
+  const due = isDue(snap, d, today);
+  const phase = due ? null : d.phase && (snap.phase || d.phase === 'fertile' || d.phase === 'period') ? d.phase : null;
+  return el('div', { class: 'pa-day-detail' }, [
+    el('p', { class: 'pa-day-head' }, [
+      phase ? el('span', { class: 'phase-dot', style: { background: `var(${PHASE_TOKEN[phase]})` }, 'aria-hidden': 'true' }) : null,
+      due ? 'Her period is due'
+        : `Day ${d.cycleDay} of ${hers(snap)} cycle${phase ? ` · ${PHASE_WORDS[phase].title}` : ''}`,
+    ]),
+    likelyList(snap, d, today),
+    d.date > today ? el('p', { class: 'hint-sm', text: 'A forecast from her history, not a promise.' }) : null,
+  ]);
+}
+
+/**
+ * A day from the week strip, opened.
+ * @param {Snapshot} snap
+ * @param {PartnerDay} d
+ * @param {DateKey} today
+ */
+function openDay(snap, d, today) {
+  openSheet({ title: d.date === today ? 'Today' : fmtLong(d.date), body: [dayDetail(snap, d, today)] });
 }
 
 /** @param {import('../domain/model.js').PartnerOf} of */
@@ -535,6 +642,8 @@ function goneCard(snap) {
 /* ── Calendar ───────────────────────────────────────────────────────────── */
 
 let shownMonth = /** @type {{y: number, m: number}|null} */ (null);
+/** The day whose detail shows under the month. Today until he taps another. */
+let picked = /** @type {DateKey|null} */ (null);
 
 /** @param {HTMLElement} host */
 export function renderPartnerCalendar(host) {
@@ -547,33 +656,32 @@ export function renderPartnerCalendar(host) {
   const count = daysInMonth(y, m);
   const lead = (dow(first) + 6) % 7;
   const model = partnerModel(snap, today);
+  const sel = picked ?? today;
 
+  /** @type {Set<string>} */
+  const shown = new Set();
   const cells = [];
   for (let i = 0; i < lead; i += 1) cells.push(el('span', { class: 'cal-cell cal-cell-empty', 'aria-hidden': 'true' }));
   for (let n = 1; n <= count; n += 1) {
     const key = makeKey(y, m, n);
     const d = partnerDay(snap, key);
+    const look = dayLook(snap, d, today);
+    if (look) shown.add(look);
     const classes = ['cal-cell'];
     if (key === today) classes.push('is-today');
-    if (d?.period === 'logged') classes.push('is-period');
-    else if (d?.period === 'expected' && key > today) classes.push('is-predicted');
-    else if (d?.phase === 'fertile') classes.push('is-fertile');
-    else if (d?.easy) classes.push('is-easy');
-    const kinds = d ? [...new Set(d.lanes.map((l) => l.kind))] : [];
+    if (key === sel) classes.push('is-selected');
+    if (look) classes.push(look);
     cells.push(el('button', {
       type: 'button',
       class: classes.join(' '),
-      'aria-label': d ? `${fmtLong(key)}: ${dayWords(snap, d)}` : fmtLong(key),
+      'aria-label': d ? `${fmtLong(key)}: ${dayWords(snap, d, today)}` : fmtLong(key),
+      'aria-pressed': String(key === sel),
       disabled: d ? null : true,
-      onclick: () => { if (d) { haptic(8); openDay(snap, d); } },
-    }, [
-      el('span', { class: 'cal-num', text: String(n) }),
-      kinds.length ? el('span', { class: 'pa-day-dots', 'aria-hidden': 'true' },
-        kinds.slice(0, 3).map((k) => el('span', { class: `pa-dot is-${k}` }))) : null,
-    ]));
+      onclick: () => { if (d) { haptic(8); picked = key; store.updateSettings({}); } },
+    }, [el('span', { class: 'cal-num', text: String(n) })]));
   }
 
-  const kindsShown = new Set(snap.lanes.map((l) => l.kind));
+  const selDay = partnerDay(snap, sel);
   replace(host, [
     el('div', { class: 'cal-head' }, [
       el('button', { type: 'button', class: 'btn-icon', 'aria-label': 'Previous month', text: '‹',
@@ -586,15 +694,12 @@ export function renderPartnerCalendar(host) {
       ...['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((x) => el('span', { class: 'cal-dow', 'aria-hidden': 'true', text: x })),
       ...cells,
     ]),
-    el('ul', { class: 'cal-legend' }, [
-      legend('is-period', 'Period'),
-      legend('is-predicted', 'Expected'),
-      snap.fertile ? legend('is-fertile', 'Fertile') : null,
-      snap.easy ? legend('is-easy', 'Easier days') : null,
-      kindsShown.has('body') ? dotLegend('body', 'Usual symptoms') : null,
-      kindsShown.has('mood') ? dotLegend('mood', 'Harder days') : null,
-      kindsShown.has('sleep') ? dotLegend('sleep', 'Shorter sleep') : null,
-    ]),
+    looksLegend(shown),
+    selDay ? el('section', { class: 'card pa-picked', 'aria-live': 'polite' }, [
+      el('h3', { class: 'pa-card-title', text: sel === today ? 'Today' : fmtLong(sel) }),
+      dayDetail(snap, selDay, today),
+      el('p', { class: 'hint-sm pa-picked-tip', text: 'Tap any day to see what’s likely.' }),
+    ]) : null,
     model.upcoming.length ? addToCalendarButton(model) : null,
   ]);
 }
@@ -610,15 +715,6 @@ function shift(by) {
   store.updateSettings({});
 }
 
-/** @param {string} cls @param {string} label */
-const legend = (cls, label) => el('li', {}, [
-  el('span', { class: `cal-legend-swatch ${cls}`, 'aria-hidden': 'true' }), label,
-]);
-/** @param {string} kind @param {string} label */
-const dotLegend = (kind, label) => el('li', {}, [
-  el('span', { class: `pa-dot is-${kind}`, 'aria-hidden': 'true' }), label,
-]);
-
 /** @param {import('../domain/partner.js').PartnerModel} model */
 function addToCalendarButton(model) {
   return el('button', {
@@ -633,7 +729,7 @@ function addToCalendarButton(model) {
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 2000);
     },
-  }, ['Add to my calendar']);
+  }, ['Add her periods to my calendar']);
 }
 
 /* ── Rhythm ─────────────────────────────────────────────────────────────── */
@@ -647,71 +743,148 @@ export function renderPartnerRhythm(host) {
   if (!model.day) { replace(host, [partnerToday(snap)]); return; }
 
   replace(host, [
-    typicalMonth(snap, model.day),
+    monthCard(snap, model.day, today),
     statTiles(snap),
     comingPeriods(model, today),
-    snap.phase ? phaseGuide(snap, model.day) : null,
+    snap.phase ? phaseGuide(snap, model.day, today) : null,
   ]);
 }
 
 /**
- * Her month as lanes: where each thing usually lands, and where today is.
+ * Her month, unrolled: the ring's colours as a bar with today on it, then
+ * what usually happens when, each with the dates it lands on this time.
  * @param {Snapshot} snap
  * @param {PartnerDay} day
+ * @param {DateKey} today
  */
-function typicalMonth(snap, day) {
+function monthCard(snap, day, today) {
   const len = Math.max(15, snap.cycleLength);
   const bleed = Math.max(1, snap.periodLength);
-  /** @type {{label: string, icon: string, tone: string, from: number, to: number}[]} */
-  const rows = [{ label: 'Period', icon: '🩸', tone: 'period', from: 1, to: bleed }];
-  if (snap.fertile) {
-    const ov = len - snap.lutealDays;
-    rows.push({ label: 'Fertile', icon: '🌷', tone: 'fertile', from: Math.max(bleed + 1, ov - 5), to: ov + 1 });
-  }
+  const due = isDue(snap, day, today);
+  const at = due ? len : Math.min(len, day.cycleDay);
+  const left = (/** @type {number} */ n) => `${((n - 1) / len) * 100}%`;
+  const width = (/** @type {number} */ a, /** @type {number} */ b) => `${((b - a + 1) / len) * 100}%`;
+  const start = due ? addDays(day.next, -len) : day.start;
+
+  /** @type {{key: string, icon: string, title: string, when: string, from: number, to: number, match: (d: PartnerDay) => boolean}[]} */
+  const rows = [{ key: 'period', icon: '🩸', title: 'Period', when: `Usually ${plural(bleed, 'day')}`,
+    from: 1, to: bleed,
+    match: (d) => d.period === 'logged' || (d.period === 'expected' && daysBetween(d.next, d.date) < bleed) }];
   for (const lane of snap.lanes) {
     const from = lane.from > 0 ? lane.from : len + lane.from + 1;
     const to = lane.to > 0 ? lane.to : len + lane.to + 1;
     rows.push({
-      label: lane.label,
+      key: lane.kind === 'mood' ? 'harder-days' : lane.kind === 'sleep' ? 'sleep' : lane.id,
       icon: lane.kind === 'mood' ? '💭' : lane.kind === 'sleep' ? '🌙' : lane.id,
-      tone: lane.kind,
+      title: lane.label,
+      when: laneWhen(lane, bleed),
       from: Math.max(1, from), to: Math.min(len, to),
+      match: (d) => d.lanes.some((l) => l.id === lane.id),
     });
   }
-  if (snap.easy) rows.push({ label: 'Easier days', icon: '🌟', tone: 'easy', from: snap.easy.from, to: Math.min(len, snap.easy.to) });
-  // In the order they happen, so the chart reads left to right like her month.
-  rows.sort((a, b) => a.from - b.from || (a.tone === 'period' ? -1 : b.tone === 'period' ? 1 : a.to - b.to));
+  if (snap.easy) {
+    const easy = snap.easy;
+    rows.push({ key: 'easy', icon: '🌟', title: 'Easier days', when: laneWhen(easy, bleed),
+      from: easy.from, to: Math.min(len, easy.to), match: (d) => d.easy });
+  }
+  if (snap.fertile) {
+    const f = phaseSpans(snap).find((x) => x.id === 'fertile');
+    if (f) rows.push({ key: 'fertile', icon: '🌷', title: 'Fertile window', when: `Usually days ${f.from} to ${f.to} of her cycle`,
+      from: f.from, to: f.to, match: (d) => d.phase === 'fertile' });
+  }
+  // In the order they happen, so it reads like her month.
+  rows.sort((a, b) => a.from - b.from || (a.key === 'period' ? -1 : b.key === 'period' ? 1 : a.to - b.to));
 
-  const at = Math.min(len, day.cycleDay);
-  const pct = (/** @type {number} */ n) => `${((n - 1) / len) * 100}%`;
-  const width = (/** @type {number} */ a, /** @type {number} */ b) => `${((b - a + 1) / len) * 100}%`;
-
+  const patterns = rows.length > 1;
   return el('section', { class: 'card pa-month' }, [
-    el('h3', { class: 'pa-card-title', text: `${snap.name ? `${snap.name}’s` : 'Her'} typical month` }),
-    el('p', { class: 'hint-sm', text: snap.stats?.cycles
-      ? `From her last ${plural(snap.stats.cycles, 'cycle')}. Today is day ${day.cycleDay}.`
-      : `Today is day ${day.cycleDay}.` }),
-    el('div', { class: 'pa-lanes', style: { '--today-frac': String((at - 0.5) / len) } }, [
-      ...rows.map((r) => el('div', { class: 'pa-lane' }, [
-        el('span', { class: 'pa-lane-label' }, [momentIcon(r.icon, 'pa-lane-mark'), r.label]),
-        el('span', { class: 'pa-lane-track' }, [
-          el('span', { class: `pa-lane-bar is-${r.tone}`, style: { left: pct(r.from), width: width(r.from, r.to) } }),
-        ]),
-      ])),
-      el('div', { class: 'pa-lane pa-lane-axis', 'aria-hidden': 'true' }, [
-        el('span', {}),
-        el('span', { class: 'pa-axis' }, [
-          el('span', { text: 'Day 1' }),
-          el('span', { text: `Day ${Math.round(len / 2)}` }),
-          el('span', { text: 'Next period' }),
-        ]),
-      ]),
-      el('span', { class: 'pa-today-line', 'aria-hidden': 'true' }, [el('span', { text: 'Today' })]),
+    el('h3', { class: 'pa-card-title', text: `${snap.name ? `${snap.name}’s` : 'Her'} month` }),
+    el('p', { class: 'hint-sm', text: due
+      ? `Her period is due. She’s usually on a ${len}-day cycle.`
+      : `Day ${day.cycleDay} of about ${len}. Next period around ${DOW_SHORT[dow(day.next)]} ${fmtDayMonth(day.next)}.` }),
+    el('div', { class: 'pa-bar', style: { '--at': String((at - 0.5) / len) } }, [
+      ...phaseSpans(snap).map((x) => el('span', { class: 'pa-bar-seg', style: {
+        left: left(x.from), width: width(x.from, x.to), background: `var(${PHASE_TOKEN[x.id]})` } })),
+      el('span', { class: 'pa-bar-pin', 'aria-hidden': 'true' }, [el('span', { text: 'Today' })]),
     ]),
-    snap.lanes.length || snap.easy ? null : el('p', { class: 'hint', text:
-      `${snap.name ?? 'She'} hasn’t shared patterns, or there isn’t enough history yet. `
-      + 'They fill in after about three cycles of logging.' }),
+    el('div', { class: 'pa-bar-ends', 'aria-hidden': 'true' }, [
+      el('span', { text: `Started ${fmtDayMonth(start)}` }),
+      el('span', { text: `Next ~${fmtDayMonth(day.next)}` }),
+    ]),
+    phaseKey(snap, due ? null : day.phase),
+
+    patterns ? el('h4', { class: 'pa-when-h', text: 'What usually happens when' }) : null,
+    patterns ? el('ul', { class: 'pa-when' }, rows.map((r) => {
+      // While her period is due, every date after it is a guess on a guess:
+      // say when each thing usually comes, not a date it will not keep.
+      if (due) {
+        const withPeriod = r.key === 'period' || r.from <= bleed;
+        return whenRow(r, at, len, withPeriod ? 'Due' : null,
+          `${r.when}.${withPeriod && r.key !== 'period' ? ' Expected with her period, which is due.' : r.key === 'period' ? ' It’s due now.' : ''}`, withPeriod);
+      }
+      const run = nextRun(snap, r.match, start, today);
+      const now = Boolean(run && run.from <= today && run.to >= today);
+      const until = run ? daysBetween(today, run.from) : null;
+      return whenRow(r, at, len,
+        run ? (now ? 'Now' : until === 1 ? 'Tomorrow' : `In ${until} days`) : null,
+        run ? `${r.when}. ${now ? `Until ${dayAndDate(run.to)}` : `Next: ${spanText(run)}`}.` : `${r.when}.`,
+        now);
+    })) : patternsProgress(snap),
   ]);
+}
+
+/**
+ * One row of "what usually happens when", with its place in her month.
+ * @param {{key: string, icon: string, title: string, from: number, to: number}} r
+ * @param {number} at  today's cycle day
+ * @param {number} len
+ * @param {string|null} badge
+ * @param {string} text
+ * @param {boolean} now
+ */
+function whenRow(r, at, len, badge, text, now) {
+  const left = `${((r.from - 1) / len) * 100}%`;
+  const width = `${((r.to - r.from + 1) / len) * 100}%`;
+  return el('li', { class: `pa-when-row is-${toneOf(r.key)}${now ? ' is-now' : ''}` }, [
+    el('span', { class: 'pa-item-icon' }, [momentIcon(r.icon, 'pa-item-mark')]),
+    el('span', { class: 'pa-when-body' }, [
+      el('span', { class: 'pa-when-top' }, [
+        el('span', { class: 'pa-item-title', text: r.title }),
+        badge ? el('span', { class: `badge${now ? ' badge-primary' : ''}`, text: badge }) : null,
+      ]),
+      el('span', { class: 'pa-item-text', text }),
+      el('span', { class: 'pa-when-track', 'aria-hidden': 'true', style: { '--at': String((at - 0.5) / len) } }, [
+        el('span', { class: 'pa-when-bar', style: { left, width } }),
+      ]),
+    ]),
+  ]);
+}
+
+/** @param {DateKey} key */
+const dayAndDate = (key) => `${DOW_SHORT[dow(key)]} ${fmtDayMonth(key)}`;
+/** @param {{from: DateKey, to: DateKey}} run */
+const spanText = (run) => (run.from === run.to ? dayAndDate(run.from) : `${dayAndDate(run.from)} to ${dayAndDate(run.to)}`);
+
+/**
+ * When there are no patterns to show, why, and how far along they are.
+ * @param {Snapshot} snap
+ */
+function patternsProgress(snap) {
+  const name = snap.name ?? 'She';
+  const n = snap.tracked;
+  if (n == null) {
+    return el('p', { class: 'hint pa-progress', text: `${name} hasn’t shared her patterns. Her period and phases above are still her own.` });
+  }
+  if (n < 3) {
+    return el('div', { class: 'pa-progress' }, [
+      el('h4', { class: 'pa-when-h', text: 'Her patterns are on the way' }),
+      el('div', { class: 'pa-progress-dots', role: 'img', 'aria-label': `${n} of 3 cycles` }, [0, 1, 2].map((i) =>
+        el('span', { class: i < n ? 'is-done' : '' }))),
+      el('p', { class: 'hint', text: `Kittycal learns things like when her cramps or harder days usually come from her daily check-ins. `
+        + `It needs three full cycles of them; ${name} has ${n === 0 ? 'none finished yet' : `${n} so far`}. `
+        + 'Periods she entered from memory don’t count, since there’s nothing logged in them.' }),
+    ]);
+  }
+  return el('p', { class: 'hint pa-progress', text: `Nothing repeats clearly yet. ${name}’s check-ins don’t show anything landing at the same point each month. That can change as she logs more.` });
 }
 
 /** @param {Snapshot} snap */
@@ -723,12 +896,12 @@ function statTiles(snap) {
   ];
   if (s?.regularity) {
     tiles.push({ big: { regular: 'Regular', variable: 'Varies', irregular: 'Irregular' }[s.regularity],
-      label: 'cycle rhythm', sub: s.regularity === 'regular' ? 'Forecasts are dependable' : 'Dates can move a few days' });
+      label: 'cycle rhythm', sub: s.regularity === 'regular' ? 'Dates are dependable' : 'Dates can move a few days' });
   }
   if (s?.total) {
-    tiles.push({ big: `${s.hits}/${s.total}`, label: 'forecasts within 2 days', sub: null });
+    tiles.push({ big: `${s.hits} of ${s.total}`, label: 'recent forecasts', sub: 'were right to within 2 days' });
   } else if (s?.cycles) {
-    tiles.push({ big: `${s.cycles}`, label: 'cycles logged', sub: null });
+    tiles.push({ big: `${s.cycles}`, label: 'cycles behind these numbers', sub: null });
   }
   return el('section', { class: 'pa-tiles' }, tiles.map((t) => el('div', { class: 'pa-tile' }, [
     el('span', { class: 'pa-tile-big num', text: t.big }),
@@ -745,11 +918,12 @@ function comingPeriods(model, today) {
   if (!model.upcoming.length) return null;
   return el('section', { class: 'card pa-coming' }, [
     el('h3', { class: 'pa-card-title', text: 'Coming periods' }),
+    el('p', { class: 'hint-sm', text: 'Forecasts. They can move by a few days.' }),
     el('ul', { class: 'pa-coming-list' }, model.upcoming.map((p) => {
       const until = daysBetween(today, p.start);
       return el('li', {}, [
-        el('span', { text: `${fmtDayMonth(p.start)} to ${fmtDayMonth(p.end)}` }),
-        el('span', { class: 'badge', text: until <= 0 ? 'Now' : until === 1 ? 'Tomorrow' : `In ${until} days` }),
+        el('span', { text: `${dayAndDate(p.start)} to ${dayAndDate(p.end)}` }),
+        el('span', { class: 'badge', text: until <= 0 ? 'Due' : until === 1 ? 'Tomorrow' : `In ${until} days` }),
       ]);
     })),
     addToCalendarButton(model),
@@ -760,19 +934,20 @@ function comingPeriods(model, today) {
  * The four phases, for him, with the current one marked.
  * @param {Snapshot} snap
  * @param {PartnerDay} day
+ * @param {DateKey} today
  */
-function phaseGuide(snap, day) {
+function phaseGuide(snap, day, today) {
   const ids = /** @type {const} */ (['period', 'follicular', 'fertile', 'luteal']);
-  const token = PHASE_TOKEN;
+  const nowId = isDue(snap, day, today) ? null : day.phase;
   return el('section', { class: 'pa-section' }, [
     el('h3', { class: 'pa-h', text: 'Her cycle, phase by phase' }),
     el('div', { class: 'pa-phases' }, ids.filter((id) => id !== 'fertile' || snap.fertile).map((id) =>
-      el('details', { class: `pa-phase${day.phase === id ? ' is-now' : ''}` }, [
+      el('details', { class: `pa-phase${nowId === id ? ' is-now' : ''}` }, [
         el('summary', {}, [
           el('span', { class: 'pa-phase-row' }, [
-            el('span', { class: 'phase-dot', style: { background: `var(${token[id]})` }, 'aria-hidden': 'true' }),
+            el('span', { class: 'phase-dot', style: { background: `var(${PHASE_TOKEN[id]})` }, 'aria-hidden': 'true' }),
             el('span', { class: 'pa-phase-title', text: PHASE_WORDS[id].title }),
-            day.phase === id ? el('span', { class: 'badge badge-primary', text: 'Now' }) : null,
+            nowId === id ? el('span', { class: 'badge badge-primary', text: 'Now' }) : null,
           ]),
           el('span', { class: 'pa-phase-short' }, [
             PHASE_WORDS[id].short,
@@ -813,9 +988,10 @@ export function renderPartnerSettings(host) {
             : of.fetchedAt ? `Checked ${fmtRelative(keyOf(of.fetchedAt)).toLowerCase()}` : 'Not loaded yet' }),
         ]),
       ]),
-      of.code ? el('p', { class: 'pa-code-line' }, [
-        'Code ', el('span', { class: 'pa-code num', text: of.code }),
-        el('span', { class: 'hint-sm', text: ' · enter it on another phone to follow her there too' }),
+      of.code ? el('div', { class: 'pa-code-line' }, [
+        el('span', { class: 'hint-sm', text: 'Her code' }),
+        el('span', { class: 'pa-code num', text: of.code }),
+        el('span', { class: 'hint-sm', text: 'To follow her on another phone too, enter it there.' }),
       ]) : null,
       el('div', { class: 'pa-connection-actions' }, [
         el('button', { type: 'button', class: 'btn btn-secondary',

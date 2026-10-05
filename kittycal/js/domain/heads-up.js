@@ -29,7 +29,7 @@
  */
 
 import { addDays, daysBetween } from '../utils/date.js';
-import { MIN_CYCLES_FOR_PATTERN } from './stats.js';
+import { MIN_CYCLES_FOR_PATTERN, trackedCycles } from './stats.js';
 
 /** How far before a period counts as "before your period". */
 export const BEFORE_WINDOW = 10;
@@ -82,7 +82,7 @@ const NOT_A_WARNING = new Set(['calm', 'happy', 'energetic', 'playful', 'confide
  * @returns {PremenstrualPattern[]} most consistent first
  */
 export function premenstrualPatterns(logs, cycles) {
-  const complete = cycles.filter((c) => c.complete && c.nextStart);
+  const complete = trackedCycles(logs, cycles);
   if (complete.length < MIN_CYCLES_FOR_PATTERN) return [];
 
   /** @type {Map<string, {kind: PremenstrualPattern['kind'], onsets: number[]}>} */
