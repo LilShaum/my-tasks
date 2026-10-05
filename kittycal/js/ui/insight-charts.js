@@ -275,6 +275,7 @@ export function fingerprint({ rows, highlightDay = null, summary }) {
         if (i >= row.flows.length) return el('span', { class: 'fp-cell is-after' });
         return el('span', {
           class: `fp-cell${strength ? ' has-flow' : ''}${flow === 'spotting' ? ' is-spotting' : ''}`
+            + `${flow === 'unknown' ? ' is-unknown' : ''}`
             + `${highlightDay === i + 1 ? ' is-highlight' : ''}`,
           style: strength ? { '--flow': String(strength) } : {},
         });
@@ -285,6 +286,10 @@ export function fingerprint({ rows, highlightDay = null, summary }) {
         el('span', { class: 'fp-cell has-flow', style: { '--flow': String(FLOW_STRENGTH[flow]) } }),
         flow[0].toUpperCase() + flow.slice(1),
       ])),
+      // Only when some period day has no flow logged: a mark is named where it is drawn.
+      rows.some((r) => r.flows.includes('unknown')) ? el('span', { class: 'fp-key' }, [
+        el('span', { class: 'fp-cell is-unknown' }), 'Not logged',
+      ]) : null,
     ]),
   ]);
 }

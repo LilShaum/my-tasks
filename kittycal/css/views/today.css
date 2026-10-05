@@ -694,19 +694,6 @@
 .checkin-subgroup { margin-top: var(--sp-4); }
 .checkin-sublabel { font-weight: 600; margin: 0; }
 
-/* A card that has said its piece and only needs one line now. */
-.card-compact { padding-top: var(--sp-3); padding-bottom: var(--sp-3); }
-.compact-line {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: var(--sp-1) var(--sp-3);
-  margin: 0;
-  font-weight: 700;
-}
-.compact-label { color: var(--ink); }
-.card-compact .hint-sm { margin: var(--sp-1) 0 0; }
-
 /* ── For you today: the end of the check-in ───────────────────────────── */
 .foryou-head { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
 .foryou-head .checkin-title { margin: 0; }

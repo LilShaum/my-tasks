@@ -30,7 +30,7 @@
 import { el, replace, haptic, announce } from '../utils/dom.js';
 import {
   todayKey, daysBetween, addDays, fmtDayMonth, fmtLong, fmtRelative, fmtMonthYear,
-  dow, dayOfMonth, DOW_MIN, DOW_SHORT, daysInMonth, makeKey, year as yearOf, month as monthOf,
+  dow, dayOfMonth, DOW_MIN, DOW_SHORT, DOW_LONG, daysInMonth, makeKey, year as yearOf, month as monthOf,
 } from '../utils/date.js';
 import { plural } from '../utils/fmt.js';
 import { openSheet } from '../ui/sheet.js';
@@ -560,7 +560,6 @@ function weekSummary(snap, days, today) {
   return null;
 }
 
-const DOW_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const cap = (/** @type {string} */ s) => `${s[0].toUpperCase()}${s.slice(1)}`;
 
 /**
@@ -700,7 +699,7 @@ export function renderPartnerCalendar(host) {
       dayDetail(snap, selDay, today),
       el('p', { class: 'hint-sm pa-picked-tip', text: 'Tap any day to see what’s likely.' }),
     ]) : null,
-    model.upcoming.length ? addToCalendarButton(model) : null,
+    comingPeriods(model, today),
   ]);
 }
 
@@ -742,10 +741,14 @@ export function renderPartnerRhythm(host) {
   const model = partnerModel(snap, today);
   if (!model.day) { replace(host, [partnerToday(snap)]); return; }
 
+  /*
+    Rhythm answers one question: what is her month usually like, and how far
+    can he plan on it. Dates (coming periods, add to calendar) are Calendar's;
+    where she is today is Today's ring (PRODUCT.md, U3 to U5).
+  */
   replace(host, [
     monthCard(snap, model.day, today),
-    statTiles(snap),
-    comingPeriods(model, today),
+    dependability(snap),
     snap.phase ? phaseGuide(snap, model.day, today) : null,
   ]);
 }
@@ -762,8 +765,6 @@ function monthCard(snap, day, today) {
   const bleed = Math.max(1, snap.periodLength);
   const due = isDue(snap, day, today);
   const at = due ? len : Math.min(len, day.cycleDay);
-  const left = (/** @type {number} */ n) => `${((n - 1) / len) * 100}%`;
-  const width = (/** @type {number} */ a, /** @type {number} */ b) => `${((b - a + 1) / len) * 100}%`;
   const start = due ? addDays(day.next, -len) : day.start;
 
   /** @type {{key: string, icon: string, title: string, when: string, from: number, to: number, match: (d: PartnerDay) => boolean}[]} */
@@ -796,23 +797,12 @@ function monthCard(snap, day, today) {
   rows.sort((a, b) => a.from - b.from || (a.key === 'period' ? -1 : b.key === 'period' ? 1 : a.to - b.to));
 
   const patterns = rows.length > 1;
+  const n = snap.tracked ?? snap.stats?.cycles ?? 0;
   return el('section', { class: 'card pa-month' }, [
-    el('h3', { class: 'pa-card-title', text: `${snap.name ? `${snap.name}’s` : 'Her'} month` }),
-    el('p', { class: 'hint-sm', text: due
-      ? `Her period is due. She’s usually on a ${len}-day cycle.`
-      : `Day ${day.cycleDay} of about ${len}. Next period around ${DOW_SHORT[dow(day.next)]} ${fmtDayMonth(day.next)}.` }),
-    el('div', { class: 'pa-bar', style: { '--at': String((at - 0.5) / len) } }, [
-      ...phaseSpans(snap).map((x) => el('span', { class: 'pa-bar-seg', style: {
-        left: left(x.from), width: width(x.from, x.to), background: `var(${PHASE_TOKEN[x.id]})` } })),
-      el('span', { class: 'pa-bar-pin', 'aria-hidden': 'true' }, [el('span', { text: 'Today' })]),
-    ]),
-    el('div', { class: 'pa-bar-ends', 'aria-hidden': 'true' }, [
-      el('span', { text: `Started ${fmtDayMonth(start)}` }),
-      el('span', { text: `Next ~${fmtDayMonth(day.next)}` }),
-    ]),
-    phaseKey(snap, due ? null : day.phase),
-
-    patterns ? el('h4', { class: 'pa-when-h', text: 'What usually happens when' }) : null,
+    el('h3', { class: 'pa-card-title', text: 'What usually happens when' }),
+    el('p', { class: 'hint-sm', text: patterns
+      ? `From ${hers(snap)} last ${plural(n || 1, 'cycle')}. Each bar is her month, from one period to the next; the line is today.`
+      : `Her period, and the patterns Kittycal finds in ${hers(snap)} check-ins.` }),
     patterns ? el('ul', { class: 'pa-when' }, rows.map((r) => {
       // While her period is due, every date after it is a guess on a guess:
       // say when each thing usually comes, not a date it will not keep.
@@ -887,27 +877,34 @@ function patternsProgress(snap) {
   return el('p', { class: 'hint pa-progress', text: `Nothing repeats clearly yet. ${name}’s check-ins don’t show anything landing at the same point each month. That can change as she logs more.` });
 }
 
-/** @param {Snapshot} snap */
-function statTiles(snap) {
+/**
+ * How far ahead he can plan on her dates, said once, as the finding.
+ *
+ * This was four tiles: days per cycle, days of period, "Regular", and "4 of
+ * 4". Two repeated other lines (the Period row already says how long it
+ * lasts), and none of them was the thing he wants from them, which is whether
+ * he can book the 18th (PRODUCT.md, U4).
+ * @param {Snapshot} snap
+ */
+function dependability(snap) {
   const s = snap.stats;
-  const tiles = [
-    { big: `${snap.cycleLength}`, label: 'days per cycle', sub: s && s.min !== s.max ? `${s.min} to ${s.max} lately` : null },
-    { big: `${snap.periodLength}`, label: 'days of period', sub: null },
-  ];
-  if (s?.regularity) {
-    tiles.push({ big: { regular: 'Regular', variable: 'Varies', irregular: 'Irregular' }[s.regularity],
-      label: 'cycle rhythm', sub: s.regularity === 'regular' ? 'Dates are dependable' : 'Dates can move a few days' });
-  }
-  if (s?.total) {
-    tiles.push({ big: `${s.hits} of ${s.total}`, label: 'recent forecasts', sub: 'were right to within 2 days' });
-  } else if (s?.cycles) {
-    tiles.push({ big: `${s.cycles}`, label: 'cycles behind these numbers', sub: null });
-  }
-  return el('section', { class: 'pa-tiles' }, tiles.map((t) => el('div', { class: 'pa-tile' }, [
-    el('span', { class: 'pa-tile-big num', text: t.big }),
-    el('span', { class: 'pa-tile-label', text: t.label }),
-    t.sub ? el('span', { class: 'hint-sm', text: t.sub }) : null,
-  ])));
+  if (!s) return null;
+  const title = s.regularity === 'regular' ? 'Her dates are dependable'
+    : s.regularity === 'variable' ? 'Her dates can move a few days'
+      : s.regularity === 'irregular' ? 'Her dates vary a lot'
+        : 'How dependable her dates are';
+  const range = s.min !== s.max
+    ? `Her cycles run ${s.min} to ${s.max} days, usually about ${snap.cycleLength}.`
+    : `Her cycles run about ${snap.cycleLength} days.`;
+  const record = s.total
+    ? ` ${s.hits} of her last ${s.total} forecasts were right to within 2 days.`
+    : s.cycles < 3 ? ' With more cycles behind it, the forecast gets tighter.' : '';
+  const advice = s.regularity === 'regular' ? ' Plans a few weeks out are a safe bet.'
+    : s.regularity ? ' For anything that matters, leave a few days either side.' : '';
+  return el('section', { class: 'card pa-dependable' }, [
+    el('h3', { class: 'pa-card-title', text: title }),
+    el('p', { class: 'hint', text: `${range}${record}${advice}` }),
+  ]);
 }
 
 /**

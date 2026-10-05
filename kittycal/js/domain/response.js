@@ -27,6 +27,7 @@
 
 import { symptomPattern, loggingStreak, loggedIds } from './stats.js';
 import { labelOf } from '../data/taxonomy.js';
+import { premenstrualPatterns } from './heads-up.js';
 import { addDays, daysBetween } from '../utils/date.js';
 import { plural, listJoin } from '../utils/fmt.js';
 
@@ -126,8 +127,14 @@ function matchedPattern(log, logs, cycles) {
 
   /** @type {{id: string, cyclesWith: number, cyclesTotal: number, peakDays: number[]}|null} */
   let best = null;
+  // A pre-period pattern is already on the same screen, in "Coming up for
+  // you", counted back from the period ("about 3 days before"), which is how
+  // she thinks of it. Saying it again here as "day 27, 28 and 29" is the same
+  // fact twice, in the less useful form.
+  const known = new Set(premenstrualPatterns(logs, cycles).map((p) => p.id));
 
   for (const id of loggedIds(log)) {
+    if (known.has(id)) continue;
     const pattern = symptomPattern(id, logs, cycles);
     if (pattern.cyclesTotal < MIN_CYCLES) continue;
     if (pattern.cyclesWith / pattern.cyclesTotal < PATTERN_SHARE) continue;
@@ -207,7 +214,13 @@ function echoOfLastCycle(log, logs, cycles) {
   const day = daysBetween(current.start, log.date) + 1;
   if (day < 1) return null;
 
+  // Once something is one of her pre-period patterns, "Coming up for you"
+  // on the same screen already says it, with the count behind it. The echo is
+  // for the months before there is a pattern to name.
+  const known = new Set(premenstrualPatterns(logs, cycles).map((p) => p.id));
+
   for (const id of loggedIds(log)) {
+    if (known.has(id)) continue;
     for (let offset = -ECHO_WINDOW; offset <= ECHO_WINDOW; offset += 1) {
       const date = addDays(previous.start, day - 1 + offset);
       // The window must not spill into the cycle either side of it, or "last

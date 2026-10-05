@@ -17,7 +17,7 @@
  */
 
 import { el, svg, replace, haptic, announce } from '../utils/dom.js';
-import { todayKey, fmtDayMonth, fmtRelative, daysBetween, addDays, dow, dayOfMonth, DOW_MIN }
+import { todayKey, fmtDayMonth, fmtRelative, daysBetween, addDays, dow, dayOfMonth, DOW_MIN, DOW_LONG }
   from '../utils/date.js';
 import { plural, listJoin, fmtWater } from '../utils/fmt.js';
 import {
@@ -1013,7 +1013,7 @@ function forYouCard({ phase, prediction, logs, cycles, settings, today }) {
 /** @param {import('../domain/predict.js').Prediction} prediction */
 function nextPeriodCard(prediction) {
   if (!prediction.nextPeriod) return null;
-  const { start, end } = prediction.nextPeriod;
+  const { start } = prediction.nextPeriod;
   const window = prediction.startWindow;
 
   /*
@@ -1045,11 +1045,13 @@ function nextPeriodCard(prediction) {
     el('p', { class: 'big-value num', text: window
       ? `${fmtDayMonth(window.from)} – ${fmtDayMonth(window.to)}`
       : fmtDayMonth(start) }),
-    el('p', { class: 'hint-sm', text: window
-      ? `Most likely ${fmtDayMonth(start)}. Usually a `
-        + `${prediction.avgPeriodLength}-day period, so bleeding around `
-        + `${fmtDayMonth(start)} to ${fmtDayMonth(end)}.`
-      : `Estimated ${prediction.avgPeriodLength}-day period.` }),
+    /*
+      One date under the window: the likeliest start. The bleed span ("so
+      bleeding around 9 to 13 Oct") was a second date range under the first,
+      on the screen's busiest card, answering a question nobody asks the week
+      before (PRODUCT.md, U8). The calendar draws those days.
+    */
+    window ? el('p', { class: 'hint-sm', text: `Most likely ${DOW_LONG[dow(start)]} ${fmtDayMonth(start)}.` }) : null,
     confidenceLine(prediction),
   ]);
 }
@@ -1320,23 +1322,17 @@ function fertileCard(prediction, today, mode) {
   const passed = prediction.fertileWindow.end < today;
 
   /*
-    Once it has passed, and she is not trying to conceive, it shrinks to a line.
+    Once it has passed, and she is not trying to conceive, it goes.
 
-    For the next two weeks the full card was the same dates, the same
-    provenance and the same link, every day, about a window that no longer
-    mattered to her — the biggest card on the screen for the least useful fact
-    on it. The date is still worth a glance; the rest waits for the next one.
+    It used to shrink to a line ("20 Sep - 26 Sep, passed. Today: low chance
+    of getting pregnant") and stay for two weeks. Nothing on it changed a plan:
+    the phase line already says she is past ovulation, the calendar still
+    shades the window for anyone who wants the dates, and "low chance today",
+    said every day, reads as contraception advice the app explicitly does not
+    give (PRODUCT.md, U6). Trying to conceive, the full card stays: there it is
+    the answer to her main question.
   */
-  if (passed && mode === 'cycle') {
-    return el('div', { class: 'card data-zone card-compact' }, [
-      el('p', { class: 'compact-line' }, [
-        el('span', { class: 'compact-label', text: 'Fertile window' }),
-        el('span', { class: 'num', text:
-          `${fmtDayMonth(prediction.fertileWindow.start)} – ${fmtDayMonth(prediction.fertileWindow.end)}, passed` }),
-      ]),
-      el('p', { class: 'hint-sm', text: `Today: ${chance.label.toLowerCase()}.` }),
-    ]);
-  }
+  if (passed && mode === 'cycle') return null;
 
   return el('div', { class: 'card data-zone' }, [
     el('h3', { text: passed ? 'Fertile window has passed' : 'Fertile window' }),
@@ -1629,7 +1625,8 @@ function summariseLog(log) {
 
   // Sleep is part of the check-in now, so the line that confirms the
   // check-in says it; water has its own strip right below.
-  if (log.sleep != null) bits.push(`${log.sleep}h sleep`);
+  // Rounded: an imported or restored file can carry any number of decimals.
+  if (log.sleep != null) bits.push(`${Math.round(log.sleep * 10) / 10}h sleep`);
   if (log.bbt != null) bits.push('temperature');
   if (log.notes.trim()) bits.push('a note');
   return bits.length ? `${listJoin(bits)}.` : 'You can add to it any time.';

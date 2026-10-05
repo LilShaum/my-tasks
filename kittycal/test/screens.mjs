@@ -296,7 +296,7 @@ console.log('\nthe legend describes the grid rather than the prediction');
     const seen = new Set();
     for (const c of cells) {
       if (c.classList.contains('is-period')) seen.add('Period logged');
-      if (c.classList.contains('is-predicted')) seen.add('Period expected');
+      if (c.classList.contains('is-predicted')) seen.add('Period likely');
       if (c.classList.contains('is-fertile')) seen.add('Fertile window');
       if (c.classList.contains('is-ovulation')) seen.add('Ovulation estimated');
       if (c.classList.contains('is-luteal')) seen.add('After ovulation');
@@ -311,7 +311,7 @@ console.log('\nthe legend describes the grid rather than the prediction');
     'and the legend names every state the current month draws',
     `drawn ${JSON.stringify(drawnNow)} vs legend "${now}"`);
 
-  const ALL = ['Period logged', 'Period expected', 'Fertile window',
+  const ALL = ['Period logged', 'Period likely', 'Fertile window',
     'Ovulation estimated', 'After ovulation'];
   const extraNow = ALL.filter((label) => now.includes(label) && !drawnNow.includes(label));
   check(extraNow.length === 0,
@@ -327,8 +327,8 @@ console.log('\nthe legend describes the grid rather than the prediction');
     await page.waitForTimeout(350);
   }
   const past = await legend();
-  check(past === 'Period logged',
-    'a month behind her names only the one state it draws', past);
+  check(past === 'Period logged' || past === 'Period logged / Something logged',
+    'a month behind her names only what it draws', past);
 
   await backToToday();
   await page.locator('button:has-text("Whole year")').click();
@@ -518,8 +518,8 @@ console.log('\na day in the next expected period is labelled as one');
   await page.waitForTimeout(600);
   const label = target ? await page.locator('.day-summary-phase').first().innerText() : '';
   check(target !== null, 'the fixture has a next period still ahead', String(target));
-  check(label === 'Day 2 · Period expected',
-    'its second day reads "Day 2 · Period expected", not a day of the current cycle', label);
+  check(label === 'Day 2 · Period likely',
+    'its second day reads "Day 2 · Period likely", not a day of the current cycle', label);
   await page.keyboard.press('Escape');
   await page.waitForTimeout(450);
 }
