@@ -199,9 +199,9 @@ export function parseShareInput(text) {
 
 /**
  * @param {string} fn
- * @param {Record<string, string>} args
+ * @param {Record<string, unknown>} args
  */
-async function rpc(fn, args) {
+export async function rpc(fn, args) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
     method: 'POST',
     headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },

@@ -131,8 +131,9 @@ const ink = (art) =>
  * The outline is stroked *after* the shading rather than as part of the fill,
  * so nothing is ever drawn over it and it stays unbroken all the way round.
  *
- * Duplicate ids are harmless here: a clipPath is pure geometry, so two copies
- * of the same emblem on one page resolve to identical clips.
+ * The ids are made unique per drawing by ui/mascot.js `emblem`: a copy whose
+ * clip is found first inside a hidden view has no clip at all, so duplicates
+ * are not harmless.
  *
  * @param {string} d      the form
  * @param {string} fill

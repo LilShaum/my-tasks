@@ -312,6 +312,9 @@
 .pa-connection-actions { display: flex; gap: var(--sp-2); }
 .pa-code { font-weight: 700; letter-spacing: 0.06em; }
 .pa-theme-note { margin-bottom: var(--sp-2); }
+.pa-next { margin: var(--sp-2) 0 var(--sp-4); }
+.pa-connection-head .pa-status-who { flex: none; }
+.her-art { display: block; flex: none; }
 
 /* ── Her side: the status row on Today ─────────────────────────────────── */
 .status-row { margin-bottom: var(--sp-5); }
