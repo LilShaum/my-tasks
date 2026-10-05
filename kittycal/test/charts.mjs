@@ -122,7 +122,7 @@ const shapes = await page.$$eval('.chart', (nodes) => nodes.map((n) => {
   return { drawn: box.width / box.height, declared: vb[2] / vb[3], w: box.width };
 }));
 
-ok('every chart is on the page', shapes.length >= 3, String(shapes.length));
+ok('every chart is on the page', shapes.length >= 2, String(shapes.length));
 ok('and each keeps the aspect ratio it was drawn at',
   shapes.every((s) => Math.abs(s.drawn - s.declared) < 0.02),
   JSON.stringify(shapes.map((s) => [s.drawn.toFixed(2), s.declared.toFixed(2)])));
@@ -186,13 +186,13 @@ const collisions = await cycleCard.evaluate((card) => {
 ok('no two labels sit on top of each other', collisions.length === 0,
   collisions.join(', '));
 
-console.log('\na nightly series does not repeat itself');
+console.log('\na daily series does not repeat itself');
 
 const sleepLabels = await page.evaluate(() => {
   const trends = document.querySelector('#insight-trends');
   if (!trends) return null;
   const chart = [...trends.querySelectorAll('.chart')]
-    .find((c) => /^Sleep hours/.test(c.getAttribute('aria-label') ?? ''));
+    .find((c) => /^Steps over/.test(c.getAttribute('aria-label') ?? ''));
   if (!chart) return null;
   return [...chart.querySelectorAll('text')]
     .map((t) => t.textContent)
@@ -200,23 +200,12 @@ const sleepLabels = await page.evaluate(() => {
 });
 
 if (sleepLabels === null) {
-  ok('the sleep chart rendered', false, 'no sleep chart in #insight-trends');
+  ok('the steps chart rendered', false, 'no steps chart in #insight-trends');
 } else {
-  ok('sixteen nights get a handful of dated labels',
+  ok('sixteen days get a handful of dated labels',
     sleepLabels.length > 0 && sleepLabels.length <= 6, JSON.stringify(sleepLabels));
   ok('and no label is repeated',
     new Set(sleepLabels).size === sleepLabels.length, JSON.stringify(sleepLabels));
-}
-
-console.log('\nthe sleep chart shows the recommended band');
-{
-  const edges = await page.evaluate(() => {
-    const chart = [...document.querySelectorAll('#insight-trends .chart')]
-      .find((c) => /^Sleep hours/.test(c.getAttribute('aria-label') ?? ''));
-    return chart ? [...chart.querySelectorAll('text')].map((t) => t.textContent) : [];
-  });
-  ok('both edges of the 7 to 9 hour band are numbered',
-    edges.some((l) => Number(l) === 7) && edges.some((l) => Number(l) === 9), JSON.stringify(edges));
 }
 
 console.log('\nthe numbers she can type are numbers she can see again');
@@ -228,12 +217,9 @@ console.log('\nthe numbers she can type are numbers she can see again');
   });
   ok('the card is called "Your recent numbers"', trends?.title === 'Your recent numbers', trends?.title);
   const text = trends?.text ?? '';
-  // Water zig-zags by nature, so it is one sentence (average and low days), not a chart.
-  ok('water comes back as a sentence', /Water: about [\d.]+ (L|oz|ml) a day over the last/.test(text), text.slice(0, 200));
-  ok('and is not drawn as a chart', !(trends?.labels ?? []).some((l) => /water/i.test(l)),
-    JSON.stringify(trends?.labels));
+  // Sleep and water have their own cycle cards; here they were counters (PRODUCT.md, U9).
   ok('steps come back as a trend', /Steps, last/.test(text), text.slice(0, 200));
-  ok('and so does sleep', /Sleep, last/.test(text), text.slice(0, 200));
+  ok('sleep and water are not repeated here as counters', !/Sleep, last|Water: about/.test(text), text.slice(0, 200));
 }
 
 console.log('\nand it is still described to a screen reader');
