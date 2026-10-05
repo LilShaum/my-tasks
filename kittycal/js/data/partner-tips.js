@@ -20,69 +20,51 @@
 
 /** @type {Record<string, {icon: string, lines: string[]}>} */
 export const TIPS = {
-  // What she sent, which outranks everything else.
-  'status:good': { icon: '🌟', lines: ['She’s feeling good today. A nice day to make a plan together.'] },
-  'status:tired': { icon: 'low-energy', lines: ['Low on energy today. Take one chore off her plate without asking.'] },
-  'status:cramps': { icon: 'cramps', lines: ['Cramps today. Heat pad, painkillers within reach, and you handle dinner.'] },
-  'status:space': { icon: '💭', lines: ['She’d like some space. A short kind message, then let her be.'] },
-  'status:cuddles': { icon: '💗', lines: ['She asked for cuddles. Keep the evening free.'] },
-  'status:snacks': { icon: 'cravings', lines: ['Snack request. You know her favourites.'] },
+  // What she sent: the line under her status bubble, which already says it.
+  'status:good': { icon: '🌟', lines: ['A nice day to make a plan together.'] },
+  'status:tired': { icon: 'low-energy', lines: ['Take one chore off her plate without asking.'] },
+  'status:cramps': { icon: 'cramps', lines: ['Heat pad, painkillers within reach, and you handle dinner.'] },
+  'status:space': { icon: '💭', lines: ['A short kind message, then let her be.'] },
+  'status:cuddles': { icon: '💗', lines: ['Keep the evening free.'] },
+  'status:snacks': { icon: 'cravings', lines: ['You know her favourites.'] },
 
-  // Timing.
-  due: { icon: '🗓️', lines: ['Her period could start any day now. Supplies at home?', 'Any day now. Keep plans flexible this week.'] },
-  soon: { icon: '🗓️', lines: ['Her period’s likely in a day or two. Worth having supplies ready.'] },
+  // Timing. Each is the line under a title that already names the thing.
+  due: { icon: '🗓️', lines: ['Could start any day. Supplies at home?', 'Keep plans flexible this week.'] },
+  soon: { icon: '🗓️', lines: ['Worth having supplies, and some slack, ready.'] },
   'period-start': {
     icon: '🩸',
     lines: [
       'The first days are usually the hardest. Keep plans easy to cancel.',
-      'Offer to cook or pick up food tonight.',
-      'A warm drink and the sofa beat a big night out today.',
+      'Offering to cook or pick up food helps.',
+      'A warm drink and the sofa beat a big night out.',
     ],
   },
   'period-later': { icon: '🩸', lines: ['Usually easing off by now. Ask how she’s feeling rather than guessing.'] },
-  easy: {
-    icon: '🌟',
-    lines: [
-      'Usually one of her easier stretches. A good time for that date.',
-      'Her easier days. Good timing for plans you’ve been putting off.',
-    ],
-  },
-  follicular: { icon: '✨', lines: ['Energy often picks up around now. A good stretch for plans.'] },
-  fertile: { icon: '🌷', lines: ['Her fertile window: pregnancy is possible on these days.'] },
+  easy: { icon: '🌟', lines: ['A good time for that date.', 'Good timing for plans you’ve been putting off.'] },
+  fertile: { icon: '🌷', lines: ['Pregnancy is possible on these days.'] },
 
-  // Her own patterns, when one lands today.
-  cramps: {
-    icon: 'cramps',
-    lines: ['Heat pad charged and painkillers within reach.', 'Cramps usually show up now. Offer to handle dinner.'],
-  },
-  bloating: {
-    icon: 'bloating',
-    lines: ['Comfy plans beat dressed-up ones around now.', 'Bloating usually shows up now. Skip the snack jokes, bring the snacks.'],
-  },
-  headache: {
-    icon: 'headache',
-    lines: ['Headaches tend to land now. Keep the evening quiet, lights low.', 'Water and something to eat often help a headache. Offer both.'],
-  },
-  migraine: { icon: 'migraine', lines: ['Migraines tend to land now. A dark, quiet room and no plans if one hits.'] },
-  fatigue: {
-    icon: 'fatigue',
-    lines: ['She’s usually more tired around now. An early night beats a big night out.', 'Take one chore off her list without being asked.'],
-  },
-  'low-energy': { icon: 'low-energy', lines: ['Energy usually dips now. Keep plans low-key.'] },
-  backache: { icon: 'backache', lines: ['Her back usually aches around now. A back rub goes a long way.'] },
-  nausea: { icon: 'nausea', lines: ['She can feel queasy around now. Plain food, and skip strong smells.'] },
-  'tender-breasts': { icon: 'tender-breasts', lines: ['Tenderness is usual around now. Go gently with hugs.'] },
-  cravings: { icon: 'cravings', lines: ['Cravings usually kick in now. Stock something she likes.'] },
-  insomnia: { icon: 'insomnia', lines: ['Her sleep is often worse now. Keep late nights for another week.'] },
+  // Her own patterns, when one lands. Shown after when it usually happens,
+  // so each is only the part he can do something with.
+  cramps: { icon: 'cramps', lines: ['A heat pad and painkillers within reach help.', 'Offering to handle dinner helps.'] },
+  bloating: { icon: 'bloating', lines: ['Comfy plans beat dressed-up ones.', 'Skip the snack jokes, bring the snacks.'] },
+  headache: { icon: 'headache', lines: ['A quiet evening with the lights low helps.', 'Water and something to eat often help. Offer both.'] },
+  migraine: { icon: 'migraine', lines: ['A dark, quiet room and no plans if one hits.'] },
+  fatigue: { icon: 'fatigue', lines: ['An early night beats a big night out.', 'Take one chore off her list without being asked.'] },
+  'low-energy': { icon: 'low-energy', lines: ['Keep plans low-key.'] },
+  backache: { icon: 'backache', lines: ['A back rub goes a long way.'] },
+  nausea: { icon: 'nausea', lines: ['Plain food, and skip strong smells.'] },
+  'tender-breasts': { icon: 'tender-breasts', lines: ['Go gently with hugs.'] },
+  cravings: { icon: 'cravings', lines: ['Stock something she likes.'] },
+  insomnia: { icon: 'insomnia', lines: ['Keep late nights for another week.'] },
   'harder-days': {
     icon: '💭',
     lines: [
-      'Harder days usually start around now. Extra patience; it’s hormones, not you.',
+      'Extra patience helps. It’s hormones, not you.',
       'Ask “what would help?” rather than guessing.',
-      'A kind message in the afternoon lands well on harder days.',
+      'A kind message in the afternoon lands well.',
     ],
   },
-  sleep: { icon: '🌙', lines: ['She usually sleeps less this week. Keep evenings low-key.'] },
+  sleep: { icon: '🌙', lines: ['Keep evenings low-key.'] },
 };
 
 /**

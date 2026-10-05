@@ -20,6 +20,7 @@ import { moodCurve, bodyMap, sleepCurve, easierDays } from '../domain/rhythm.js'
 import { cycleLengths } from '../domain/cycles.js';
 import { predictionAccuracy, MIN_SCORED } from '../domain/accuracy.js';
 import { buildSnapshot } from '../domain/partner.js';
+import { trackedCycles } from '../domain/stats.js';
 import { putShare } from '../storage/share.js';
 
 /** Long enough to fold a burst of taps into one send. */
@@ -63,6 +64,7 @@ export function currentSnapshot(share = store.getState().settings.partnerShare) 
       total: record.total >= MIN_SCORED ? record.total : null,
     } : null,
     status: share.status ?? null,
+    tracked: trackedCycles(logs, cycles).length,
   });
 }
 

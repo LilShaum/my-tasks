@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 
 import {
   SHARE_ITEMS, defaultChoices, buildSnapshot, partnerModel, icsFor, cleanSnapshot,
-  partnerDay, helpFor, freshStatus, STATUS_HOURS,
+  partnerDay, dayItems, laneWhen, isDue, nextRun, freshStatus, STATUS_HOURS,
 } from '../js/domain/partner.js';
 import {
   newSecrets, encrypt, decrypt, shareLink, parseShareHash,
@@ -129,7 +129,7 @@ test('the summary has exactly the documented fields: no logs, notes, tests or la
   });
   assert.deepEqual(Object.keys(s).sort(), [
     'cycleLength', 'easy', 'fertile', 'helps', 'lanes', 'lastStart', 'lutealDays', 'mood', 'name',
-    'nextStart', 'patterns', 'paused', 'periodLength', 'phase', 'stats', 'status', 'theme', 'updated', 'v',
+    'nextStart', 'patterns', 'paused', 'periodLength', 'phase', 'stats', 'status', 'theme', 'tracked', 'updated', 'v',
   ]);
   const text = JSON.stringify(s);
   for (const word of ['late', 'Late', 'pregnan', 'test', 'note', 'diary', 'log']) {
@@ -189,7 +189,7 @@ const snap = (until, over = {}) => ({
   lastStart: addDays(TODAY, until - 28), nextStart: addDays(TODAY, until),
   cycleLength: 28, periodLength: 5, lutealDays: 14,
   phase: true, fertile: true, patterns: [], mood: null, helps: '',
-  theme: 'hellokitty', lanes: [], easy: null, stats: null, status: null,
+  theme: 'hellokitty', lanes: [], easy: null, stats: null, status: null, tracked: null,
   ...over,
 });
 
@@ -247,9 +247,11 @@ test('"due around now" from the forecast start until its expected period has pas
   assert.equal(modelOn(snap(0, { name: null })).headline, 'Her period is due around now');
 });
 
-test('then it rolls forward a cycle, and never says late', () => {
-  // 5 days after the forecast start with a 5-day period: the expected bleed is over.
-  const m = modelOn(snap(-5));
+test('then it rolls forward a cycle if her app has not been opened since, and never says late', () => {
+  // The forecast start was after her last update: nobody knows, so the next
+  // cycle is the best guess once the expected bleed is over.
+  const unseen = snap(-5, { updated: addDays(TODAY, -6) });
+  const m = modelOn(unseen);
   assert.equal(m.status, 'later');
   assert.equal(m.headline, 'Next period in about 23 days');
   assert.equal(m.upcoming[0].start, addDays(TODAY, 23));
@@ -258,6 +260,18 @@ test('then it rolls forward a cycle, and never says late', () => {
     const m2 = modelOn(snap(0), days);
     assert.doesNotMatch(`${m2.headline} ${m2.sub ?? ''}`, /late|overdue|missed/i, `day +${days}`);
   }
+});
+
+test('if her app saw the forecast start pass with no period logged, it stays due, not "23 days away"', () => {
+  // Forecast start 8 days ago; her app updated the summary 2 days ago.
+  const s = snap(-8);
+  for (const offset of [0, 5, 15]) {
+    const m = modelOn(s, offset);
+    assert.equal(m.status, 'due', `+${offset}`);
+    assert.doesNotMatch(m.headline, /late|overdue|missed/i);
+  }
+  // A cycle on, her own forecast has stopped guessing, and so does his.
+  assert.notEqual(modelOn(s, 28).status, 'due');
 });
 
 test('rolling forward is by whole cycles, however long the summary sits', () => {
@@ -564,23 +578,75 @@ test('partnerDay: nothing before her last start, and nothing while paused', () =
   assert.equal(partnerDay({ ...s, paused: true }, TODAY), null);
 });
 
-test('helpFor: what she sent comes first, then her own patterns, at most three, one line each', () => {
+test('dayItems: each thing named, with when it usually happens for her and one thing that helps', () => {
   const s = snap(3, { lanes: LANES });
-  const d = partnerDay(s, TODAY);
-  const help = helpFor(d, { id: 'cuddles', at: 0 }, TODAY);
-  assert.equal(help.length, 3);
-  assert.equal(help[0].key, 'status:cuddles');
-  assert.deepEqual(help.slice(1).map((h) => h.key), ['bloating', 'harder-days']);
-  for (const h of help) assert.ok(h.text.length < 90 && !h.text.includes('\n'), h.text);
+  const items = dayItems(s, /** @type {any} */ (partnerDay(s, TODAY)), TODAY);
+  assert.deepEqual(items.map((i) => i.title), ['Bloating', 'Harder days']);
+  assert.match(items[0].text, /^Usually the last 3 days before her period\. \S/);
+  assert.match(items[1].text, /^Usually the last 4 days before her period\. /);
+  for (const i of items) assert.ok(i.text.length < 120 && !i.text.includes('\n'), i.text);
   // Stable through the day, so it does not change under him.
-  assert.deepEqual(helpFor(d, null, TODAY), helpFor(d, null, TODAY));
+  assert.deepEqual(dayItems(s, /** @type {any} */ (partnerDay(s, TODAY)), TODAY), items);
 });
 
-test('helpFor: a quiet day still has something useful, never a generic lecture', () => {
-  const s = snap(20, { lanes: LANES, easy: { from: 7, to: 11 } });
-  const d = partnerDay(s, TODAY);
-  const keys = helpFor(d, null, TODAY).map((h) => h.key);
-  assert.ok(keys.includes('easy'), keys.join());
+test('dayItems: her period by day, a coming one as likely, a quiet stretch as easier', () => {
+  const on = snap(-1, { lastStart: addDays(TODAY, -1), lanes: LANES });
+  const onItems = dayItems(on, /** @type {any} */ (partnerDay(on, TODAY)), TODAY);
+  assert.equal(onItems[0].title, 'Period, day 2');
+  assert.equal(onItems[1].title, 'Cramps');
+  assert.match(onItems[1].text, /^Usually the first 2 days of her period\./);
+
+  const soon = snap(1);
+  assert.equal(dayItems(soon, /** @type {any} */ (partnerDay(soon, TODAY)), TODAY)[0].title, 'Period likely tomorrow');
+  const ahead = snap(5);
+  const day = /** @type {any} */ (partnerDay(ahead, addDays(TODAY, 6)));
+  assert.equal(dayItems(ahead, day, TODAY)[0].title, 'Period likely, day 2');
+
+  const quiet = snap(20, { easy: { from: 7, to: 11 } });
+  const q = dayItems(quiet, /** @type {any} */ (partnerDay(quiet, TODAY)), TODAY);
+  assert.equal(q[0].title, 'One of her easier days');
+  assert.match(q[0].text, /^Usually days 7 to 11 of her cycle\. /);
+});
+
+test('a due period is "due any day", never day 3 or 4 of something unconfirmed', () => {
+  const s = snap(-3, { lanes: LANES });
+  const d = /** @type {any} */ (partnerDay(s, TODAY));
+  assert.equal(d.period, 'expected');
+  assert.ok(isDue(s, d, TODAY));
+  const items = dayItems(s, d, TODAY);
+  assert.equal(items[0].title, 'Period due any day');
+  assert.ok(!items.some((i) => /Period, day|Cramps|easing off/.test(`${i.title} ${i.text}`)), JSON.stringify(items));
+  // A forecast period ahead is not due.
+  const ahead = snap(5);
+  assert.ok(!isDue(ahead, /** @type {any} */ (partnerDay(ahead, addDays(TODAY, 5))), TODAY));
+});
+
+test('laneWhen: said the way he would picture it', () => {
+  assert.equal(laneWhen({ from: 1, to: 2 }, 5), 'Usually the first 2 days of her period');
+  assert.equal(laneWhen({ from: 1, to: 1 }, 5), 'Usually the first day of her period');
+  assert.equal(laneWhen({ from: 2, to: 3 }, 5), 'Usually days 2 to 3 of her period');
+  assert.equal(laneWhen({ from: 8, to: 13 }, 5), 'Usually days 8 to 13 of her cycle');
+  assert.equal(laneWhen({ from: -3, to: -1 }, 5), 'Usually the last 3 days before her period');
+  assert.equal(laneWhen({ from: -1, to: -1 }, 5), 'Usually the day before her period');
+  assert.equal(laneWhen({ from: -6, to: -3 }, 5), 'Usually 6 to 3 days before her period');
+});
+
+test('nextRun: the stretch under way today with its real first day, or the next one', () => {
+  const s = snap(3, { lanes: LANES, easy: { from: 7, to: 11 } });
+  const since = /** @type {any} */ (partnerDay(s, TODAY)).start;
+  const harder = nextRun(s, (d) => d.lanes.some((l) => l.kind === 'mood'), since, TODAY);
+  assert.deepEqual(harder, { from: addDays(TODAY, -1), to: addDays(TODAY, 2) });
+  const easy = nextRun(s, (d) => d.easy, since, TODAY);
+  // This cycle's easier days are over; the next ones are days 7 to 11 of the next.
+  assert.deepEqual(easy, { from: addDays(TODAY, 3 + 6), to: addDays(TODAY, 3 + 10) });
+});
+
+test('buildSnapshot: tracked says how many cycles of check-ins her patterns have, only if shared', () => {
+  assert.equal(snapshot({ tracked: 1 }).tracked, 1);
+  assert.equal(snapshot({ tracked: 1, choices: { patterns: false, mood: false } }).tracked, null);
+  assert.equal(cleanSnapshot({ ...snap(5), tracked: 2 })?.tracked, 2);
+  assert.equal(cleanSnapshot({ ...snap(5), tracked: 'lots' })?.tracked, 0);
+  assert.equal(cleanSnapshot({ ...snap(5), tracked: undefined })?.tracked, null);
 });
 
 test('freshStatus: shows for its hours, then lapses', () => {

@@ -103,6 +103,7 @@ export function defaultChoices() {
  * @property {{from: number, to: number}|null} easy
  * @property {Stats|null} stats
  * @property {{id: string, at: number}|null} status
+ * @property {number|null} tracked  finished cycles she has logged in (patterns need three); null if not shared
  */
 
 /**
@@ -121,11 +122,12 @@ export function defaultChoices() {
  * @param {{from: number, to: number}|null} [input.easy]
  * @param {Stats|null} [input.stats]
  * @param {{id: string, at: number}|null} [input.status]
+ * @param {number|null} [input.tracked]   finished cycles she logged in
  * @returns {Snapshot}
  */
 export function buildSnapshot({
   settings, prediction: p, choices, helps, patterns, moodWindow, today,
-  rows = [], sleepDip = false, easy = null, stats = null, status = null,
+  rows = [], sleepDip = false, easy = null, stats = null, status = null, tracked = null,
 }) {
   /*
     Paused rather than wrong. After a positive pregnancy test, or when there
@@ -179,6 +181,8 @@ export function buildSnapshot({
     easy: showPatterns && !p.onHormonal ? easy : null,
     stats: choices.phase && !paused ? stats : null,
     status: status && STATUSES.some((s) => s.id === status.id) ? status : null,
+    // So his app can say how far along her patterns are, not just that there are none.
+    tracked: (choices.patterns || choices.mood) && !paused && tracked != null ? tracked : null,
   };
 }
 
@@ -262,6 +266,7 @@ export function cleanSnapshot(raw) {
     status: st && typeof st.id === 'string' && STATUSES.some((x) => x.id === st.id)
       && typeof st.at === 'number' && Number.isFinite(st.at)
       ? { id: st.id, at: st.at } : null,
+    tracked: r.tracked == null ? null : int(r.tracked, 0, 500, 0),
   };
 }
 
@@ -306,7 +311,16 @@ export function partnerDay(snap, date) {
   let start = snap.lastStart;
   let next = snap.nextStart;
   if (date < start) return null;
-  while (daysBetween(addDays(next, bleed - 1), date) > 0) {
+  /*
+    Roll forward past a forecast start only when her app has not been opened
+    since it: then nobody knows, and the next cycle is the best guess. If her
+    app was open on or after that date and no start was logged, it has not
+    come, and it stays due rather than quietly becoming "next period in 23
+    days". Due, not late: that word is hers. A cycle's length on, it rolls
+    anyway, as her own forecast stops guessing by then.
+  */
+  while (daysBetween(addDays(next, bleed - 1), date) > 0
+    && !(next <= snap.updated && daysBetween(next, date) < len)) {
     start = next;
     next = addDays(next, len);
   }
@@ -485,53 +499,138 @@ export function partnerDays(snap, from, count) {
 }
 
 /**
- * @typedef {Object} HelpItem
- * @property {string} key    what it is about: a lane id, a phase, a status
+ * When something usually happens, in words he can picture.
+ *
+ * @param {{from: number, to: number}} range  positive: cycle days; negative: days before her next period
+ * @param {number} periodLength
+ */
+export function laneWhen({ from, to }, periodLength) {
+  if (from > 0) {
+    if (to <= periodLength) {
+      if (from === 1) return to === 1 ? 'Usually the first day of her period' : `Usually the first ${to} days of her period`;
+      return from === to ? `Usually day ${from} of her period` : `Usually days ${from} to ${to} of her period`;
+    }
+    return from === to ? `Usually day ${from} of her cycle` : `Usually days ${from} to ${to} of her cycle`;
+  }
+  const far = -from;
+  const near = -to;
+  if (near === 1) return far === 1 ? 'Usually the day before her period' : `Usually the last ${far} days before her period`;
+  return `Usually ${far} to ${near} days before her period`;
+}
+
+/**
+ * Her period is due on this day: its expected start has passed, by today or
+ * by more than a period's length, with no start confirmed. Not day 3 or 4 of
+ * something nobody has seen.
+ *
+ * @param {Snapshot} snap
+ * @param {PartnerDay} day
+ * @param {DateKey} today
+ */
+export function isDue(snap, day, today) {
+  return day.period === 'expected'
+    && (day.date <= today || daysBetween(day.next, day.date) >= Math.max(1, snap.periodLength));
+}
+
+/**
+ * @typedef {Object} DayItem
+ * @property {string} key    what it is about: a lane id, a phase, a timing
  * @property {string} icon   a symptom id or a moment emoji, drawn by the view
- * @property {string} text
+ * @property {string} title  the thing: "Bloating", "Period, day 2"
+ * @property {string} text   when it usually happens, then one thing that helps
  */
 
 /**
- * Two or three concrete things he can do today, from what is actually going
- * on for her: what she told him, what her own patterns say lands today, then
- * where she is in her cycle. One line each, varied by date so the same day
- * of a cycle does not read the same every month.
+ * What is likely on a day, from her own patterns and where she is: each
+ * thing named, with one line on when it usually happens for her and what
+ * helps. The same list on Today, in a day's detail and in her preview.
  *
- * @param {PartnerDay|null} day
- * @param {{id: string, at: number}|null} status  only if still fresh
+ * A period whose expected start has passed by `today` is "due", not day 3 or
+ * 4 of something nobody has confirmed: her app would have said if it had
+ * started. Days of a period still ahead are forecasts, and say so.
+ *
+ * @param {Snapshot} snap
+ * @param {PartnerDay} day
  * @param {DateKey} today
  * @param {number} [limit]
- * @returns {HelpItem[]}
+ * @returns {DayItem[]}
  */
-export function helpFor(day, status, today, limit = 3) {
-  /** @type {string[]} */
-  const keys = [];
-  if (status) keys.push(`status:${status.id}`);
-  if (day) {
-    if (day.period === 'expected' && day.untilNext <= 0) keys.push('due');
-    else if (!day.period && day.untilNext >= 1 && day.untilNext <= 2) keys.push('soon');
-    if (day.period && day.cycleDay <= 2) keys.push('period-start');
-    for (const lane of day.lanes) keys.push(lane.kind === 'mood' ? 'harder-days' : lane.kind === 'sleep' ? 'sleep' : lane.id);
-    if (day.period && day.cycleDay > 2) keys.push('period-later');
-    if (day.easy) keys.push('easy');
-    if (day.phase === 'fertile') keys.push('fertile');
-    if (day.phase === 'follicular' && !day.easy) keys.push('follicular');
-  }
-
-  // A stable pick per date: the same tip all day, a different one next month.
+export function dayItems(snap, day, today, limit = 4) {
+  // A stable pick per date: the same line all day, a different one next month.
   let seed = 0;
-  for (const ch of today) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
+  for (const ch of day.date) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
+  const line = (/** @type {string} */ key, n = 0) => {
+    const lines = TIPS[key]?.lines ?? [];
+    return lines.length ? lines[(seed + n) % lines.length] : '';
+  };
+  const bleed = Math.max(1, snap.periodLength);
+  const due = isDue(snap, day, today);
 
-  /** @type {HelpItem[]} */
+  /** @type {DayItem[]} */
   const out = [];
-  for (const key of keys) {
-    if (out.length >= limit) break;
-    const tip = TIPS[key];
-    if (!tip || out.some((o) => o.key === key)) continue;
-    out.push({ key, icon: tip.icon, text: tip.lines[(seed + out.length) % tip.lines.length] });
+  if (day.period === 'logged') {
+    out.push({ key: 'period', icon: '🩸', title: `Period, day ${day.cycleDay}`,
+      text: line(day.cycleDay <= 2 ? 'period-start' : 'period-later') });
+  } else if (due) {
+    out.push({ key: 'due', icon: '🗓️', title: 'Period due any day', text: line('due') });
+  } else if (day.period === 'expected') {
+    out.push({ key: 'period', icon: '🩸',
+      title: day.untilNext === 0 ? 'Period likely to start' : `Period likely, day ${day.cycleDay}`,
+      text: line(day.cycleDay <= 2 ? 'period-start' : 'period-later') });
+  } else if (day.untilNext >= 1 && day.untilNext <= 2) {
+    out.push({ key: 'soon', icon: '🗓️',
+      title: day.untilNext === 1 ? 'Period likely tomorrow' : 'Period likely in 2 days', text: line('soon') });
   }
-  return out;
+  for (const lane of day.lanes) {
+    // Not "cramps, day 4" of a period that has not been confirmed.
+    if (due && lane.from > 0) continue;
+    const key = lane.kind === 'mood' ? 'harder-days' : lane.kind === 'sleep' ? 'sleep' : lane.id;
+    const tip = line(key, out.length);
+    out.push({
+      key,
+      icon: lane.kind === 'mood' ? '💭' : lane.kind === 'sleep' ? '🌙' : lane.id,
+      title: lane.label,
+      text: `${laneWhen(lane, bleed)}.${tip ? ` ${tip}` : ''}`,
+    });
+  }
+  if (day.easy && snap.easy) {
+    out.push({ key: 'easy', icon: '🌟', title: 'One of her easier days',
+      text: `${laneWhen(snap.easy, bleed)}. ${line('easy')}` });
+  }
+  if (day.phase === 'fertile') out.push({ key: 'fertile', icon: '🌷', title: 'Fertile window', text: line('fertile') });
+  return out.slice(0, limit);
 }
+
+/**
+ * The stretch of days where `match` holds that is under way on `today`, or
+ * the next one after it. Looked for from `since` (the start of her current
+ * cycle), so a stretch already going has its real first day. Null if none
+ * comes within the horizon.
+ *
+ * @param {Snapshot} snap
+ * @param {(d: PartnerDay) => boolean} match
+ * @param {DateKey} since
+ * @param {DateKey} today
+ * @param {number} [horizon]  days to look through
+ * @returns {{from: DateKey, to: DateKey}|null}
+ */
+export function nextRun(snap, match, since, today, horizon = 100) {
+  /** @type {{from: DateKey, to: DateKey}|null} */
+  let run = null;
+  for (const d of partnerDays(snap, since, horizon)) {
+    if (match(d)) {
+      if (run) run.to = d.date;
+      else run = { from: d.date, to: d.date };
+    } else if (run) {
+      if (run.to >= today) return run;
+      run = null;
+    }
+  }
+  return run && run.to >= today ? run : null;
+}
+
+/** The status line he sees under what she sent. */
+export const statusTip = (/** @type {string} */ id) => TIPS[`status:${id}`]?.lines[0] ?? '';
 
 /** How long a status she sent stays on his screen. */
 export const STATUS_HOURS = 16;

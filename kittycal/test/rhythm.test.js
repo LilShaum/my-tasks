@@ -43,7 +43,7 @@ function world(lengths, fill = () => ({}), periodLen = 5) {
     const end = cycle.nextStart ? addDays(cycle.nextStart, -1) : addDays(cycle.start, periodLen - 1);
     for (const date of range(cycle.start, end)) {
       const pos = align(cycle, date);
-      logs[date] = { ...emptyLog(date), ...fill({ date, ...pos, cycle: i }) };
+      logs[date] = { ...emptyLog(date), checkedIn: true, ...fill({ date, ...pos, cycle: i }) };
     }
   });
   return { logs, cycles };
@@ -517,4 +517,15 @@ test('easierDays: logging evenly, or hardly at all, gives no window', () => {
   assert.equal(easierDays(quiet.logs, quiet.cycles), null);
   const short = world([28, 28], ({ after }) => ({ symptoms: after <= 3 ? ['cramps'] : [], checkedIn: true }));
   assert.equal(easierDays(short.logs, short.cycles), null);
+});
+
+test('bodyMap: periods remembered at setup, with no logs, do not hide a real pattern', () => {
+  // Three cycles she only entered the dates of, then three she checked in on,
+  // with cramps on day 1 each time. Counting the blanks would make it 3 of 6.
+  const { logs, cycles } = world([28, 28, 28, 28, 28, 28], ({ after, cycle }) => (cycle < 3
+    ? { checkedIn: false }
+    : { symptoms: after === 1 ? ['cramps'] : [] }));
+  const rows = bodyMap(logs, cycles);
+  assert.deepEqual(rows.map((r) => r.id), ['cramps']);
+  assert.equal(rows[0].cyclesTotal, 3);
 });

@@ -128,8 +128,8 @@ export function mountPartnerSetup(host, { onDone, onBack }) {
         content: [
           el('div', { class: 'onb-art onb-art-sm', 'aria-hidden': 'true' }, [art]),
           el('h2', { text: snap.name ? `Connected to ${snap.name}’s cycle` : 'Connected to her cycle' }),
-          el('p', { class: 'hint', text: 'You’ll see what she chose to share: where she is in her cycle, what’s '
-            + 'likely each day, and how you can help.' }),
+          el('p', { class: 'hint', text: 'You’ll see what she chose to share: where she is in her cycle, when '
+            + 'her period’s coming, and what’s likely each day.' }),
           of?.code ? installTip(of.code) : null,
         ],
         footer: footer('Continue', next),

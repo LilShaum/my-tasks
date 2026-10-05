@@ -122,3 +122,17 @@ test('a one-off in the window each cycle is not a pattern', () => {
   });
   assert.deepEqual(premenstrualPatterns(logs, cycles).map((p) => p.id), ['bloating']);
 });
+
+test('periods remembered at setup, with no logs, do not hide a pattern', () => {
+  // Five complete cycles; bloating logged before each of the last three.
+  const { logs, cycles } = history([28, 28, 28, 28, 28], {});
+  for (const c of cycles.slice(2, 5)) {
+    for (const b of [3, 2, 1]) {
+      const date = addDays(/** @type {string} */ (c.nextStart), -b);
+      logs[date] = emptyLog(date);
+      logs[date].symptoms.push('bloating');
+    }
+  }
+  const found = premenstrualPatterns(logs, cycles);
+  assert.deepEqual(found.map((p) => [p.id, p.cyclesWith, p.cyclesTotal]), [['bloating', 3, 3]]);
+});
