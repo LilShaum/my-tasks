@@ -42,6 +42,8 @@ import {
 } from '../domain/partner.js';
 import { STATUSES } from '../data/partner-tips.js';
 import { getShare } from '../storage/share.js';
+import { pushSupport, subscribePush, registerPush, forgetPush } from '../storage/push.js';
+import { pushPlan } from '../domain/push-plan.js';
 import { getTheme } from '../data/themes.js';
 import * as store from '../state/store.js';
 
@@ -71,12 +73,116 @@ export async function refreshPartner({ force = false } = {}) {
       return fetchState = 'gone';
     }
     store.updateSettings({ partnerOf: { ...latest, snapshot: got.snapshot, fetchedAt: Date.now(), gone: false } });
+    // Her dates may have moved: keep the notification times in step.
+    void syncPush();
     return fetchState = 'ok';
   } catch {
     fetchState = 'offline';
     store.updateSettings({});
     return fetchState;
   }
+}
+
+/* ── Notifications ──────────────────────────────────────────────────────── */
+
+/**
+ * Keep the server's wake-up times in step with her latest summary. Resent
+ * when the times change, and at least once a day so a quiet week does not
+ * leave the server with an old schedule.
+ * @param {{force?: boolean}} [opts]
+ */
+export async function syncPush({ force = false } = {}) {
+  const { settings } = store.getState();
+  const pp = settings.partnerPush;
+  const of = settings.partnerOf;
+  if (!pp || !of?.snapshot || of.gone) return;
+  const plan = pushPlan(of.snapshot, pp, todayKey(), Date.now());
+  const sent = JSON.stringify(plan.map((p) => p.at));
+  if (!force && sent === pp.sent && Date.now() - pp.sentAt < 24 * 3600e3) {
+    // Same times; the words may still have changed (her name, say).
+    if (JSON.stringify(plan) !== JSON.stringify(pp.plan)) store.updateSettings({ partnerPush: { ...pp, plan } });
+    return;
+  }
+  try {
+    await registerPush(of.id, pp, plan.map((p) => p.at));
+    const latest = store.getState().settings.partnerPush;
+    if (latest) store.updateSettings({ partnerPush: { ...latest, plan, sent, sentAt: Date.now() } });
+  } catch {
+    const latest = store.getState().settings.partnerPush;
+    if (latest) store.updateSettings({ partnerPush: { ...latest, plan } });
+  }
+}
+
+/**
+ * Turn one kind of heads-up on or off. The first one on asks the phone for
+ * permission (it has to be from a tap); the last one off forgets this phone.
+ * @param {'period'|'harder'} kind
+ * @param {boolean} on
+ */
+async function setPush(kind, on) {
+  const { settings } = store.getState();
+  let pp = settings.partnerPush;
+  const next = { period: pp?.period ?? false, harder: pp?.harder ?? false, [kind]: on };
+  if (!next.period && !next.harder) {
+    if (pp) await forgetPush(pp.endpoint);
+    store.updateSettings({ partnerPush: null });
+    return;
+  }
+  if (!pp) {
+    const sub = await subscribePush().catch(() => null);
+    if (!sub) {
+      toast('Notifications are off for Kittycal. You can allow them in your phone’s settings.', { ms: 6000 });
+      store.updateSettings({});
+      return;
+    }
+    pp = { ...sub, period: false, harder: false, plan: [], sent: '', sentAt: 0 };
+  }
+  store.updateSettings({ partnerPush: { ...pp, ...next } });
+  await syncPush({ force: true });
+  const saved = store.getState().settings.partnerPush;
+  if (on) toast(saved?.sentAt ? 'You’ll get a heads-up' : 'Saved. It’ll switch on when you’re online.');
+}
+
+/** The notification rows in his Settings. */
+function notificationRows() {
+  const { settings } = store.getState();
+  const support = pushSupport();
+  const snap = settings.partnerOf?.snapshot ?? null;
+  const hasMood = Boolean(snap?.lanes.some((l) => l.kind === 'mood'));
+  const pp = settings.partnerPush;
+  const name = snap?.name ?? 'her';
+
+  if (support === 'install') {
+    return el('p', { class: 'hint-sm', text: 'On iPhone, add Kittycal to your Home Screen and open it from there to get heads-ups.' });
+  }
+  if (support === 'none') {
+    return el('p', { class: 'hint-sm', text: 'This browser can’t show notifications.' });
+  }
+  /** @param {'period'|'harder'} kind @param {string} label @param {string} sub @param {boolean} [disabled] */
+  const row = (kind, label, sub, disabled = false) => {
+    const on = Boolean(pp?.[kind]);
+    return el('div', { class: 'row' }, [
+      el('span', { class: 'row-label' }, [label, el('span', { class: 'choice-sub', text: sub })]),
+      el('button', {
+        type: 'button', class: 'toggle', role: 'switch', 'aria-checked': String(on), 'aria-label': label,
+        disabled: disabled || null,
+        onclick: () => { haptic(8); void setPush(kind, !on); },
+      }),
+    ]);
+  };
+  const next = pp?.plan.find((p) => p.at > Date.now());
+  return el('div', {}, [
+    el('div', { class: 'rows' }, [
+      row('period', `Before ${name === 'her' ? 'her' : `${name}’s`} period`, 'The evening before it’s likely to start'),
+      row('harder', 'When harder days start', hasMood
+        ? 'The morning they usually begin'
+        : `${snap?.name ?? 'She'} hasn’t shared this`, !hasMood && !pp?.harder),
+    ]),
+    support === 'blocked' && !pp
+      ? el('p', { class: 'hint-sm', text: 'Notifications are blocked for Kittycal. Allow them in your phone’s settings first.' })
+      : next ? el('p', { class: 'hint-sm pa-next', text: `Next: ${new Date(next.at).toLocaleString([], {
+        weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}.` }) : null,
+  ]);
 }
 
 /** The summary on this phone, if any. */
@@ -700,7 +806,7 @@ export function renderPartnerSettings(host) {
   replace(host, [
     of ? el('section', { class: 'card pa-connection' }, [
       el('div', { class: 'pa-connection-head' }, [
-        snap ? herCharacter(snap, 48) : null,
+        snap ? el('span', { class: 'pa-status-who' }, [herCharacter(snap, 40)]) : null,
         el('div', {}, [
           el('h3', { text: snap?.name ? `${snap.name}’s cycle` : 'Your partner’s cycle' }),
           el('p', { class: 'hint-sm', text: of.gone ? 'Stopped sharing'
@@ -718,6 +824,9 @@ export function renderPartnerSettings(host) {
           ['Disconnect']),
       ]),
     ]) : null,
+
+    of && !of.gone ? el('h3', { class: 'section-label', text: 'Heads-ups' }) : null,
+    of && !of.gone ? notificationRows() : null,
 
     el('h3', { class: 'section-label', text: 'Look' }),
     herTheme ? el('p', { class: 'hint-sm pa-theme-note', text:
@@ -771,7 +880,9 @@ async function askDisconnect() {
 }
 
 function disconnect() {
-  store.updateSettings({ partnerOf: null });
+  const pp = store.getState().settings.partnerPush;
+  if (pp) void forgetPush(pp.endpoint);
+  store.updateSettings({ partnerOf: null, partnerPush: null });
   announce('Disconnected');
   location.reload();
 }

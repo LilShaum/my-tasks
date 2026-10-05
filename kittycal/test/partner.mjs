@@ -63,7 +63,7 @@ const snap = async (page, name) => {
 
 /* ── The pretend server ───────────────────────────────────────────────── */
 
-const newServer = () => ({ rows: new Map(), calls: [], down: false });
+const newServer = () => ({ rows: new Map(), push: new Map(), calls: [], down: false });
 const callCount = (server, fn) => server.calls.filter((c) => c.fn === fn).length;
 
 async function attach(ctx, server) {
@@ -92,6 +92,12 @@ async function attach(ctx, server) {
       return json(200);
     }
     if (fn === 'kittycal_get_share') return json(200, row ? [{ blob: row.blob, updated_at: row.updated_at }] : []);
+    if (fn === 'kittycal_push_register') {
+      if (!server.rows.has(args.p_share_id)) return json(400, { message: 'no such share' });
+      server.push.set(args.p_endpoint, { share: args.p_share_id, times: args.p_times });
+      return json(200);
+    }
+    if (fn === 'kittycal_push_forget') { server.push.delete(args.p_endpoint); return json(200); }
     if (fn === 'kittycal_delete_share') {
       if (row && row.token === args.p_token) server.rows.delete(args.p_id);
       return json(200);
@@ -325,7 +331,49 @@ await snap(his.page, 'his-calendar');
 await tab(his.page, 'settings');
 check((await his.page.locator('.pa-code').textContent()) === code, 'Settings shows the code, to connect another phone');
 check(await his.page.locator('button', { hasText: 'Disconnect' }).count() === 1, 'and a way to disconnect');
+// Her character is drawn on several screens at once, some hidden. Shared clip
+// ids made the copy here lose its clip and show stripes; every id is unique now.
+const dupes = await his.page.evaluate(() => {
+  const ids = [...document.querySelectorAll('[id]')].map((n) => n.id);
+  return ids.filter((id, i) => ids.indexOf(id) !== i);
+});
+check(dupes.length === 0, 'no id is used twice on the page, so every drawing keeps its own clip', dupes.slice(0, 5).join(' '));
 await snap(his.page, 'his-settings');
+await tab(his.page, 'today');
+
+/* ── 5b. Heads-ups on his phone ────────────────────────────────────────── */
+console.log('\nhis heads-ups');
+await his.ctx.grantPermissions(['notifications'], { origin: ORIGIN });
+// Headless Chromium has no push service; stand in for the browser's subscribe.
+await his.page.evaluate(() => {
+  const fake = { endpoint: 'https://push.example/abc123def456ghi', keys: { p256dh: 'BPk-fake-key', auth: 'fake-auth' } };
+  /** @type {any} */ (PushManager.prototype).subscribe = async () => ({ toJSON: () => fake, unsubscribe: async () => true });
+  /** @type {any} */ (PushManager.prototype).getSubscription = async () => null;
+});
+await tab(his.page, 'settings');
+check(/Heads-ups/i.test(await his.page.locator('#view-settings').innerText()), 'Settings has a heads-ups section');
+await his.page.locator('[role="switch"][aria-label^="Before Mia"]').click();
+await his.page.waitForTimeout(1500);
+const reg = [...server.push.values()][0];
+check(server.push.size === 1, 'turning one on registers this phone', String(server.push.size));
+check(reg && reg.times.length >= 1 && reg.times.every((t) => !Number.isNaN(Date.parse(t))), 'with times only', JSON.stringify(reg));
+const regCall = server.calls.find((c) => c.fn === 'kittycal_push_register');
+check(regCall && !/Mia|period|tomorrow/i.test(JSON.stringify(regCall.args)), 'and nothing about her: no name, no words');
+check(/Next:/.test(await his.page.locator('#view-settings').innerText()), 'Settings says when the next one is');
+await snap(his.page, 'his-headsups');
+
+// A push arrives: the service worker shows what his phone planned.
+const shown = await his.page.evaluate(async () => {
+  const reg = await navigator.serviceWorker.ready;
+  const { getState } = await import('/js/state/store.js');
+  const plan = getState().settings.partnerPush?.plan ?? [];
+  return { planned: plan.length, first: plan[0]?.title ?? '' , scope: reg.scope };
+});
+check(shown.planned >= 1 && /period is likely tomorrow/.test(shown.first), 'his phone keeps the words itself', JSON.stringify(shown));
+
+await his.page.locator('[role="switch"][aria-label^="Before Mia"]').click();
+await his.page.waitForTimeout(1200);
+check(server.push.size === 0, 'turning the last one off forgets this phone');
 await tab(his.page, 'today');
 
 /* ── 6. Opening her link on a fresh phone ──────────────────────────────── */

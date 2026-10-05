@@ -73,6 +73,8 @@ const PRECACHE = [
   'js/domain/foryou.js',
   'js/domain/partner.js',
   'js/storage/share.js',
+  'js/storage/push.js',
+  'js/domain/push-plan.js',
   'js/state/partner-sync.js',
   'js/views/partner.js',
   'js/views/partner-app.js',
@@ -178,5 +180,55 @@ self.addEventListener('fetch', (event) => {
       }
       return new Response('', { status: 504, statusText: 'Offline' });
     }
+  })());
+});
+
+/* ── Partner heads-ups ─────────────────────────────────────────────────────
+   The server sends an empty push at a time his phone asked for. What it
+   should say is on this phone, in the plan saved with his settings: the
+   entry closest to now (within a few hours) is shown. A push must always
+   show something, so a late or unexpected one gets a plain line. */
+
+function readSettings() {
+  return new Promise((resolve) => {
+    const open = indexedDB.open('kittycal', 1);
+    open.onerror = () => resolve(null);
+    open.onsuccess = () => {
+      try {
+        const get = open.result.transaction(['meta'], 'readonly').objectStore('meta').get('settings');
+        get.onsuccess = () => resolve(get.result ? get.result.value : null);
+        get.onerror = () => resolve(null);
+      } catch { resolve(null); }
+    };
+  });
+}
+
+self.addEventListener('push', (event) => {
+  event.waitUntil((async () => {
+    const settings = await readSettings();
+    const plan = (settings && settings.partnerPush && settings.partnerPush.plan) || [];
+    const now = Date.now();
+    let best = null;
+    for (const p of plan) {
+      const off = Math.abs(p.at - now);
+      if (off <= 6 * 3600e3 && (!best || off < Math.abs(best.at - now))) best = p;
+    }
+    const name = settings && settings.partnerOf && settings.partnerOf.snapshot && settings.partnerOf.snapshot.name;
+    await self.registration.showNotification(best ? best.title : 'Kittycal', {
+      body: best ? best.body : `A heads-up about ${name ? `${name}’s` : 'her'} cycle. Open Kittycal to see it.`,
+      icon: 'assets/icons/icon-180.png',
+      badge: 'assets/icons/icon-180.png',
+      tag: 'kittycal-heads-up',
+      data: { url: './' },
+    });
+  })());
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    if (windows.length) return windows[0].focus();
+    return self.clients.openWindow('./');
   })());
 });

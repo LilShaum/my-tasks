@@ -80,6 +80,7 @@ import { cleanSnapshot } from './partner.js';
  * @property {string[]} forYouDismissed  moment ids she marked "not useful"
  * @property {PartnerShare|null} partnerShare  her own share, when she is sharing
  * @property {PartnerOf|null} partnerOf        a share someone sent her phone
+ * @property {PartnerPush|null} partnerPush    his notifications, when he turned them on
  * @property {'self'|'partner'|null} role  what this phone is for: her own cycle, or someone else's
  * @property {string|null} startedOn  the day she finished setting up; nothing before it counts as missed
  * @property {boolean} onboarded
@@ -102,6 +103,18 @@ import { cleanSnapshot } from './partner.js';
  * @property {string} since     DateKey sharing started
  * @property {string} sentHash  the last summary sent, so an unchanged one is not sent again
  * @property {number} sentAt    epoch ms of the last successful send, 0 if none
+ */
+
+/**
+ * @typedef {Object} PartnerPush
+ * @property {string} endpoint   this phone's push address
+ * @property {string} p256dh
+ * @property {string} auth
+ * @property {boolean} period    the evening before her period is likely
+ * @property {boolean} harder    the morning her harder days usually start
+ * @property {{at: number, title: string, body: string}[]} plan  what each push will say; never sent anywhere
+ * @property {string} sent       the times last given to the server, so an unchanged plan is not resent
+ * @property {number} sentAt
  */
 
 /**
@@ -166,6 +179,7 @@ export function defaultSettings() {
     forYouDismissed: [],
     partnerShare: null,
     partnerOf: null,
+    partnerPush: null,
     startedOn: null,
     role: null,
     onboarded: false,
@@ -417,6 +431,19 @@ export function normalizeSettings(raw) {
     out.forYouSeen = {};
   }
   if (!Array.isArray(out.forYouDismissed)) out.forYouDismissed = [];
+  const pp = /** @type {any} */ (raw).partnerPush;
+  out.partnerPush = pp && typeof pp.endpoint === 'string' && pp.endpoint.startsWith('https://')
+    && typeof pp.p256dh === 'string' && typeof pp.auth === 'string'
+    ? {
+        endpoint: pp.endpoint, p256dh: pp.p256dh, auth: pp.auth,
+        period: pp.period === true, harder: pp.harder === true,
+        plan: Array.isArray(pp.plan) ? pp.plan.filter((/** @type {any} */ x) => x && typeof x.at === 'number'
+          && typeof x.title === 'string' && typeof x.body === 'string').slice(0, 12)
+          .map((/** @type {any} */ x) => ({ at: x.at, title: x.title.slice(0, 120), body: x.body.slice(0, 200) })) : [],
+        sent: typeof pp.sent === 'string' ? pp.sent : '',
+        sentAt: typeof pp.sentAt === 'number' ? pp.sentAt : 0,
+      }
+    : null;
   const role = /** @type {any} */ (raw).role;
   out.role = role === 'self' || role === 'partner' ? role : null;
   const started = /** @type {any} */ (raw).startedOn;

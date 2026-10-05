@@ -33,6 +33,8 @@ const blobUrls = new Map();
  */
 let manifestPromise = null;
 
+let emblemSeq = 0;
+
 /**
  * Build an emblem as an inline SVG element.
  * @param {string} themeId
@@ -41,7 +43,16 @@ let manifestPromise = null;
  */
 export function emblem(themeId, opts = {}) {
   const { size = 64, className = 'mascot', title } = opts;
-  const markup = EMBLEMS[themeId] ?? EMBLEMS.plain;
+  /*
+    Each drawing gets its own clip ids. The same emblem appears in several
+    places at once (the header, the ring, a hidden tab), and a url(#id) points
+    at the first element in the page with that id. When that first one sits
+    in a hidden view, the browser ignores the clip and the shading spills out
+    of the silhouette as stripes: seen on the partner's Settings, where her
+    character's first copy was on his hidden Today screen.
+  */
+  const n = (emblemSeq += 1);
+  const markup = (EMBLEMS[themeId] ?? EMBLEMS.plain).replace(/(id="|url\(#)(kc\d+)/g, `$1$2-${n}`);
 
   const node = svg('svg', {
     viewBox: '0 0 100 100',
