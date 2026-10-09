@@ -117,11 +117,11 @@ Each finding names the gate question it fails.
 | U12 | Insights, "At a glance" | "Day 1 is usually your heaviest" was voted by periods where only day 1 was logged, so day 1 won by default. Only fully logged periods vote. | 5 |
 | U13 | After the check-in | A pre-period pattern was said twice on Today: in "Coming up for you" and again after the check-in as "most often on day 27, 28 and 29" (or "around this day last cycle too"). Said once, in the form she thinks in. | 2 |
 
-### Open, needs a decision
+### Decided
 
-| # | Where | Finding |
+| # | Where | Finding and decision |
 |---|---|---|
-| D1 | Settings, Reminders | All five reminders only appear when she opens the app, where Today already says the same thing. In this form they are redundant. A next-period alert is one of the most used tracker features, so the fix is real notifications (the same no-content design his heads-ups use), but that sends the server the times, which changes the "nothing leaves your phone" promise. Hers to decide: real notifications, or remove the section. |
+| D1 | Settings, Reminders | All five reminders only appeared when she opened the app, where Today already said the same thing. **Decided (October 2026): real notifications**, on the same design as his heads-ups: her phone writes them and keeps the words, the server gets her push address and the times, nothing else (`reminder-plan.js`, `supabase/partner-push.sql`). Each is off until she switches it on; switching them all off makes the server forget the phone. The pill reminder is now only for a daily pill, at her time, skips break days and days already marked. The in-app versions are gone. |
 
 ### Checked and kept
 

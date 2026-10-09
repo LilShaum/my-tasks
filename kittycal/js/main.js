@@ -24,7 +24,7 @@ import { isSheetOpen, isSheetInUse, openSheet, closeSheet } from './ui/sheet.js'
 import { toast } from './ui/toast.js';
 import { mascot } from './ui/mascot.js';
 import { loadLock, showLockScreen } from './ui/lock.js';
-import { checkReminders } from './ui/reminders.js';
+import { startReminderSync, syncReminders } from './ui/reminders.js';
 import { requestPersistence, refreshStorageSnapshot } from './storage/persist.js';
 import { buildCycles } from './domain/cycles.js';
 import { parseShareHash } from './storage/share.js';
@@ -35,7 +35,6 @@ import {
 } from './views/partner-app.js';
 import { mountDoor, mountPartnerSetup, connect } from './views/partner-setup.js';
 import { emblem } from './ui/mascot.js';
-import { predict } from './domain/predict.js';
 
 /** view id → renderer, for each of the two apps this install can be */
 const APPS = {
@@ -313,6 +312,7 @@ function startApp() {
     store.subscribe(render);
     watchDayRollover();
     startPartnerSync();
+    startReminderSync();
   }
 
   render();
@@ -486,31 +486,10 @@ function watchDayRollover() {
       // usual way she reaches the app is bringing it forward, and the day may
       // have turned over while it sat in the background with the poll frozen.
       maybeAskForCheckin();
-      void runReminderCheck();
+      // A new day moves the plan on: today's pill reminder drops off once marked.
+      if (mode !== 'partner') void syncReminders();
     }
   });
-}
-
-/**
- * Fire any reminders that have come due.
- *
- * There is no server, so nothing can wake the phone while the app is closed.
- * This runs at boot and whenever the app returns to the foreground, which is
- * the most a serverless PWA can honestly offer. Settings says so plainly.
- */
-async function runReminderCheck() {
-  const { settings, periodDays, logs } = store.getState();
-  if (!settings.onboarded || mode === 'partner') return;
-  const today = todayKey();
-  try {
-    await checkReminders({
-      prediction: predict({ periodDays, settings, today, logs }),
-      loggedToday: logs[today] != null,
-      birthControl: settings.birthControl,
-    });
-  } catch (err) {
-    console.warn('kittycal: reminder check failed', err);
-  }
 }
 
 function hideBootScreen() {
@@ -596,4 +575,4 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) void store.flushNow();
 });
 
-boot().then(registerServiceWorker).then(runReminderCheck);
+boot().then(registerServiceWorker);

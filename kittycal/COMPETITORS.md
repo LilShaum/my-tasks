@@ -369,9 +369,10 @@ Checked, and the answer is still no. Written down so it stays no.
   There is no serverless path to a notification that fires while the app is
   closed. *Since October 2026 partner mode does use Web Push*, for his
   heads-ups only: the server holds wake-up times and never the words
-  (`supabase/partner-push.sql`). Whether she wants the same for her own
-  reminders is open as `PRODUCT.md` D1, because it changes what leaves her
-  phone.
+  (`supabase/partner-push.sql`). Since then her own reminders use it too
+  (`PRODUCT.md` D1): the server holds her push address and the times, and
+  never what a reminder says. The point above still stands for anything that
+  would need the server to know *why*.
 - **Wearable sync** (Oura, Apple Watch, WHOOP, Garmin). Every one is an OAuth
   handshake with a vendor cloud. A *file* import of an Apple Health export would
   be consistent with the privacy model and belongs with G3 if it's ever wanted;

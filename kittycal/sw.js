@@ -75,6 +75,7 @@ const PRECACHE = [
   'js/storage/share.js',
   'js/storage/push.js',
   'js/domain/push-plan.js',
+  'js/domain/reminder-plan.js',
   'js/state/partner-sync.js',
   'js/views/partner.js',
   'js/views/partner-app.js',
@@ -183,11 +184,11 @@ self.addEventListener('fetch', (event) => {
   })());
 });
 
-/* ── Partner heads-ups ─────────────────────────────────────────────────────
-   The server sends an empty push at a time his phone asked for. What it
-   should say is on this phone, in the plan saved with his settings: the
-   entry closest to now (within a few hours) is shown. A push must always
-   show something, so a late or unexpected one gets a plain line. */
+/* ── Notifications: his heads-ups, her reminders ───────────────────────────
+   The server sends an empty push at a time this phone asked for. What it
+   should say is on this phone, in the plan saved with its settings
+   (partnerPush on his, selfPush on hers). A push must always show
+   something, so a late or unexpected one gets a plain line. */
 
 function readSettings() {
   return new Promise((resolve) => {
@@ -206,21 +207,43 @@ function readSettings() {
 self.addEventListener('push', (event) => {
   event.waitUntil((async () => {
     const settings = await readSettings();
-    const plan = (settings && settings.partnerPush && settings.partnerPush.plan) || [];
+    // His heads-ups and her reminders: whichever this phone planned. The
+    // same rule as remindersFor in reminder-plan.js: every entry within a
+    // quarter of an hour (two can share a time), else the closest within six.
+    const plan = [
+      ...((settings && settings.partnerPush && settings.partnerPush.plan) || []),
+      ...((settings && settings.selfPush && settings.selfPush.plan) || []),
+    ];
     const now = Date.now();
-    let best = null;
-    for (const p of plan) {
-      const off = Math.abs(p.at - now);
-      if (off <= 6 * 3600e3 && (!best || off < Math.abs(best.at - now))) best = p;
+    let show = plan.filter((p) => Math.abs(p.at - now) <= 15 * 60e3);
+    if (!show.length) {
+      let best = null;
+      for (const p of plan) {
+        const off = Math.abs(p.at - now);
+        if (off <= 6 * 3600e3 && (!best || off < Math.abs(best.at - now))) best = p;
+      }
+      if (best) show = [best];
     }
-    const name = settings && settings.partnerOf && settings.partnerOf.snapshot && settings.partnerOf.snapshot.name;
-    await self.registration.showNotification(best ? best.title : 'Kittycal', {
-      body: best ? best.body : `A heads-up about ${name ? `${name}’s` : 'her'} cycle. Open Kittycal to see it.`,
+    const options = (tag) => ({
       icon: 'assets/icons/icon-180.png',
       badge: 'assets/icons/icon-180.png',
-      tag: 'kittycal-heads-up',
+      tag,
       data: { url: './' },
     });
+    if (!show.length) {
+      // A push must always show something.
+      const partner = settings && settings.role === 'partner';
+      const name = settings && settings.partnerOf && settings.partnerOf.snapshot && settings.partnerOf.snapshot.name;
+      await self.registration.showNotification('Kittycal', {
+        ...options('kittycal-heads-up'),
+        body: partner ? `A heads-up about ${name ? `${name}’s` : 'her'} cycle. Open Kittycal to see it.`
+          : 'A reminder from Kittycal. Open it to see.',
+      });
+      return;
+    }
+    for (const p of show) {
+      await self.registration.showNotification(p.title, { ...options(`kittycal-${p.kind || 'heads-up'}`), body: p.body });
+    }
   })());
 });
 

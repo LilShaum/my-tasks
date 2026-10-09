@@ -1,42 +1,31 @@
 // @ts-check
 /**
- * reminders.js — period, pill and logging nudges.
+ * reminders.js — her reminder choices, and keeping the phone's schedule in step.
  *
- * An honest note about what this can and cannot do.
+ * Her reminders are real notifications now: they arrive with the app closed.
+ * They used to be checked only when she opened the app, which is exactly when
+ * Today already said the same thing (PRODUCT.md, D1).
  *
- * Flo's reminders arrive because Flo runs a server that sends push messages to
- * your phone. Kittycal has no server — that is the entire point of it — so it
- * cannot wake your phone up while it's closed. What it can do is check for due
- * reminders whenever the app is opened or brought back to the foreground, and
- * fire them then.
+ * What leaves the phone: its push address and a list of times. The words, and
+ * the reasons behind each time, are worked out here (reminder-plan.js) and kept
+ * in settings.selfPush.plan, where the service worker reads them when a push
+ * arrives. Whenever her data changes the plan is rebuilt, and if the times
+ * moved they are sent again, so a reminder for a pill she has marked or a day
+ * she has logged is gone before it is due.
  *
- * In practice that means: open the app any time on the day a reminder is due
- * and you get it. Never open the app and you never get it. The settings screen
- * says exactly this rather than implying background delivery that will not
- * happen.
- *
- * Each reminder fires at most once per day, tracked by date key, so a reminder
- * doesn't repeat every time the app is foregrounded.
- *
- * @typedef {import('../utils/date.js').DateKey} DateKey
+ * @typedef {import('../domain/reminder-plan.js').ReminderChoices} ReminderSettings
  */
 
-import { todayKey, daysBetween, addDays, fmtDayMonth } from '../utils/date.js';
-import { plural } from '../utils/fmt.js';
 import * as db from '../storage/db.js';
+import * as store from '../state/store.js';
+import { todayKey } from '../utils/date.js';
+import { predict } from '../domain/predict.js';
+import { reminderPlan } from '../domain/reminder-plan.js';
+import { registerSelf, currentEndpoint } from '../storage/push.js';
 
 const META_REMINDERS = 'reminders';
-const META_FIRED = 'remindersFired';
-
-/**
- * @typedef {Object} ReminderSettings
- * @property {boolean} periodSoon
- * @property {number} periodSoonDays   how many days ahead
- * @property {boolean} periodLate
- * @property {boolean} fertile
- * @property {boolean} pill
- * @property {boolean} logDaily
- */
+/** Long enough to fold a burst of taps into one send. */
+const DEBOUNCE_MS = 3000;
 
 /** @returns {ReminderSettings} */
 function defaultReminders() {
@@ -46,176 +35,92 @@ function defaultReminders() {
     periodLate: false,
     fertile: false,
     pill: false,
+    pillTime: '21:00',
     logDaily: false,
   };
 }
 
+/** The choices, kept in memory once read, so a store change can plan without waiting. */
+let cached = /** @type {ReminderSettings|null} */ (null);
+
 /** @returns {Promise<ReminderSettings>} */
 export async function loadReminders() {
   const stored = await db.getMeta(META_REMINDERS, null);
-  return { ...defaultReminders(), ...(stored && typeof stored === 'object' ? stored : {}) };
+  cached = { ...defaultReminders(), ...(stored && typeof stored === 'object' ? stored : {}) };
+  return cached;
 }
 
 /** @param {Partial<ReminderSettings>} patch */
 export async function saveReminders(patch) {
-  const current = await loadReminders();
-  const next = { ...current, ...patch };
+  const next = { ...(await loadReminders()), ...patch };
   await db.setMeta(META_REMINDERS, next);
+  cached = next;
   return next;
 }
 
-/** Which reminders have already fired, keyed `id:date`. */
-async function loadFired() {
-  const stored = await db.getMeta(META_FIRED, null);
-  return Array.isArray(stored) ? new Set(stored) : new Set();
-}
+/** Whether any reminder is chosen. @param {ReminderSettings} r */
+export const anyOn = (r) => r.periodSoon || r.periodLate || r.fertile || r.pill || r.logDaily;
 
-/** @param {Set<string>} fired */
-async function saveFired(fired) {
-  // Keep the last 60 entries; older ones can never match again.
-  await db.setMeta(META_FIRED, [...fired].slice(-60));
-}
-
-/* ── Permission ─────────────────────────────────────────────────────────── */
-
-export function notificationsSupported() {
-  return typeof Notification !== 'undefined';
-}
-
-/** @returns {NotificationPermission|'unsupported'} */
-export function permissionState() {
-  if (!notificationsSupported()) return 'unsupported';
-  return Notification.permission;
-}
-
-/** @returns {Promise<boolean>} */
-export async function requestPermission() {
-  if (!notificationsSupported()) return false;
-  if (Notification.permission === 'granted') return true;
-  if (Notification.permission === 'denied') return false;
-  const result = await Notification.requestPermission();
-  return result === 'granted';
-}
-
-/* ── Firing ─────────────────────────────────────────────────────────────── */
+let syncing = false;
+let timer = /** @type {ReturnType<typeof setTimeout>|null} */ (null);
 
 /**
- * @param {string} title
- * @param {string} body
+ * Rebuild the plan and, if the times changed or a day has passed, send them.
+ * Resolves true when the server has the current times.
+ * @param {{force?: boolean}} [opts]
  */
-async function notify(title, body) {
-  if (permissionState() !== 'granted') return;
-
-  // Prefer the service worker: notifications shown through it survive the page
-  // being closed and behave correctly when the PWA is installed.
+export async function syncReminders({ force = false } = {}) {
+  const { settings, logs, periodDays } = store.getState();
+  const sp = settings.selfPush;
+  if (!sp || syncing || settings.role === 'partner') return false;
+  syncing = true;
   try {
-    const registration = await navigator.serviceWorker?.getRegistration();
-    if (registration) {
-      await registration.showNotification(title, {
-        body,
-        icon: 'assets/icons/icon-192.png',
-        badge: 'assets/icons/icon-192.png',
-        tag: 'kittycal',
-        silent: false,
-      });
-      return;
+    // A backup restored from another phone brings that phone's address.
+    const endpoint = await currentEndpoint();
+    if (endpoint && endpoint !== sp.endpoint) {
+      store.updateSettings({ selfPush: null });
+      return false;
     }
-  } catch {
-    /* fall through to a page notification */
-  }
-
-  try {
-    new Notification(title, { body, icon: 'assets/icons/icon-192.png' });
-  } catch {
-    /* the browser refused; nothing more to do */
+    const choices = cached ?? await loadReminders();
+    const today = todayKey();
+    const plan = reminderPlan({
+      prediction: predict({ periodDays, settings, today, logs }),
+      settings, logs, choices, today, now: Date.now(),
+    });
+    const sent = JSON.stringify(plan.map((p) => p.at));
+    const latest = () => store.getState().settings.selfPush;
+    if (!force && sent === sp.sent && Date.now() - sp.sentAt < 24 * 3600e3) {
+      if (JSON.stringify(plan) !== JSON.stringify(sp.plan)) {
+        const l = latest();
+        if (l) store.updateSettings({ selfPush: { ...l, plan } });
+      }
+      return true;
+    }
+    try {
+      await registerSelf(sp, plan.map((p) => p.at));
+      const l = latest();
+      if (l) store.updateSettings({ selfPush: { ...l, plan, sent, sentAt: Date.now() } });
+      return true;
+    } catch {
+      // Offline: keep the words in step; the times go next time.
+      const l = latest();
+      if (l) store.updateSettings({ selfPush: { ...l, plan } });
+      return false;
+    }
+  } finally {
+    syncing = false;
   }
 }
 
-/**
- * Work out which reminders are due today and fire them.
- *
- * Called at boot and whenever the app returns to the foreground.
- *
- * @param {Object} input
- * @param {import('../domain/predict.js').Prediction} input.prediction
- * @param {boolean} input.loggedToday
- * @param {string} input.birthControl
- */
-export async function checkReminders({ prediction, loggedToday, birthControl }) {
-  if (permissionState() !== 'granted') return [];
-
-  const settings = await loadReminders();
-  const fired = await loadFired();
-  const today = todayKey();
-
-  /** @type {{id: string, title: string, body: string}[]} */
-  const due = [];
-
-  // Period expected in N days.
-  if (settings.periodSoon && prediction.nextStart && !prediction.isLate) {
-    const away = daysBetween(today, prediction.nextStart);
-    if (away >= 0 && away <= settings.periodSoonDays) {
-      due.push({
-        id: 'period-soon',
-        title: away === 0 ? 'Your period is expected today' : `Period expected ${away === 1 ? 'tomorrow' : `in ${away} days`}`,
-        body: away === 0
-          ? `Around ${fmtDayMonth(prediction.nextStart)}, based on your last few cycles.`
-          : `Around ${fmtDayMonth(prediction.nextStart)}. Worth having what you need to hand.`,
-      });
-    }
-  }
-
-  // Late.
-  if (settings.periodLate && prediction.isLate && prediction.daysLate != null) {
-    due.push({
-      id: 'period-late',
-      title: `Your period is ${plural(prediction.daysLate, 'day')} late`,
-      body: 'Cycles often shift for ordinary reasons. Log it when it starts and Kittycal will recalculate.',
-    });
-  }
-
-  // Fertile window opening — only when fertility output is shown at all.
-  if (settings.fertile && prediction.showFertility && prediction.fertileWindow) {
-    if (today === prediction.fertileWindow.start) {
-      due.push({
-        id: 'fertile',
-        title: 'Your fertile window starts today',
-        body: prediction.ovulation
-          ? `Ovulation estimated around ${fmtDayMonth(prediction.ovulation)}.`
-          : 'Based on your recent cycles.',
-      });
-    }
-  }
-
-  // Daily pill.
-  if (settings.pill && birthControl !== 'none') {
-    due.push({
-      id: 'pill',
-      title: 'Birth control reminder',
-      body: 'Tap to mark today as taken.',
-    });
-  }
-
-  // Gentle logging nudge. Rewards logging; never mentions a broken streak.
-  if (settings.logDaily && !loggedToday) {
-    due.push({
-      id: 'log-daily',
-      title: 'Anything to log today?',
-      body: 'Flow, symptoms, mood. Whatever you feel like recording.',
-    });
-  }
-
-  /** @type {string[]} */
-  const sent = [];
-  for (const reminder of due) {
-    const key = `${reminder.id}:${today}`;
-    if (fired.has(key)) continue;
-    fired.add(key);
-    sent.push(reminder.id);
-    await notify(reminder.title, reminder.body);
-  }
-
-  if (sent.length) await saveFired(fired);
-  return sent;
+function schedule() {
+  if (!store.getState().settings.selfPush) return;
+  if (timer) clearTimeout(timer);
+  timer = setTimeout(() => { timer = null; void syncReminders(); }, DEBOUNCE_MS);
 }
 
+/** Start watching. Safe to call once at start-up whether or not any reminder is on. */
+export function startReminderSync() {
+  void loadReminders().then(schedule).catch(() => {});
+  store.subscribe(schedule);
+  addEventListener('online', schedule);
+}
