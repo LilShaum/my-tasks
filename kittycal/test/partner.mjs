@@ -223,7 +223,15 @@ await her.page.locator('button', { hasText: 'Start sharing' }).click();
 await her.page.waitForTimeout(2500);
 check(callCount(server, 'kittycal_put_share') === 1, 'starting sends exactly one put', String(callCount(server, 'kittycal_put_share')));
 const put = server.calls.find((c) => c.fn === 'kittycal_put_share');
-check(put && !put.body.includes('Mia') && !put.body.includes('bloating'), 'what is sent is ciphertext: her name and patterns are not readable');
+/*
+  The blob is base64 ciphertext, so three random letters like "Mia" turn up in
+  it by chance about one run in a hundred (it did, once, and stopped a
+  deploy). What must not be there is anything readable: a JSON key, her name
+  as JSON, or a pattern's name, none of which base64 can spell by accident.
+*/
+const blob = String(put?.args?.p_blob ?? '');
+check(put && /^[A-Za-z0-9+/=_-]+$/.test(blob) && !/"name"|"Mia"|bloating|Bloating/.test(put.body),
+  'what is sent is ciphertext: her name and patterns are not readable', blob.slice(0, 60));
 const code = (await her.page.locator('.share-code').textContent().catch(() => '') ?? '').trim();
 check(/^[0-9A-Z]{5}-[0-9A-Z]{5}$/.test(code), 'a code is shown to give him', code);
 await snap(her.page, 'her-sharing');
