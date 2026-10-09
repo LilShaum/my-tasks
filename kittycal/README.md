@@ -57,7 +57,7 @@ list of symptoms. It does not need a server, and it should not want one.
 - Diary icons are from [Lucide](https://lucide.dev) (ISC licence; notice kept in
   `js/data/icons.js`), plus a few drawn for the app where no general icon fits.
 - **Passcode lock** — 4 digits, stored only as a PBKDF2 hash.
-- **Reminders** for period-soon, late, fertile window, birth control and logging.
+- **Reminders** as notifications that arrive with the app closed: period coming up, has it started, fertile window, the pill at her time, and a check-in nudge.
 - **Export and erase** — a complete, readable JSON export, and a real delete.
 - Fertility estimates are hidden when you're on hormonal birth control, because
   ovulation isn't happening and a guess dressed up as a prediction is worse than
@@ -73,11 +73,12 @@ a doctor" prompt using the cycle-length and period-length ranges ACOG publishes,
 framed as a reason to ask a professional rather than as a finding. Apple Health
 and Watch sync aren't available to a web app.
 
-Reminders are the one place the no-server design has a visible cost. Flo can
-notify you out of the blue because Flo runs a server that pushes to your phone —
-and that server necessarily knows your cycle. Kittycal's reminders fire when you
-next open the app on the day they're due, and the settings screen says so rather
-than promising delivery that won't arrive.
+Reminders are real notifications, and the one place, with partner sharing,
+where anything leaves the phone. Flo's server knows your cycle because it
+writes your reminders. Kittycal's phone writes them itself and keeps the words;
+the server (`supabase/partner-push.sql`) is given only a push address and a
+list of times, and sends an empty push at each. Every reminder is off until she
+switches it on, and switching them all off deletes the address and the times.
 
 **Kittycal is not contraception and not medical advice.** Predicted periods,
 fertile windows and ovulation days are estimates calculated from your own logs.

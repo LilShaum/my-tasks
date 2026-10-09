@@ -102,14 +102,19 @@ export function openHelp() {
       ]),
 
       section('Reminders', [
-        p('In Settings. They show when you next open the app on the day they ' +
-          'are due. Kittycal has no server, so it can’t buzz you while it’s closed.'),
+        p('In Settings, each one yours to switch on: your period coming up, a check '
+          + 'if it hasn’t started, your fertile window, your pill at your time, and a '
+          + 'check-in nudge. They arrive with the app closed. On iPhone, Kittycal has '
+          + 'to be on your Home Screen first.'),
+        p('Kittycal’s server is told only when to buzz your phone, never why. The '
+          + 'words are worked out and kept on your phone.'),
       ]),
 
       section('Privacy and passcode', [
         p('No account, no analytics. What you log stays on this phone. The app ' +
-          'makes no internet requests unless you turn on partner sharing, and ' +
-          'then it sends only an encrypted summary of what you chose to share.'),
+          'makes no internet requests unless you turn on partner sharing (it sends ' +
+          'only an encrypted summary of what you chose) or reminders (it sends ' +
+          'only the times they are due).'),
         p('Settings can put a four-digit code in front of the app. The code is ' +
           'never stored, only a scrambled version. It isn’t encryption: ' +
           'someone determined, with your unlocked phone, could still reach the ' +

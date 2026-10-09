@@ -81,6 +81,7 @@ import { cleanSnapshot } from './partner.js';
  * @property {PartnerShare|null} partnerShare  her own share, when she is sharing
  * @property {PartnerOf|null} partnerOf        a share someone sent her phone
  * @property {PartnerPush|null} partnerPush    his notifications, when he turned them on
+ * @property {SelfPush|null} selfPush          her reminders as notifications, when she turned one on
  * @property {'self'|'partner'|null} role  what this phone is for: her own cycle, or someone else's
  * @property {string|null} startedOn  the day she finished setting up; nothing before it counts as missed
  * @property {boolean} onboarded
@@ -114,6 +115,16 @@ import { cleanSnapshot } from './partner.js';
  * @property {boolean} harder    the morning her harder days usually start
  * @property {{at: number, title: string, body: string}[]} plan  what each push will say; never sent anywhere
  * @property {string} sent       the times last given to the server, so an unchanged plan is not resent
+ * @property {number} sentAt
+ */
+
+/**
+ * @typedef {Object} SelfPush
+ * @property {string} endpoint   this phone's push address
+ * @property {string} p256dh
+ * @property {string} auth
+ * @property {{at: number, title: string, body: string, kind: string}[]} plan  what each push will say; never sent anywhere
+ * @property {string} sent       the times last given to the server
  * @property {number} sentAt
  */
 
@@ -180,6 +191,7 @@ export function defaultSettings() {
     partnerShare: null,
     partnerOf: null,
     partnerPush: null,
+    selfPush: null,
     startedOn: null,
     role: null,
     onboarded: false,
@@ -442,6 +454,19 @@ export function normalizeSettings(raw) {
           .map((/** @type {any} */ x) => ({ at: x.at, title: x.title.slice(0, 120), body: x.body.slice(0, 200) })) : [],
         sent: typeof pp.sent === 'string' ? pp.sent : '',
         sentAt: typeof pp.sentAt === 'number' ? pp.sentAt : 0,
+      }
+    : null;
+  const sp = /** @type {any} */ (raw).selfPush;
+  out.selfPush = sp && typeof sp.endpoint === 'string' && sp.endpoint.startsWith('https://')
+    && typeof sp.p256dh === 'string' && typeof sp.auth === 'string'
+    ? {
+        endpoint: sp.endpoint, p256dh: sp.p256dh, auth: sp.auth,
+        plan: Array.isArray(sp.plan) ? sp.plan.filter((/** @type {any} */ x) => x && typeof x.at === 'number'
+          && typeof x.title === 'string' && typeof x.body === 'string').slice(0, 60)
+          .map((/** @type {any} */ x) => ({ at: x.at, title: x.title.slice(0, 120), body: x.body.slice(0, 200),
+            kind: typeof x.kind === 'string' ? x.kind.slice(0, 20) : 'reminder' })) : [],
+        sent: typeof sp.sent === 'string' ? sp.sent : '',
+        sentAt: typeof sp.sentAt === 'number' ? sp.sentAt : 0,
       }
     : null;
   const role = /** @type {any} */ (raw).role;

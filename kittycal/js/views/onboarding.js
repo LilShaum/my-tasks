@@ -619,8 +619,9 @@ function stepDisclaimer() {
         el('div', {}, [
           el('strong', { text: 'What you log stays on this phone.' }),
           ' No account, no analytics. Nothing is sent anywhere unless you choose ' +
-          'to share a summary with a partner, and that’s encrypted first. You ' +
-          'can export or erase everything whenever you like.',
+          'to share a summary with a partner (encrypted first) or turn on ' +
+          'reminders (only their times). You can export or erase everything ' +
+          'whenever you like.',
         ]),
       ]),
     ],

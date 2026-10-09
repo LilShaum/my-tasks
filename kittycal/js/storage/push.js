@@ -1,10 +1,11 @@
 // @ts-check
 /**
- * push.js — his phone's side of partner notifications.
+ * push.js — notifications, for his heads-ups and for her reminders.
  *
- * Subscribing gives the browser's push address for this phone. That address,
- * her share's id and the times from push-plan.js are all the server gets.
- * What each heads-up says is saved on the phone (settings.partnerPush.plan),
+ * Subscribing gives the browser's push address for this phone. That address
+ * and the times from push-plan.js (his) or reminder-plan.js (hers) are all the
+ * server gets; his also names the share he follows. What each notification
+ * says is saved on the phone (settings.partnerPush.plan, settings.selfPush.plan),
  * where the service worker reads it when a push wakes it.
  */
 
@@ -66,6 +67,32 @@ export async function registerPush(shareId, sub, times) {
     p_share_id: shareId, p_endpoint: sub.endpoint, p_p256dh: sub.p256dh, p_auth: sub.auth,
     p_times: times.map((t) => new Date(t).toISOString()),
   });
+}
+
+/**
+ * Her reminders: tell the server when to wake this phone. Replaces whatever it
+ * had. No share, no name, nothing but the address and the times.
+ * @param {{endpoint: string, p256dh: string, auth: string}} sub
+ * @param {number[]} times  epoch ms
+ */
+export async function registerSelf(sub, times) {
+  await rpc('kittycal_push_register_self', {
+    p_endpoint: sub.endpoint, p_p256dh: sub.p256dh, p_auth: sub.auth,
+    p_times: times.map((t) => new Date(t).toISOString()),
+  });
+}
+
+/**
+ * The address this browser holds now, or null. A backup restored on another
+ * phone carries the old phone's address, which this one cannot use.
+ */
+export async function currentEndpoint() {
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    return (await reg.pushManager.getSubscription())?.endpoint ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**

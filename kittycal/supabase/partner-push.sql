@@ -1,4 +1,4 @@
--- KittyCal partner notifications.
+-- KittyCal notifications: his heads-ups (partner mode) and her reminders.
 --
 -- Applied with the Supabase connector; safe to run more than once. Nothing
 -- here touches any table that is not KittyCal's.
@@ -14,6 +14,13 @@
 --     now, and shows it.
 --   * So the server knows a phone wants waking at certain times, and nothing
 --     about why: no names, no dates of anything, no text.
+--
+-- Her reminders work the same way (kittycal_push_register_self): her phone
+-- plans them and keeps the words; the server gets her push address and up to
+-- sixty times, and no share, name or reason.
+--
+-- Both register functions only accept addresses on the browsers' own push
+-- services, so the sender can never be pointed at anywhere else.
 --
 -- The VAPID private key that signs pushes lives in Supabase Vault
 -- (name 'kittycal_vapid_private'), readable only through
@@ -126,3 +133,48 @@ create extension if not exists pg_cron;
 --     body := jsonb_build_object('at', now()))
 --   where exists (select 1 from public.kittycal_push_jobs where send_at <= now());
 -- $cron$);
+
+-- ── October 2026: her reminders ──────────────────────────────────────────
+
+-- A phone registering its own reminders follows no share.
+alter table public.kittycal_push_subs alter column share_id drop not null;
+
+-- Only the browsers' push services: Google (Chrome, Android, Samsung),
+-- Mozilla, Apple, Microsoft.
+create or replace function public.kittycal_push_ok_endpoint(p_endpoint text)
+returns boolean language sql immutable set search_path = public as $$
+  select p_endpoint ~ '^https://(fcm\.googleapis\.com|updates\.push\.services\.mozilla\.com|web\.push\.apple\.com|[a-z0-9-]+\.notify\.windows\.com)/'
+$$;
+
+-- His phone, as before, now also checking the address.
+create or replace function public.kittycal_push_register(p_share_id text, p_endpoint text, p_p256dh text, p_auth text, p_times timestamptz[])
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.kittycal_push_ok_endpoint(p_endpoint) then raise exception 'not a push service'; end if;
+  if not exists (select 1 from public.kittycal_shares where id = p_share_id) then raise exception 'no such share'; end if;
+  if coalesce(array_length(p_times, 1), 0) > 12 then raise exception 'too many times'; end if;
+  if not exists (select 1 from public.kittycal_push_subs where endpoint = p_endpoint)
+     and (select count(*) from public.kittycal_push_subs) >= 2000 then raise exception 'too many subscriptions'; end if;
+  insert into public.kittycal_push_subs (endpoint, share_id, p256dh, auth) values (p_endpoint, p_share_id, p_p256dh, p_auth)
+    on conflict (endpoint) do update set share_id = excluded.share_id, p256dh = excluded.p256dh, auth = excluded.auth;
+  perform public.kittycal_push_schedule(p_endpoint, p_times);
+end;
+$$;
+
+-- Her phone: remember this push address and replace its schedule. At most
+-- sixty times (a month of pill days, her next periods), all within four months.
+create or replace function public.kittycal_push_register_self(p_endpoint text, p_p256dh text, p_auth text, p_times timestamptz[])
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.kittycal_push_ok_endpoint(p_endpoint) then raise exception 'not a push service'; end if;
+  if coalesce(array_length(p_times, 1), 0) > 60 then raise exception 'too many times'; end if;
+  if not exists (select 1 from public.kittycal_push_subs where endpoint = p_endpoint)
+     and (select count(*) from public.kittycal_push_subs) >= 2000 then raise exception 'too many subscriptions'; end if;
+  insert into public.kittycal_push_subs (endpoint, share_id, p256dh, auth) values (p_endpoint, null, p_p256dh, p_auth)
+    on conflict (endpoint) do update set share_id = null, p256dh = excluded.p256dh, auth = excluded.auth;
+  perform public.kittycal_push_schedule(p_endpoint, p_times);
+end;
+$$;
+
+revoke all on function public.kittycal_push_register_self(text, text, text, timestamptz[]) from public;
+grant execute on function public.kittycal_push_register_self(text, text, text, timestamptz[]) to anon, authenticated;

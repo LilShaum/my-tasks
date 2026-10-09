@@ -13,9 +13,9 @@ import { todayKey, daysBetween, fmtLong } from '../utils/date.js';
 import { plural, fmtWater } from '../utils/fmt.js';
 import { GLASS_SIZES, glassMl } from '../data/taxonomy.js';
 import { loadLock, disableLock, promptForNewPin } from '../ui/lock.js';
-import {
-  loadReminders, saveReminders, permissionState, requestPermission,
-} from '../ui/reminders.js';
+import { loadReminders, saveReminders, syncReminders, anyOn } from '../ui/reminders.js';
+import { pushSupport, subscribePush, forgetPush } from '../storage/push.js';
+import { DAILY_PILL } from '../domain/reminder-plan.js';
 import { BIRTH_CONTROL, HORMONAL_BIRTH_CONTROL } from '../domain/model.js';
 import { measuredLuteal } from '../domain/ovulation.js';
 import { REGIMENS, regimen, packPosition, describePack } from '../domain/pill.js';
@@ -432,92 +432,127 @@ function unitRows(settings) {
 /* ── Reminders ──────────────────────────────────────────────────────────── */
 
 /**
- * The copy here is deliberately blunt about the limitation. Flo's reminders
- * arrive because Flo runs a server that pushes to your phone; Kittycal has no
- * server, so it can only fire a reminder while the app is being used. Saying
- * so is better than a notification that silently never comes.
+ * Her reminders, as notifications that arrive with the app closed.
+ *
+ * Each switch is hers; the first one on asks the phone for permission, and the
+ * last one off makes the server forget this phone. What the server holds, and
+ * what it never sees, is said right under the switches, because it is the one
+ * thing here that changes what leaves her phone.
  */
 function reminderRows() {
   const host = el('div', {});
 
-  const repaint = () => {
-    const state = permissionState();
+  const repaint = async () => {
+    const choices = await loadReminders().catch(() => null);
+    const { settings } = store.getState();
+    const sp = settings.selfPush;
+    const support = pushSupport();
 
-    /** @param {keyof import('../ui/reminders.js').ReminderSettings} key */
+    if (!choices) {
+      // A switch that cannot read its own value must not sit there looking off.
+      replace(host, [el('p', { class: 'hint-sm', text: 'Couldn’t read your reminder settings. Try reopening Kittycal.' })]);
+      return;
+    }
+    if (support === 'install') {
+      replace(host, [el('div', { class: 'note' }, [
+        el('span', { class: 'note-icon', text: 'i', 'aria-hidden': 'true' }),
+        el('div', { text: 'On iPhone, reminders only arrive for apps on the Home Screen. '
+          + 'Add Kittycal there (Share, then Add to Home Screen), open it from there, and switch them on here.' }),
+      ])]);
+      return;
+    }
+    if (support === 'none') {
+      replace(host, [el('p', { class: 'hint-sm', text: 'This browser can’t show notifications.' })]);
+      return;
+    }
+
+    /** @param {keyof import('../ui/reminders.js').ReminderSettings} key @param {string} label @param {string} sub */
     const row = (key, label, sub) => {
-      const toggle = el('button', {
-        type: 'button', class: 'toggle', role: 'switch',
-        'aria-checked': 'false', 'aria-label': label,
-        onclick: async () => {
-          const next = toggle.getAttribute('aria-checked') !== 'true';
-          if (next && !(await requestPermission())) {
-            toast('Your browser blocked notifications for this site');
-            repaint();
-            return;
-          }
-          toggle.setAttribute('aria-checked', String(next));
-          await saveReminders({ [key]: next });
-          haptic(8);
-          repaint();
-        },
-      });
-
-      // Reflect the stored value once it loads.
-      loadReminders().then((r) => {
-        toggle.setAttribute('aria-checked', String(Boolean(r[key])));
-      }).catch((err) => {
-        /*
-          A switch that cannot read its own value must not sit there looking
-          off. Off is a claim — "this reminder is not set" — and making it
-          without knowing is how she misses a reminder she thought she had.
-        */
-        toggle.setAttribute('aria-checked', 'mixed');
-        toggle.setAttribute('aria-label', `${label}, could not read this setting`);
-        console.error('kittycal: could not read reminder settings', err);
-      });
-
+      const on = Boolean(sp && choices[key]);
       return el('div', { class: 'row' }, [
-        el('span', { class: 'row-label' }, [
-          label,
-          sub && el('span', { class: 'choice-sub', text: sub }),
-        ]),
-        toggle,
+        el('span', { class: 'row-label' }, [label, el('span', { class: 'choice-sub', text: sub })]),
+        el('button', {
+          type: 'button', class: 'toggle', role: 'switch', 'aria-checked': String(on), 'aria-label': label,
+          onclick: () => { haptic(8); void setReminder(key, !on).then(repaint); },
+        }),
       ]);
     };
 
+    const pillShown = DAILY_PILL.has(settings.birthControl);
+    const fertileShown = settings.showFertility && !HORMONAL_BIRTH_CONTROL.has(settings.birthControl);
+    // Switched on before they were notifications: they no longer fire on
+    // opening the app, so say so rather than show them off without a word.
+    const before = !sp && anyOn(choices);
+    const next = sp?.plan.find((x) => x.at > Date.now());
+
     replace(host, [
-      state === 'unsupported'
-        ? el('div', { class: 'alert alert-info' }, [
-            el('span', { class: 'alert-icon', text: 'i', 'aria-hidden': 'true' }),
-            el('div', { text: 'This browser does not support notifications.' }),
-          ])
-        : el('div', { class: 'rows' }, [
-            row('periodSoon', 'Period coming up', 'A couple of days before it is expected'),
-            row('periodLate', 'Period is late', 'If it has not started when expected'),
-            row('fertile', 'Fertile window opens', 'Only when fertility estimates are shown'),
-            row('pill', 'Birth control', 'A daily nudge'),
-            row('logDaily', 'Log a day', 'If you have not logged anything yet'),
-          ]),
-
-      el('div', { class: 'alert alert-warn', style: { marginTop: 'var(--sp-3)' } }, [
-        el('span', { class: 'alert-icon', text: '!', 'aria-hidden': 'true' }),
-        el('div', {}, [
-          el('strong', { text: 'Reminders show when you open Kittycal. ' }),
-          'There’s no server, so they can’t arrive while it’s closed.',
-        ]),
+      before ? el('div', { class: 'note', style: { marginBottom: 'var(--sp-3)' } }, [
+        el('span', { class: 'note-icon', text: '★', 'aria-hidden': 'true' }),
+        el('div', { text: 'Reminders now arrive even when Kittycal is closed. Switch on the ones you want '
+          + 'and allow notifications when your phone asks.' }),
+      ]) : null,
+      el('div', { class: 'rows' }, [
+        row('periodSoon', 'Period coming up', 'Two days before it’s likely, in the morning'),
+        row('periodLate', 'Has my period started?', 'The morning after your usual range, if nothing’s logged'),
+        fertileShown ? row('fertile', 'Fertile window opens', 'The morning it starts') : null,
+        pillShown ? row('pill', 'My pill', 'Every pill day at the time below, unless already marked') : null,
+        pillShown && sp && choices.pill ? el('label', { class: 'row' }, [
+          el('span', { class: 'row-label', text: 'Pill time' }),
+          el('input', {
+            type: 'time', class: 'input', style: { width: 'auto' }, value: choices.pillTime,
+            onchange: async (/** @type {Event} */ e) => {
+              const v = /** @type {HTMLInputElement} */ (e.target).value;
+              if (!/^\d{2}:\d{2}$/.test(v)) return;
+              await saveReminders({ pillTime: v });
+              await syncReminders({ force: true });
+              void repaint();
+            },
+          }),
+        ]) : null,
+        row('logDaily', 'Check-in nudge', 'At 8 PM on a day with nothing logged'),
       ]),
-
-      state === 'denied' && el('div', { class: 'alert alert-danger', style: { marginTop: 'var(--sp-3)' } }, [
-        el('span', { class: 'alert-icon', text: '!', 'aria-hidden': 'true' }),
-        el('div', { text:
-          'Notifications are blocked for this site. You can re-enable them in ' +
-          'your browser’s settings for this page.' }),
-      ]),
+      support === 'blocked' && !sp
+        ? el('p', { class: 'hint-sm', style: { marginTop: 'var(--sp-2)' }, text:
+          'Notifications are blocked for Kittycal. Allow them in your phone’s settings first.' })
+        : null,
+      next ? el('p', { class: 'hint-sm', style: { marginTop: 'var(--sp-2)' }, text:
+        `Next: ${new Date(next.at).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short',
+          hour: 'numeric', minute: '2-digit' })}, “${next.title}”` }) : null,
+      el('p', { class: 'hint-sm', style: { marginTop: 'var(--sp-2)' }, text:
+        'Kittycal’s server is only told when to buzz this phone, never what about. The words stay here. '
+        + 'Switching every reminder off makes it forget this phone.' }),
     ]);
   };
 
-  repaint();
+  void repaint();
   return host;
+}
+
+/**
+ * Turn one reminder on or off. The first on asks for permission (it has to be
+ * from a tap); the last off forgets this phone on the server.
+ * @param {keyof import('../ui/reminders.js').ReminderSettings} key
+ * @param {boolean} on
+ */
+async function setReminder(key, on) {
+  let sp = store.getState().settings.selfPush;
+  if (on && !sp) {
+    const sub = await subscribePush().catch(() => null);
+    if (!sub) {
+      toast('Notifications are off for Kittycal. You can allow them in your phone’s settings.', { ms: 6000 });
+      return;
+    }
+    sp = { ...sub, plan: [], sent: '', sentAt: 0 };
+    store.updateSettings({ selfPush: sp });
+  }
+  const choices = await saveReminders({ [key]: on });
+  if (!anyOn(choices)) {
+    if (sp) await forgetPush(sp.endpoint);
+    store.updateSettings({ selfPush: null });
+    return;
+  }
+  const ok = await syncReminders({ force: true });
+  if (on) toast(ok ? 'Reminder on' : 'Saved. It switches on when you’re online.');
 }
 
 /* ── Passcode ───────────────────────────────────────────────────────────── */
@@ -987,13 +1022,18 @@ async function doErase() {
 }
 
 function privacyNote() {
-  const sharing = Boolean(store.getState().settings.partnerShare);
+  const { settings } = store.getState();
+  const sharing = Boolean(settings.partnerShare);
+  const reminders = Boolean(settings.selfPush);
+  /** @type {string[]} */
+  const leaves = [];
+  if (sharing) leaves.push('your partner summary, encrypted here first and holding only what you chose');
+  if (reminders) leaves.push('the times your reminders are due, so your phone can be woken; never what they say');
   return el('div', { class: 'note', style: { marginTop: 'var(--sp-3)' } }, [
     el('span', { class: 'note-icon', text: '♥', 'aria-hidden': 'true' }),
-    el('div', {}, sharing ? [
-      el('strong', { text: 'Only your partner summary leaves this phone. ' }),
-      'It is encrypted here first, and holds only what you chose to share. '
-      + 'No account, no analytics. Your logs stay on this phone.',
+    el('div', {}, leaves.length ? [
+      el('strong', { text: 'Your logs stay on this phone. ' }),
+      `The only things that leave it: ${leaves.join('; and ')}. No account, no analytics.`,
     ] : [
       el('strong', { text: 'Nothing here is sent anywhere. ' }),
       'No account, no analytics, and no internet requests at all. ' +
