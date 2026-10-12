@@ -25,6 +25,7 @@ import { toast } from './ui/toast.js';
 import { mascot } from './ui/mascot.js';
 import { loadLock, showLockScreen } from './ui/lock.js';
 import { startReminderSync, syncReminders } from './ui/reminders.js';
+import { shouldOfferInstall, mountInstallStep } from './views/install-step.js';
 import { requestPersistence, refreshStorageSnapshot } from './storage/persist.js';
 import { buildCycles } from './domain/cycles.js';
 import { parseShareHash } from './storage/share.js';
@@ -213,6 +214,12 @@ function startDoor() {
   const host = need('#onboarding-root');
   host.hidden = false;
   need('#app-root').hidden = true;
+  // On an iPhone in Safari, installing comes first: a Home Screen app keeps
+  // its own storage, so setting up here would be left behind.
+  if (shouldOfferInstall()) {
+    mountInstallStep(host, { onContinue: () => startDoor() });
+    return;
+  }
   mountDoor(host, {
     onSelf: () => startOnboarding(),
     onPartner: () => startPartnerSetup(),
@@ -406,7 +413,11 @@ function render() {
 
   syncTabs(ui.view);
   const title = $('#app-title-text');
-  if (title) title.textContent = mode === 'partner' ? partnerTitle(ui.view) : titleFor(ui.view);
+  const heading = mode === 'partner' ? partnerTitle(ui.view) : titleFor(ui.view);
+  if (title) title.textContent = heading;
+  // The tab and app-switcher name the screen, not only the app.
+  const page = heading === 'Kittycal' ? 'Today' : heading;
+  document.title = `${page} · Kittycal`;
   renderHeaderMascot();
 }
 

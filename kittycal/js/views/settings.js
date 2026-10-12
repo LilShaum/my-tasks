@@ -25,7 +25,7 @@ import { CYCLE_STATED_MIN, CYCLE_STATED_MAX } from '../domain/predict.js';
 import { themePicker, setPickerSelection } from '../ui/theme-picker.js';
 import { getTheme } from '../data/themes.js';
 import { applyTheme } from '../ui/theme.js';
-import { toast } from '../ui/toast.js';
+import { toast, toastUndo } from '../ui/toast.js';
 import { confirmSheet } from '../ui/dialog.js';
 import { openSheet } from '../ui/sheet.js';
 import { releaseMascotUrls, mascot } from '../ui/mascot.js';
@@ -793,28 +793,30 @@ async function doImport(file) {
     return;
   }
 
-  const confirmed = await confirmSheet({
-    title: 'Replace everything?',
-    body: [
-      `The backup holds ${plural(result.logCount ?? 0, 'logged day')} and ` +
-      `${plural(result.periodCount ?? 0, 'period day')}.`,
-      'Everything in Kittycal right now is replaced by it and gone for good. ' +
-      'Export first if you’re not sure.',
-    ],
-    confirmLabel: 'Replace with the backup',
-    danger: true,
-  });
-  if (!confirmed) return;
-
+  /*
+    Restored straight away, with Undo, rather than asked about first. What
+    she has now is kept in memory until the undo window passes, so a backup
+    picked by mistake costs one tap instead of everything.
+  */
+  const before = store.getState();
+  const kept = {
+    settings: JSON.parse(JSON.stringify(before.settings)),
+    logs: { ...before.logs },
+    periodDays: new Set(before.periodDays),
+  };
   await store.replaceAll({
     settings: result.settings,
     logs: result.logs,
     periodDays: result.periodDays,
   });
-
-  const settings = store.getState().settings;
-  applyTheme(settings.theme, settings.colorMode);
-  toast(`Imported ${result.logCount} logged days`);
+  const fresh = store.getState().settings;
+  applyTheme(fresh.theme, fresh.colorMode);
+  toastUndo(`Restored ${plural(result.logCount ?? 0, 'logged day')} from your backup`, () => {
+    void store.replaceAll(kept).then(() => {
+      applyTheme(kept.settings.theme, kept.settings.colorMode);
+      toast('Back to how it was');
+    });
+  });
 }
 
 /**

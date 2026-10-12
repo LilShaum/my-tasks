@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Not found · Kittycal</title>
+<meta name="theme-color" content="#fff6f2"/>
+<link rel="icon" href="/my-tasks/kittycal/assets/icons/icon.svg" type="image/svg+xml"/>
+<style>
+  :root { color-scheme: light dark; --bg: #fff6f2; --ink: #4a1c22; --sub: #8a5a60; --btn: #e8707a; --line: #a5545b; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #241619; --ink: #fbe9ea; --sub: #d1aeb1; --btn: #e8707a; --line: #e8a0a6; } }
+  html, body { margin: 0; min-height: 100dvh; background: var(--bg); color: var(--ink); overflow-x: clip; }
+  body { display: grid; place-items: center; padding: max(24px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+    font: 600 17px/1.5 system-ui, -apple-system, sans-serif; text-align: center; box-sizing: border-box; }
+  main { max-width: 22rem; }
+  img { width: 96px; height: 96px; border-radius: 22px; }
+  h1 { font-size: 26px; margin: 18px 0 6px; }
+  p { color: var(--sub); margin: 0 0 24px; font-weight: 500; }
+  a.btn { display: inline-block; min-height: 44px; padding: 12px 28px; box-sizing: border-box; border-radius: 999px; background: var(--btn);
+    color: #2a0d12; text-decoration: none; font-weight: 800; border: 2px solid var(--line); box-shadow: 3px 4px 0 var(--line); }
+  a.btn:active { transform: translate(2px, 3px); box-shadow: 1px 1px 0 var(--line); }
+</style>
+</head>
+<body>
+<main>
+  <img src="/my-tasks/kittycal/assets/icons/icon-180.png" alt=""/>
+  <h1>This page isn’t here</h1>
+  <p>The link may be old or mistyped. Kittycal itself is just a tap away.</p>
+  <a class="btn" href="/my-tasks/kittycal/">Open Kittycal</a>
+  <p style="margin-top:20px"><a href="/my-tasks/" style="color:var(--sub);display:inline-block;min-height:44px;line-height:44px">Or go to My Tasks</a></p>
+</main>
+<script>
+  /* A mistyped address inside Kittycal goes straight back into it, keeping
+     anything after the # (a partner's share link carries its code there). */
+  if (location.pathname.startsWith('/my-tasks/kittycal/')) location.replace('/my-tasks/kittycal/' + location.hash);
+</script>
+</body>
+</html>

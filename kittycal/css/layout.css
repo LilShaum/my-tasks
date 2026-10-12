@@ -149,6 +149,22 @@
 }
 .onb-art-sm { width: 72px; margin-bottom: 0; }
 
+/* The iPhone install screen (install-step.js): numbered, with Safari's own glyphs. */
+.install-steps { display: grid; gap: var(--sp-3); margin: 0; padding: 0; list-style: none; text-align: left; }
+.install-steps li { display: grid; grid-template-columns: 28px 1fr; gap: var(--sp-3); align-items: start; line-height: 1.45; }
+.install-num {
+  display: grid; place-items: center;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  border: var(--bw-data) solid var(--primary-line);
+  font-weight: 800; font-size: var(--fs-sm);
+}
+.install-glyph { display: inline-grid; place-items: center; vertical-align: -4px; width: 22px; height: 22px;
+  border-radius: 6px; background: var(--surface-2); color: var(--ink); }
+.install-glyph svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2;
+  stroke-linecap: round; stroke-linejoin: round; }
+
 .onb-foot {
   flex: none;
   display: flex;

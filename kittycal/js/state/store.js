@@ -499,11 +499,16 @@ export function shiftMonth(delta) {
  * @param {{settings?: Settings, logs?: Record<DateKey, DayLog>, periodDays?: Set<DateKey>}} data
  */
 export function replaceAll(data) {
+  // Days here now and not in the replacement are written back empty: marking
+  // only the new days dirty left the old ones in storage, so a day the backup
+  // did not have came back on the next launch.
+  const before = Object.keys(state.logs);
   if (data.settings) state.settings = normalizeSettings(data.settings);
   if (data.logs) state.logs = data.logs;
   if (data.periodDays) state.periodDays = data.periodDays;
   dirty.settings = true;
   dirty.periods = true;
+  for (const date of before) dirty.logs.add(date);
   for (const date of Object.keys(state.logs)) dirty.logs.add(date);
   notify();
   return flushNow();

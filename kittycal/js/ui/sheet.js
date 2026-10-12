@@ -112,6 +112,7 @@ export function openSheet({ title, body, footer, onClose }) {
 
   document.body.append(backdrop, root);
   holdBackground(true);
+  dragToClose(root, backdrop);
 
   // Stop the page behind from scrolling while the sheet is up.
   const previousOverflow = document.body.style.overflow;
@@ -167,6 +168,58 @@ export function openSheet({ title, body, footer, onClose }) {
   haptic(8);
 
   return { close: closeSheet, body: bodyHost };
+}
+
+/**
+ * Swipe down to close, from the grip or the title bar.
+ *
+ * The handle at the top of every sheet is the universal sign for this, and a
+ * handle that does nothing is a web page wearing an app's clothes. Pointer
+ * events, so a finger and a mouse behave the same. Only the top of the sheet
+ * drags: the body keeps its own scrolling, and its buttons their taps.
+ * Released far enough down, or flicked, it closes; otherwise it springs back.
+ *
+ * @param {HTMLElement} root
+ * @param {HTMLElement} backdrop
+ */
+function dragToClose(root, backdrop) {
+  /** @type {{id: number, y: number, t: number, dy: number}|null} */
+  let drag = null;
+
+  /** @param {PointerEvent} e */
+  const start = (e) => {
+    const target = /** @type {HTMLElement} */ (e.target);
+    if (e.button > 0 || target.closest('button, a, input, select, textarea')) return;
+    drag = { id: e.pointerId, y: e.clientY, t: e.timeStamp, dy: 0 };
+    root.setPointerCapture?.(e.pointerId);
+    root.style.transition = 'none';
+  };
+  /** @param {PointerEvent} e */
+  const move = (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    drag.dy = Math.max(0, e.clientY - drag.y);
+    root.style.transform = `translateY(${drag.dy}px)`;
+    backdrop.style.opacity = String(1 - Math.min(drag.dy / 500, 0.6));
+  };
+  /** @param {PointerEvent} e */
+  const end = (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const { dy, t } = drag;
+    const speed = dy / Math.max(1, e.timeStamp - t);
+    drag = null;
+    root.style.transition = '';
+    root.style.transform = '';
+    backdrop.style.opacity = '';
+    // From where it was let go, the CSS transition carries it home or away.
+    if (dy > 120 || (dy > 40 && speed > 0.5)) closeSheet();
+  };
+
+  for (const handle of root.querySelectorAll('.sheet-grip, .sheet-head')) {
+    handle.addEventListener('pointerdown', /** @type {EventListener} */ (start));
+  }
+  root.addEventListener('pointermove', move);
+  root.addEventListener('pointerup', end);
+  root.addEventListener('pointercancel', end);
 }
 
 export function closeSheet() {

@@ -134,11 +134,26 @@ await p2.locator('[data-tab="settings"]').click();
 await p2.waitForTimeout(900);
 const inputs = await p2.locator('input[type=file]').count();
 check(inputs > 0, 'there is a file input to import through', `${inputs} found`);
+const countLogs = () => p2.evaluate(async () => {
+  const db = await new Promise((r2)=>{const r=indexedDB.open('kittycal',1);r.onsuccess=()=>r2(r.result);});
+  return new Promise((res)=>{const tx=db.transaction(['logs'],'readonly');
+    const g=tx.objectStore('logs').count();g.onsuccess=()=>res(g.result);});
+});
+const setupLogs = await countLogs();
+
+// Restoring happens at once, with Undo, instead of an "are you sure?".
 await p2.locator('input[type=file]').first().setInputFiles(saved);
-await p2.waitForTimeout(900);
-const sheetText = await p2.locator('.sheet').innerText().catch(()=>'(none)');
-check(/Replace everything/.test(sheetText), 'it asks before replacing', sheetText.slice(0,80));
-await p2.locator('.sheet .btn-lg').click();
+await p2.waitForTimeout(1200);
+const toastText = await p2.locator('.toast').last().innerText().catch(()=>'(none)');
+check(/Restored/.test(toastText) && /Undo/.test(toastText), 'it restores straight away and offers Undo', toastText.slice(0,80));
+await p2.locator('.toast button', { hasText: 'Undo' }).click();
+await p2.waitForTimeout(1500);
+check(await countLogs() === setupLogs, 'Undo puts back exactly what was there', `${setupLogs} -> ${await countLogs()}`);
+
+// And for real this time.
+await p2.locator('[data-tab="settings"]').click();
+await p2.waitForTimeout(600);
+await p2.locator('input[type=file]').first().setInputFiles(saved);
 await p2.waitForTimeout(1600);
 
 const after = await p2.evaluate(async () => {

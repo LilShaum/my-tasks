@@ -379,7 +379,7 @@
   cursor: pointer;
 }
 
-.cycle-row:hover { border-color: var(--line); }
+@media (hover: hover) { .cycle-row:hover { border-color: var(--line); } }
 
 .cycle-row-date { font-weight: 600; }
 

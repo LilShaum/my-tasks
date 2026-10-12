@@ -82,6 +82,7 @@
 }
 
 .water-glass {
+  position: relative;
   width: 40px;
   height: 44px;
   display: grid;
@@ -95,6 +96,8 @@
 }
 
 .water-glass:active { transform: scale(0.85); }
+/* 44px to a finger: the glasses sit 4px apart, so each reaches halfway. */
+.water-glass::before { content: ''; position: absolute; inset: 0 -2px; }
 
 .water-glass svg {
   fill: none;

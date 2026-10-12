@@ -149,8 +149,9 @@
   border: 2px solid transparent;
   color: var(--ink);
   font-weight: 600;
-  /* 44px targets in a 7-column phone grid isn't possible; 40 with 3px gaps is
-     the practical floor and keeps the whole month on one screen. */
+  /* About 48px on a 390px iPhone. On the smallest phones 44px in seven
+     columns isn't possible; 40 is the floor, and ::before reaches across the
+     3px gap so a tap between two days still lands on one. */
   min-height: 40px;
   transition:
     transform var(--dur-tap) var(--ease-bounce),
@@ -161,6 +162,8 @@
 .cal-cell:active { transform: scale(0.88); }
 
 .cal-cell-empty { pointer-events: none; }
+/* Reaches halfway across the gap to the next day: no dead space between. */
+.cal-cell::before { content: ''; position: absolute; inset: -1.5px; border-radius: inherit; }
 
 .cal-num { font-size: var(--fs-sm); line-height: 1; }
 
@@ -301,7 +304,7 @@
 }
 
 .mini-month:active { transform: scale(0.95); }
-.mini-month:hover { border-color: var(--line); }
+@media (hover: hover) { .mini-month:hover { border-color: var(--line); } }
 
 .mini-month-name {
   font-size: 10px;

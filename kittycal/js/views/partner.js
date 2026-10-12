@@ -16,9 +16,9 @@
 
 import { el, replace, haptic } from '../utils/dom.js';
 import { todayKey, fmtRelative, fmtLong } from '../utils/date.js';
-import { openSheet } from '../ui/sheet.js';
+import { openSheet, closeSheet } from '../ui/sheet.js';
 import { confirmSheet } from '../ui/dialog.js';
-import { toast } from '../ui/toast.js';
+import { toast, toastUndo } from '../ui/toast.js';
 import { momentIcon } from '../ui/mascot.js';
 import { SHARE_ITEMS, defaultChoices, STATUS_HOURS } from '../domain/partner.js';
 import { STATUSES } from '../data/partner-tips.js';
@@ -236,13 +236,12 @@ export function openShareSheet() {
           type: 'button', class: 'btn btn-ghost btn-block',
           onclick: async () => {
             haptic();
-            const yes = await confirmSheet({
-              title: 'Stop sharing?',
-              body: ['Their view goes blank straight away. You can share again later with a new code.'],
-              confirmLabel: 'Stop sharing',
-              danger: true,
-            });
-            if (!yes) { openShareSheet(); return; }
+            /*
+              Stopped straight away, which is what someone stopping a share
+              usually needs, with Undo rather than an "are you sure?". Undo
+              puts the same share back under the same code, so their app
+              picks it up again without a new code.
+            */
             try {
               await deleteShare(s);
             } catch {
@@ -250,7 +249,11 @@ export function openShareSheet() {
               return;
             }
             store.updateSettings({ partnerShare: null });
-            toast('Sharing stopped');
+            closeSheet();
+            toastUndo('Sharing stopped. Their view is blank now.', () => {
+              store.updateSettings({ partnerShare: { ...s, sentHash: '', sentAt: 0 } });
+              void syncNow({ force: true }).then((ok) => toast(ok ? 'Sharing again, same code' : 'Couldn’t reach the server to share again'));
+            });
           },
         }, ['Stop sharing']),
       ] : [

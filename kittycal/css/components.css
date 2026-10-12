@@ -114,7 +114,7 @@
 }
 
 .btn-icon:active { transform: scale(0.9); }
-.btn-icon:hover { background: var(--surface-2); }
+@media (hover: hover) { .btn-icon:hover { background: var(--surface-2); } }
 
 /* ── Chips — the logging taxonomy's primary control ───────────────────── */
 /*
@@ -531,12 +531,20 @@
 .sheet[data-open='true'] { transform: none; }
 
 .sheet-grip {
+  position: relative;
   width: 42px; height: 5px;
   border-radius: var(--r-pill);
   background: var(--line-soft);
   margin: var(--sp-3) auto var(--sp-2);
   flex: none;
 }
+/* Swiped down to close (sheet.js dragToClose): a finger-sized place to grab. */
+.sheet-grip::before {
+  content: '';
+  position: absolute;
+  inset: -14px -60px -10px;
+}
+.sheet-grip, .sheet-head { touch-action: none; }
 
 .sheet-head {
   display: flex;
@@ -786,6 +794,7 @@
   box, because a quiet control is still a control.
 */
 .btn-link {
+  position: relative;
   display: inline-flex;
   align-items: center;
   min-height: var(--tap);
@@ -799,3 +808,17 @@
   text-underline-offset: 3px;
   cursor: pointer;
 }
+
+/* A short link ("Refresh") is still 44px wide to a finger. */
+.btn-link::before { content: ''; position: absolute; inset: 0 -4px; }
+
+/* ── Pressed states ───────────────────────────────────────────────────────
+   Every tap answers at once, the way an app's controls do. These are the
+   tappable things that had no :active style of their own; most others shrink
+   with a bounce (.btn, .chip, .tab, .cal-cell). Switches and native selects
+   need none: a switch flips on the tap and a select opens the phone's own
+   picker. test/native.mjs lists anything tappable left without one. */
+.week-day, .cycle-row, .pa-day { transition: transform var(--dur-tap) var(--ease-bounce); }
+.week-day:active, .pa-day:active:not(:disabled) { transform: scale(0.92); }
+.cycle-row:active { transform: scale(0.98); }
+.btn-link:active, summary:active { opacity: 0.6; }

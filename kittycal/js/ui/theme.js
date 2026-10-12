@@ -56,9 +56,38 @@ export function resolveMode(colorMode) {
 export function updateMetaThemeColor() {
   const meta = document.querySelector('meta[name="theme-color"]');
   if (!meta) return;
-  const surface = getComputedStyle(document.documentElement)
-    .getPropertyValue('--surface').trim();
-  if (surface) meta.setAttribute('content', surface);
+  const hex = resolvedHex('var(--surface)');
+  if (hex) meta.setAttribute('content', hex);
+}
+
+/**
+ * A CSS colour as #rrggbb, worked out by the browser.
+ *
+ * The token itself is an expression ("oklch(97.5% calc(0.115 * 0.18) 355)"),
+ * and handing that string to the meta tag left the iPhone's status bar to
+ * parse a calc() it does not promise to understand. A probe element resolves
+ * the token, and a one-pixel canvas turns whatever colour space comes back
+ * into plain sRGB hex, which every browser chrome reads.
+ *
+ * @param {string} css
+ */
+function resolvedHex(css) {
+  try {
+    const probe = document.createElement('span');
+    probe.style.cssText = `position:absolute;visibility:hidden;color:${css}`;
+    document.body.append(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    const ctx = document.createElement('canvas').getContext('2d');
+    if (!ctx) return null;
+    ctx.fillStyle = '#000';
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, 1, 1);
+    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+    return `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+  } catch {
+    return null;
+  }
 }
 
 /** What the pre-paint inline script stored, if anything. */

@@ -425,15 +425,34 @@ await other.ctx.close();
 console.log('\nshe stops sharing');
 await her.page.evaluate(async () => (await import('/js/views/partner.js')).openShareSheet());
 await her.page.waitForTimeout(400);
+const shareId = [...server.rows.keys()][0];
 await her.page.locator('button', { hasText: 'Stop sharing' }).click();
+await her.page.waitForTimeout(1200);
+check(server.rows.size === 0, 'one tap stops it: the share is deleted, no "are you sure?"');
+check(/Undo/.test(await her.page.locator('.toast').last().innerText().catch(() => '')), 'with Undo');
+await her.page.locator('.toast button', { hasText: 'Undo' }).click();
+await her.page.waitForTimeout(2000);
+check(server.rows.has(shareId), 'Undo puts the same share back, under the same code');
+// And stopped for real.
+await her.page.evaluate(async () => (await import('/js/views/partner.js')).openShareSheet());
 await her.page.waitForTimeout(400);
-await her.page.locator('.sheet[data-open="true"] button', { hasText: 'Stop sharing' }).last().click();
+await her.page.locator('button', { hasText: 'Stop sharing' }).click();
 await her.page.waitForTimeout(1200);
 check(server.rows.size === 0, 'the share is deleted');
 await his.page.locator('.pa-foot button', { hasText: 'Refresh' }).click();
 await his.page.waitForTimeout(1500);
 check(/Mia has stopped sharing/.test(await his.page.locator('#view-today').innerText()), 'his app says she stopped sharing');
 await snap(his.page, 'his-stopped');
+
+console.log('\nhis disconnect, undone');
+await tab(his.page, 'settings');
+await his.page.locator('button', { hasText: 'Disconnect' }).click();
+await his.page.waitForTimeout(500);
+check(/Disconnecting/.test(await his.page.locator('.toast').last().innerText().catch(() => '')), 'disconnecting says so, with Undo, and asks nothing');
+await his.page.locator('.toast button', { hasText: 'Undo' }).click();
+await his.page.waitForTimeout(6500);
+check(await his.page.evaluate(async () => (await import('/js/state/store.js')).getState().settings.partnerOf != null),
+  'Undo keeps this phone connected, after the window has passed');
 
 check(errors.length === 0, 'no page errors on any phone', errors.join(' | '));
 await her.ctx.close();

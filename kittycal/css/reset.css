@@ -28,7 +28,9 @@
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  /* No grey flash on every tap: the app draws its own pressed states. */
+  /* No grey flash on every tap: the app draws its own pressed states. Hover
+   styles elsewhere sit inside @media (hover: hover), so a tap never leaves
+   one stuck on. */
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -36,13 +38,15 @@ html {
   The page never moves sideways. `clip` rather than `hidden` on both: on iOS a
   body with overflow-x: hidden can still be dragged left and right once the
   page has been zoomed, which read as the whole app drifting under her thumb.
-  And no sideways rubber-band. Vertical bounce stays: native lists bounce too.
 */
 html, body {
   overflow-x: hidden;
   overflow-x: clip;
-  overscroll-behavior-x: none;
 }
+/* And no rubber-band at all on the page itself: it pulled the whole app,
+   header and tab bar included, away from the screen edges like a web page.
+   Sheets and lists inside keep their own scrolling. */
+html { overscroll-behavior: none; }
 
 body {
   font-family: var(--font-body);

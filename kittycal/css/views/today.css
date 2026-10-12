@@ -173,12 +173,15 @@
 .phase-line .hint { max-width: 34ch; margin: 0 auto; }
 
 .phase-more > summary {
+  position: relative;
   list-style: none;
   cursor: pointer;
   max-width: 36ch;
   margin: 0 auto;
 }
 .phase-more > summary::-webkit-details-marker { display: none; }
+/* One line of text is 20px: 44 to aim at, without moving it. */
+.phase-more > summary::before { content: ''; position: absolute; inset: -12px 0; }
 .phase-more-cue { font-weight: 700; color: var(--primary-deep); white-space: nowrap; }
 .phase-more[open] .phase-more-cue { display: none; }
 .phase-more-body {
@@ -355,7 +358,7 @@
   border-radius: var(--r-md);
 }
 
-.btn-back:hover { color: var(--ink); }
+@media (hover: hover) { .btn-back:hover { color: var(--ink); } }
 
 /*
   Focused programmatically on each step so the question is read out; it is not
@@ -478,6 +481,7 @@
 }
 
 .week-day {
+  position: relative;
   display: grid;
   justify-items: center;
   gap: 2px;
@@ -490,6 +494,9 @@
   font: inherit;
   cursor: pointer;
 }
+
+/* Reaches halfway across the 4px gap: no dead space between days. */
+.week-day::before { content: ''; position: absolute; inset: 0 -2px; }
 
 .week-day-dow {
   font-size: var(--fs-xs);

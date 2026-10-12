@@ -35,7 +35,7 @@ import {
 import { plural } from '../utils/fmt.js';
 import { openSheet } from '../ui/sheet.js';
 import { confirmSheet } from '../ui/dialog.js';
-import { toast } from '../ui/toast.js';
+import { toast, toastUndo } from '../ui/toast.js';
 import { emblem, momentIcon } from '../ui/mascot.js';
 import { cycleRing } from '../ui/ring.js';
 import { themePicker, setPickerSelection } from '../ui/theme-picker.js';
@@ -1041,15 +1041,31 @@ export function renderPartnerSettings(host) {
   ]);
 }
 
-async function askDisconnect() {
-  const name = store.getState().settings.partnerOf?.snapshot?.name ?? 'her';
-  const yes = await confirmSheet({
-    title: `Disconnect from ${name === 'her' ? 'her' : `${name}’s`} cycle?`,
-    body: ['This phone forgets the code. You can connect again with the code or link she sends.'],
-    confirmLabel: 'Disconnect',
-    danger: true,
+/**
+ * Disconnect, with Undo instead of an "are you sure?".
+ *
+ * Nothing is lost by disconnecting except the code, so it waits out the undo
+ * window before forgetting anything: his app keeps showing her cycle for those
+ * seconds, and Undo simply cancels. Leaving the app inside the window
+ * finishes it then, so it is never left half-done.
+ */
+function askDisconnect() {
+  const name = store.getState().settings.partnerOf?.snapshot?.name ?? null;
+  let settled = false;
+  const finish = () => {
+    if (settled) return;
+    settled = true;
+    document.removeEventListener('visibilitychange', onHide);
+    disconnect();
+  };
+  const onHide = () => { if (document.hidden) finish(); };
+  document.addEventListener('visibilitychange', onHide);
+  toastUndo(`Disconnecting from ${name ? `${name}’s` : 'her'} cycle`, () => {
+    settled = true;
+    document.removeEventListener('visibilitychange', onHide);
+    toast('Still connected');
   });
-  if (yes) disconnect();
+  setTimeout(finish, 5600);
 }
 
 function disconnect() {
@@ -1057,7 +1073,7 @@ function disconnect() {
   if (pp) void forgetPush(pp.endpoint);
   store.updateSettings({ partnerOf: null, partnerPush: null });
   announce('Disconnected');
-  location.reload();
+  void store.flushNow().then(() => { if (!document.hidden) location.reload(); });
 }
 
 async function switchToOwnCycle() {

@@ -80,6 +80,7 @@ const PRECACHE = [
   'js/views/partner.js',
   'js/views/partner-app.js',
   'js/views/partner-setup.js',
+  'js/views/install-step.js',
   'js/data/partner-tips.js',
   'js/domain/recap.js',
   'js/domain/response.js',
