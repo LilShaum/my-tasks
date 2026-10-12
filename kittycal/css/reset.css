@@ -28,6 +28,20 @@
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  /* No grey flash on every tap: the app draws its own pressed states. */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/*
+  The page never moves sideways. `clip` rather than `hidden` on both: on iOS a
+  body with overflow-x: hidden can still be dragged left and right once the
+  page has been zoomed, which read as the whole app drifting under her thumb.
+  And no sideways rubber-band. Vertical bounce stays: native lists bounce too.
+*/
+html, body {
+  overflow-x: hidden;
+  overflow-x: clip;
+  overscroll-behavior-x: none;
 }
 
 body {
@@ -40,7 +54,6 @@ body {
   min-height: 100dvh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
   /* Stop iOS double-tap zoom without disabling pinch-zoom, which would be
      an accessibility regression. */
   touch-action: manipulation;
@@ -59,6 +72,29 @@ button, input, select, textarea {
   background: none;
   border: none;
 }
+
+/*
+  Never under 16px in a field. iOS zooms the whole page in when a field with
+  smaller text is focused, and leaves it zoomed after: the app's base size is
+  15px, so tapping her name, a note or a number zoomed every screen and let it
+  drift sideways. A larger size set by a class still wins. test/native.mjs
+  fails if any field on any screen comes in under 16px.
+*/
+input, select, textarea { font-size: max(16px, 1em); }
+
+/*
+  Controls behave like controls, not like text on a web page: no copy menu,
+  look-up bubble or magnifier on a press-and-hold, no dragging an image out.
+  What she types stays selectable.
+*/
+button, [role="button"], [role="switch"], [role="tab"], [role="radio"], label, summary, svg, img {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+img { -webkit-user-drag: none; }
+/* Safari can refuse typing in a field inside an unselectable label. */
+input, textarea { -webkit-user-select: text; user-select: text; }
 
 button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 
